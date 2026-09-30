@@ -4014,7 +4014,7 @@ export function AtendimentoClient() {
               aria-label="Atualizar lista"
               className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-[var(--app-border)] bg-[var(--app-solid-surface)] text-[var(--app-text-75)] hover:bg-[var(--app-hover)] disabled:cursor-not-allowed disabled:opacity-60 shadow-none"
             >
-              <RefreshCw className={`h-5 w-5 ${refreshing ? "animate-spin" : ""}`} />
+              <RefreshCw className={`h-5 w-5 ${refreshing ? "animate-spin" : ""}`} strokeWidth={2.25} />
             </button>
             {/* DATA DE CADASTRO no header (acesso direto, nao precisa abrir filtros) - botão pequeno redondo IGUAL OS OUTROS ali (Refresh, SlidersHorizontal etc) */}
             <div className="">
@@ -4115,7 +4115,7 @@ export function AtendimentoClient() {
               aria-label="Adicionar registro"
               className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-[var(--app-border)] bg-[var(--app-solid-surface)] text-[var(--app-text-85)] hover:bg-[var(--app-hover)] disabled:cursor-not-allowed disabled:opacity-60 shadow-none"
             >
-              <Plus className="h-5 w-5" />
+              <Plus className="h-5 w-5" strokeWidth={2.25} />
             </button>
             <button
               type="button"
@@ -4124,7 +4124,7 @@ export function AtendimentoClient() {
               title="Legenda das cores dos avatares"
               className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] text-[var(--app-text-75)] hover:bg-[var(--app-hover)] shadow-none"
             >
-              <Palette className="h-5 w-5" />
+              <Palette className="h-5 w-5" strokeWidth={2.25} />
             </button>
             <div className="relative shrink-0">
               <button
@@ -4140,7 +4140,7 @@ export function AtendimentoClient() {
                     : "border-emerald-500/35 bg-emerald-500/15 text-emerald-700 hover:bg-emerald-500/20",
                 ].join(" ")}
               >
-                <Bot className="h-5 w-5" />
+                <Bot className="h-5 w-5" strokeWidth={2.25} />
               </button>
             </div>
           </div>
