@@ -4096,10 +4096,6 @@ export function AtendimentoClient() {
                               //   → Card Status mostra EXATAMENTE:
                               //       "Dados básicos coletados" + "Nenhum passo pendente nessa etapa."
                               //   → Esse é o único caso onde o avatar fica AMARELO.
-                              //
-                              // Nota: a condição antiga (semProf && semLink) era INCORRETA pois
-                              // pegava quem ainda faltava preencher dados, ao invés de quem já
-                              // finalizou Dados Básicos e está em "etapa neutra".
                               const step = buildRecurringMetaForVisaoGeral(lead);
                               const matriculaConcluida = isLeadMatriculaConcluida(lead);
                               const dadosBasicosOkNadaPendente =
@@ -4109,8 +4105,12 @@ export function AtendimentoClient() {
 
                               if (dadosBasicosOkNadaPendente) {
                                 return isSelected
-                                  ? "!bg-[#eab308] !text-black ring-2 ring-[#ca8a04] shadow-[0_1px_2px_rgba(234,179,8,0.35)]"
-                                  : "!bg-[#fde047] !text-black";
+                                  // SELECIONADO → tom AMARELO MAIS ESCURO (yellow-600), sem hover,
+                                  // sem transit, anel mais forte e sombra para marcar seleção.
+                                  ? "!bg-[#ca8a04] !text-black ring-2 ring-[#a16207] shadow-[0_2px_4px_rgba(202,138,4,0.4)] transition-none hover:!bg-[#ca8a04] hover:!ring-[#a16207]"
+                                  // NÃO SELECIONADO → amarelo base (yellow-400). REMOVIDO HOVER
+                                  // (não responde a hover em nenhum tom, como solicitado).
+                                  : "!bg-[#facc15] !text-black transition-none hover:!bg-[#facc15]";
                               }
 
                               // Qualquer OUTRO status (matricula concluida / warning de falta
