@@ -576,28 +576,91 @@ export async function PATCH(req: NextRequest) {
       }
     }
 
+    function extractCol(msg: unknown): string | null {
+      if (!msg) return null;
+      const s = String(msg).toLowerCase();
+      const m1 = /column "([^"]+)" does not exist/.exec(s);
+      if (m1 && m1[1]) return m1[1];
+      const m2 = /could not find the '([^']+)' column/.exec(s);
+      if (m2 && m2[1]) return m2[1];
+      const m3 = /column\s+'([^']+)'.*does not exist/i.exec(s);
+      if (m3 && m3[1]) return m3[1];
+      return null;
+    }
+    function isUndefinedColError(msg: string): boolean {
+      return /column|does not exist|PGRST204|PGRST205|42703/i.test(msg ?? "");
+    }
+
     try {
-      const { error } = await admin
-        .from("atendimento_leads")
-        .update(patch as any)
-        .eq("id", String(lead.id));
-      if (error) throw error;
+      let p: Record<string, unknown> | null = { ...patch };
+      let ok = false;
+      while (p !== null) {
+        try {
+          const { error } = await admin
+            .from("atendimento_leads")
+            .update(p as any)
+            .eq("id", String(lead.id));
+          if (error) throw error;
+          ok = true;
+          break;
+        } catch (e) {
+          const msg = e instanceof Error ? e.message : String(e ?? "Erro desconhecido.");
+          if (isUndefinedColError(msg)) {
+            const c = extractCol(msg);
+            if (c && p[c] !== undefined) {
+              const n: Record<string, unknown> = { ...p }; delete n[c];
+              p = Object.keys(n).length <= 1 ? null : n;
+              continue;
+            }
+            // Tentativa mais agressiva: remove UM por vez as colunas novas suspeitas
+            // enquanto nao passar (respeita a integridade de salvar o que for possivel).
+            const suspects = [
+              "recurring_registration_step",
+              "recurring_registration_password",
+              "signup_password_raw_temp",
+              "legal_responsible_name",
+              "legal_responsible_cpf",
+              "contract_status",
+              "contract_signed_at",
+              "contract_pdf_url",
+              "contract_html_snapshot",
+              "payment_status",
+              "payment_confirmed_at",
+              "payment_rejected_at",
+              "enrollment_number",
+              "recurring_class_status",
+              "recurring_class_weekday",
+              "recurring_class_weekday_label",
+              "recurring_class_professor_time",
+              "recurring_class_lead_time",
+              "recurring_class_professor_date",
+              "recurring_class_first_class_at",
+              "recurring_class_created_at",
+              "experimental_class_post_attendance_message_sent_at",
+              "student_email",
+            ];
+            let removedAny = false;
+            for (const s of suspects) {
+              if (p[s] !== undefined) {
+                const n: Record<string, unknown> = { ...p }; delete n[s];
+                p = Object.keys(n).length <= 1 ? null : n;
+                removedAny = true;
+                break;
+              }
+            }
+            if (!removedAny) { p = null; break; }
+            continue;
+          }
+          // Qualquer outro erro: retorna pro caller.
+          return NextResponse.json({ ok: false, error: msg }, { status: 500 });
+        }
+      }
+      if (!ok) {
+        return NextResponse.json({ ok: false, error: "Falha ao salvar progresso. Tente novamente." }, { status: 500 });
+      }
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e ?? "Erro desconhecido.");
-      if (/column|does not exist|PGRST204|PGRST205|42703/i.test(msg)) {
-        try {
-          const fallback: Record<string, unknown> = { updated_at: nowIso };
-          if (safeNome) {
-            fallback.full_name = safeNome;
-          }
-          await admin
-            .from("atendimento_leads")
-            .update(fallback as any)
-            .eq("id", String(lead.id));
-        } catch {}
-      } else {
-        return NextResponse.json({ ok: false, error: msg }, { status: 500 });
-      }
+      return NextResponse.json({ ok: false, error: msg }, { status: 500 });
     }
 
     try {
