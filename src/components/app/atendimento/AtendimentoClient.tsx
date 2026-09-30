@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { AlertCircle, AlertTriangle, BarChart3, Bot, Calendar as CalendarIcon, Check, CheckCircle2, ChevronDown, ChevronLeft, ChevronRight, Copy, Eraser, ExternalLink, FileText, GraduationCap, Info, Loader2, MapPin, Pencil, Plus, RefreshCw, Save, Search, Sparkles, Trash2, UserRound, X, Zap } from "lucide-react";
+import { AlertCircle, AlertTriangle, BarChart3, Bot, Calendar as CalendarIcon, Check, CheckCircle2, ChevronDown, ChevronLeft, ChevronRight, Copy, Eraser, ExternalLink, FileText, GraduationCap, Info, Loader2, MapPin, Palette, Pencil, Plus, RefreshCw, Save, Search, Sparkles, Trash2, UserRound, X, Zap } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { ATENDIMENTO_PROFESSOR_TIME_ZONE, STAGE_LABELS, STATUS_LABELS } from "@/lib/atendimento/constants";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
@@ -2870,7 +2870,7 @@ export function AtendimentoClient() {
           <div className="flex shrink-0 items-center justify-between gap-3 pb-1">
             <div className="flex items-center gap-3 min-w-0">
               <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-[rgba(37,99,235,0.12)]">
-                <Info className="h-5 w-5 text-[#1d4ed8]" />
+                <Palette className="h-5 w-5 text-[#1d4ed8]" />
               </div>
               <div className="min-w-0">
                 <h3 className="truncate text-[18px] font-bold leading-tight text-[var(--app-text-85)]">
@@ -4124,7 +4124,7 @@ export function AtendimentoClient() {
               title="Legenda das cores dos avatares"
               className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] text-[var(--app-text-75)] hover:bg-[var(--app-hover)] shadow-none"
             >
-              <Info className="h-5 w-5" />
+              <Palette className="h-5 w-5" />
             </button>
             <div className="relative shrink-0">
               <button
