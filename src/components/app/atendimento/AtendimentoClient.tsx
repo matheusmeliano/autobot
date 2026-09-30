@@ -88,7 +88,7 @@ type LeadDetailsTab = "visao_geral" | "agendamentos" | "historico" | "observacoe
 const LEAD_DETAILS_TABS: ReadonlyArray<{ id: LeadDetailsTab; label: string; icon: JSX.Element }> = [
   { id: "visao_geral", label: "Visão geral", icon: <UserRound className="h-4 w-4" /> },
   { id: "agendamentos", label: "Agendamentos", icon: <CalendarIcon className="h-4 w-4" /> },
-  { id: "historico", label: "Histórico", icon: <RefreshCw className="h-4 w-4" /> },
+  { id: "historico", label: "Contrato", icon: <RefreshCw className="h-4 w-4" /> },
   { id: "observacoes", label: "Observações", icon: <Pencil className="h-4 w-4" /> },
 ];
 
@@ -5242,7 +5242,7 @@ export function AtendimentoClient() {
                   {activeTab === "historico" ? (
                     <div className="mt-4 rounded-xl border border-[var(--app-border)] bg-[var(--app-solid-surface-2)] px-4 py-3 text-center">
                       <div className="text-[13px] font-semibold text-[var(--app-text-60)]">
-                        Esse registro não possuí históricos em aberto.
+                        Esse registro não possuí nenhum contrato acordado em aberto.
                       </div>
                     </div>
                   ) : null}
@@ -6293,7 +6293,7 @@ export function AtendimentoClient() {
                 {activeTab === "historico" ? (
                   <div className="w-full rounded-2xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] p-5 text-center shadow-none">
                     <div className="text-[13px] text-[var(--app-text-60)]">
-                      Histórico de eventos e interações do registro — em integração.
+                      Contratos e acordos do registro — em integração.
                     </div>
                   </div>
                 ) : null}
