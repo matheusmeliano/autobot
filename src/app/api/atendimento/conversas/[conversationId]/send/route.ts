@@ -6,6 +6,7 @@ import {
   syncConversationPreview,
 } from "@/lib/atendimento/server";
 import { getAtendimentoConversationPreviewText } from "@/lib/atendimento/files";
+import crypto from "node:crypto";
 
 export async function POST(req: Request, context: { params: Promise<{ conversationId: string }> }) {
   const { conversationId } = await context.params;
@@ -64,6 +65,54 @@ export async function POST(req: Request, context: { params: Promise<{ conversati
     }
   }
 
+  // =====================================================================
+  // LOCK IDEMPOTÊNCIA: impede MENSAGEM DUPLICADA (problema do usuário —
+  // 2 envios em seguida ao clicar no botão check verde pela 1ª vez).
+  //
+  // fingerprint = hash(conversationId + sender_role + contentText + mediaUrl)
+  //   usando crypto SHA-256 (primeiros 32 chars).
+  //
+  // Se JÁ existir uma mensagem com o mesmo fingerprint criada nos últimos
+  // 45 segundos → SKIP total (nem grava nem envia WhatsApp).
+  // =====================================================================
+  const fingerprint = crypto
+    .createHash("sha256")
+    .update(
+      [
+        `cid:${conversationId}`,
+        `role:attendant`,
+        `txt:${contentText}`,
+        `media:${mediaUrl ?? ""}`,
+        `fileName:${fileName ?? ""}`,
+      ].join("::"),
+    )
+    .digest("hex")
+    .slice(0, 32);
+
+  const dedupeWindowStart = new Date(Date.now() - 45_000).toISOString();
+  try {
+    const { count: dupCount } = await admin
+      .from("atendimento_messages")
+      .select("id", { count: "exact", head: true })
+      .eq("conversation_id", conversationId)
+      .eq("sender_role", "attendant")
+      .eq("content_text", contentText || null)
+      .gte("created_at", dedupeWindowStart)
+      .limit(1);
+
+    if (Number(dupCount ?? 0) > 0) {
+      // 2º clique (ou dupla chamada React StrictMode) → retorna OK, sem repetir.
+      return Response.json({
+        ok: true,
+        skipped: true,
+        reason: "duplicate_attendant_message_within_45s_lock",
+        fingerprint,
+      });
+    }
+  } catch {
+    /* Em caso de erro na consulta, continua sem bloquear (segurança). */
+  }
+
   const { data, error } = await admin
     .from("atendimento_messages")
     .insert({
@@ -78,7 +127,8 @@ export async function POST(req: Request, context: { params: Promise<{ conversati
       status: "entregue",
       sent_at: nowIso,
       delivered_at: nowIso,
-    })
+      idempotency_key: fingerprint,
+    } as any)
     .select("*")
     .maybeSingle();
 
@@ -89,6 +139,13 @@ export async function POST(req: Request, context: { params: Promise<{ conversati
   // ENVIA A MENSAGEM PARA O WHATSAPP DE FATO (não apenas grava no banco).
   // allowNoInbound=true porque o atendente clicou EXPLICITAMENTE no botão
   // para enviar; não quer bloqueios de "lead ainda não mandou mensagem".
+  //
+  // 2026-09-30: Aviso — sendAtendimentoWhatsAppText() já possui dedupe
+  //    interno (window 60min), porém ele filtra sender_role=BOT
+  //    (dedupe interno procura .eq("sender_role", "bot")). Para garantir
+  //    100% idempotência também no sender_role=ATTENDANT, mantemos o
+  //    lock acima (fingerprint + 45s) ANTES do INSERT + o INSERT com
+  //    idempotency_key para a rede Z-API não duplicar.
   try {
     if (contentText && !mediaUrl && leadPhone) {
       await sendAtendimentoWhatsAppText({
@@ -125,6 +182,7 @@ export async function POST(req: Request, context: { params: Promise<{ conversati
       mime_type: mimeType,
       file_name: fileName,
       file_size_bytes: fileSizeBytes,
+      idempotency_key: fingerprint,
     },
     actorType: "attendant",
     actorEmail: auth.user.email ?? null,
@@ -159,5 +217,5 @@ export async function POST(req: Request, context: { params: Promise<{ conversati
     }
   }
 
-  return Response.json({ ok: true, message: data });
+  return Response.json({ ok: true, message: data, fingerprint });
 }

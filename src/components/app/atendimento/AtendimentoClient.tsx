@@ -564,6 +564,7 @@ export function AtendimentoClient() {
   const [activeTab, setActiveTab] = useState<LeadDetailsTab>("visao_geral");
   const tabsScrollDesktopRef = useRef<HTMLDivElement | null>(null);
   const tabsScrollMobileRef = useRef<HTMLDivElement | null>(null);
+  const postAttendanceSendLocksRef = useRef<Map<string, number>>(new Map());
   const [desktopTabsCanLeft, setDesktopTabsCanLeft] = useState(false);
   const [desktopTabsCanRight, setDesktopTabsCanRight] = useState(false);
   const [mobileTabsCanLeft, setMobileTabsCanLeft] = useState(false);
@@ -1237,6 +1238,13 @@ export function AtendimentoClient() {
       modalToast.warning("Registro não possui telefone cadastrado para receber a mensagem.");
       return;
     }
+    const lockKey = `post-att::${lead.id}::${phoneRaw}`;
+    const lockNow = Date.now();
+    const lockLast = postAttendanceSendLocksRef.current.get(lockKey) ?? 0;
+    if (lockLast > 0 && lockNow - lockLast < 45_000) {
+      return;
+    }
+    postAttendanceSendLocksRef.current.set(lockKey, lockNow);
     if (expSendingPostAttendanceId) return;
     const nowIso = new Date().toISOString();
     setExpSendingPostAttendanceId(lead.id);

@@ -975,7 +975,7 @@ export async function sendAtendimentoWhatsAppText(params: {
           .from("atendimento_messages")
           .select("id", { count: "exact", head: true })
           .eq("conversation_id", resolvedConversationIdForDedupe)
-          .eq("sender_role", "bot")
+          .in("sender_role", ["bot", "attendant"])
           .eq("content_text", messageText)
           .gte("sent_at", dedupeWindowStartUtc)
           .lte("sent_at", dedupeGraceEndUtc)
