@@ -148,26 +148,16 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ le
     const bookingId = String((leadExists as any)?.experimental_class_booking_id ?? "").trim();
     const updatedAt = new Date().toISOString();
 
-    if (scope === "experimental" || scope === "both") {
-      const { data: lastCancelEvents } = await admin
-        .from("atendimento_history_events")
-        .select("id, event_type, created_at")
-        .eq("lead_id", safeLeadId)
-        .eq("event_type", "experimental_class_cancelled")
-        .order("created_at", { ascending: false })
-        .limit(1);
-      const lastCancelEvent =
-        Array.isArray(lastCancelEvents) && lastCancelEvents.length > 0 ? lastCancelEvents[0] : null;
-      if (lastCancelEvent) {
-        return NextResponse.json(
-          {
-            ok: false,
-            error: "Professor não pode ser alterado após a aula experimental ser cancelada.",
-          },
-          { status: 409 },
-        );
-      }
-    }
+    // ============================================================
+    // REGRA ALTERADA (user: 'podera sim!' 2026-09-29):
+    //   Professor PODE ser alterado mesmo após aula cancelada.
+    //   Bloqueios que PERMANECEM:
+    //     · hasAttendance (attendance attended / no_show)
+    //     · notifications ja disparadas (studentSent || attendantSent)
+    //   REMOVIDOS:
+    //     · Bloqueio por evento experimental_class_cancelled (history events)
+    //     · Bloqueio bookingIsCancelled === true
+    // ============================================================
 
     if (bookingId && (scope === "experimental" || scope === "both")) {
       const { data: existingBooking } = await admin
@@ -185,19 +175,17 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ le
         Boolean(String((existingBooking as any)?.attendant_start_notification_sent_at ?? "").trim());
       const attendanceStatus = String((existingBooking as any)?.attendance_status ?? "").trim();
       const hasAttendance = attendanceStatus === "attended" || attendanceStatus === "no_show";
-      const bookingIsCancelled = String((existingBooking as any)?.status ?? "").trim().toLowerCase() === "cancelled";
-      if (studentSent || attendantSent || hasAttendance || bookingIsCancelled) {
+      if (studentSent || attendantSent || hasAttendance) {
         const reason = hasAttendance
           ? "após comparecimento marcado."
-          : bookingIsCancelled
-            ? "após a aula experimental ser cancelada."
-            : "após o disparo ser realizado.";
+          : "após o disparo ser realizado.";
         return NextResponse.json(
           {
             ok: false,
             error: `Professor não pode ser alterado ${reason}`,
           },
-          { status: 409 },        );
+          { status: 409 },
+        );
       }
     }
 

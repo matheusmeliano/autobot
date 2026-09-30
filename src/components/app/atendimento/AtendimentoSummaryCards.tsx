@@ -2396,8 +2396,6 @@ function BookingDetails({
                         if (experimentalLocked) {
                           if (hasAttendanceStatus) {
                             modalToast.warning("Professor não pode ser alterado após comparecimento marcado.");
-                          } else if (bookingIsCancelled) {
-                            modalToast.warning("Professor não pode ser alterado após a aula experimental ser cancelada.");
                           } else {
                             modalToast.warning("Professor não pode ser alterado após o disparo ser realizado.");
                           }
@@ -2414,8 +2412,6 @@ function BookingDetails({
                         if (experimentalLocked) {
                           if (hasAttendanceStatus) {
                             return "Professor não pode ser alterado após comparecimento marcado.";
-                          } else if (bookingIsCancelled) {
-                            return "Professor não pode ser alterado após a aula experimental ser cancelada.";
                           }
                           return "Professor não pode ser alterado após o disparo ser realizado.";
                         }
@@ -2456,8 +2452,6 @@ function BookingDetails({
                                 if (experimentalLocked) {
                                   if (hasAttendanceStatus) {
                                     modalToast.warning("Professor não pode ser alterado após comparecimento marcado.");
-                                  } else if (bookingIsCancelled) {
-                                    modalToast.warning("Professor não pode ser alterado após a aula experimental ser cancelada.");
                                   } else {
                                     modalToast.warning("Professor não pode ser alterado após o disparo ser realizado.");
                                   }
@@ -2478,9 +2472,7 @@ function BookingDetails({
                                 experimentalLocked
                                   ? hasAttendanceStatus
                                     ? "Professor não pode ser alterado após comparecimento marcado."
-                                    : bookingIsCancelled
-                                      ? "Professor não pode ser alterado após a aula experimental ser cancelada."
-                                      : "Professor não pode ser alterado após o disparo ser realizado."
+                                    : "Professor não pode ser alterado após o disparo ser realizado."
                                   : ""
                               }
                             >

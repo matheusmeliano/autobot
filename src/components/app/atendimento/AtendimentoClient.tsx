@@ -4825,14 +4825,20 @@ export function AtendimentoClient() {
                           const expClassJaPassou = isExperimentalClassPast(sl);
                           const expDisparoJaFoiFeito = experimentalHasAnyDisparoConcluido(sl);
                           const expHasAttendanceStatus = Boolean(expEffectiveAttendance) || expDisparoJaFoiFeito || (expClassJaPassou && experimentalLockedProf);
+                          // ============================================================
+                          // REGRA ALTERADA (user: 'podera sim!' 2026-09-29):
+                          //   Aula cancelada agora PODE ser editada/reagendada/professor
+                          //   alterado/link salvo/disparada.
+                          //   BLOQUEIOS PERMANECEM: hasAttendance (attendance/disparo feito)
+                          // ============================================================
                           const expBookingIsCancelled = expEffectiveStatus === "cancelled";
-                          const expCanShowDisparar = !experimentalHasAnyDisparoConcluido(sl) && !expBookingIsCancelled;
-                          const expCanSendDisparo = Boolean(expAssigned && expSavedLink && expHasPhone && !expSendingNotification && !experimentalLockedProf && !expBookingIsCancelled);
+                          const expCanShowDisparar = !experimentalHasAnyDisparoConcluido(sl);
+                          const expCanSendDisparo = Boolean(expAssigned && expSavedLink && expHasPhone && !expSendingNotification && !experimentalLockedProf);
                           const expLessonLinkSaveDisabled = (() => {
                             const d = experimentalLessonLinkDraft.trim();
                             if (!d && !expSavedLink) return true;
                             if (d === expSavedLink) return true;
-                            if (expSavingLessonLink || experimentalLockedProf || expBookingIsCancelled) return true;
+                            if (expSavingLessonLink || experimentalLockedProf) return true;
                             return false;
                           })();
                           return (
@@ -4910,14 +4916,10 @@ export function AtendimentoClient() {
                                       type="button"
                                       onClick={() => handleOpenExperimentalBooking(sl)}
                                       disabled={(() => {
-                                        if (expBookingIsCancelled) return true;
                                         if (Boolean(expEffectiveAttendance)) return true;
                                         return false;
                                       })()}
                                       title={(() => {
-                                        if (expBookingIsCancelled) {
-                                          return "Aula experimental cancelada. Não é possível reagendar.";
-                                        }
                                         if (Boolean(expEffectiveAttendance)) {
                                           return "Aula experimental não pode ser reagendada após comparecimento marcado.";
                                         }
@@ -4936,8 +4938,6 @@ export function AtendimentoClient() {
                                       if (experimentalLockedProf) {
                                         if (expHasAttendanceStatus) {
                                           modalToast.warning("Professor não pode ser alterado após comparecimento marcado.");
-                                        } else if (expBookingIsCancelled) {
-                                          modalToast.warning("Professor não pode ser alterado após a aula experimental ser cancelada.");
                                         } else {
                                           modalToast.warning("Professor não pode ser alterado após o disparo ser realizado.");
                                         }
@@ -4954,8 +4954,6 @@ export function AtendimentoClient() {
                                       if (experimentalLockedProf) {
                                         if (expHasAttendanceStatus) {
                                           return "Professor não pode ser alterado após comparecimento marcado.";
-                                        } else if (expBookingIsCancelled) {
-                                          return "Professor não pode ser alterado após a aula experimental ser cancelada.";
                                         }
                                         return "Professor não pode ser alterado após o disparo ser realizado.";
                                       }
@@ -4990,8 +4988,6 @@ export function AtendimentoClient() {
                                               if (experimentalLockedProf) {
                                                 if (expHasAttendanceStatus) {
                                                   modalToast.warning("Professor não pode ser alterado após comparecimento marcado.");
-                                                } else if (expBookingIsCancelled) {
-                                                  modalToast.warning("Professor não pode ser alterado após a aula experimental ser cancelada.");
                                                 } else {
                                                   modalToast.warning("Professor não pode ser alterado após o disparo ser realizado.");
                                                 }
@@ -5012,9 +5008,7 @@ export function AtendimentoClient() {
                                               experimentalLockedProf
                                                 ? expHasAttendanceStatus
                                                   ? "Professor não pode ser alterado após comparecimento marcado."
-                                                  : expBookingIsCancelled
-                                                    ? "Professor não pode ser alterado após a aula experimental ser cancelada."
-                                                    : "Professor não pode ser alterado após o disparo ser realizado."
+                                                  : "Professor não pode ser alterado após o disparo ser realizado."
                                                 : ""
                                             }
                                           >
@@ -5853,16 +5847,39 @@ export function AtendimentoClient() {
                         const expClassJaPassou = isExperimentalClassPast(sl);
                         const expDisparoJaFoiFeito = experimentalHasAnyDisparoConcluido(sl);
                         const expHasAttendanceStatus = Boolean(expEffectiveAttendance) || expDisparoJaFoiFeito || (expClassJaPassou && experimentalLockedProf);
-                        const expBookingIsCancelled = expEffectiveStatus === "cancelled";
-                        const expCanShowDisparar = !experimentalHasAnyDisparoConcluido(sl) && !expBookingIsCancelled;
-                        const expCanSendDisparo = Boolean(expAssigned && expSavedLink && expHasPhone && !expSendingNotification && !experimentalLockedProf && !expBookingIsCancelled);
-                        const expLessonLinkSaveDisabled = (() => {
-                          const d = experimentalLessonLinkDraft.trim();
-                          if (!d && !expSavedLink) return true;
-                          if (d === expSavedLink) return true;
-                          if (expSavingLessonLink || experimentalLockedProf || expBookingIsCancelled) return true;
-                          return false;
-                        })();
+                          // ============================================================
+                          // REGRA ALTERADA (user: 'podera sim!' 2026-09-29):
+                          //   Aula experimental cancelada agora PODE ser editada,
+                          //   reagendada, professor pode ser alterado, link pode ser
+                          //   salvo, disparo pode ser refeito etc.
+                          //
+                          //   BLOQUEIOS QUE PERMANECEM (igual ao backend):
+                          //     · expHasAttendanceStatus (attendance attended/no_show OU
+                          //       disparo feito OU classe passou + lockedProf)
+                          //
+                          //   BLOQUEIOS REMOVIDOS (agora são permitidos quando
+                          //   cancelada):
+                          //     · Reagendar (botão Reagendar)
+                          //     · Alterar professor (botão Selecionar professor /
+                          //       dropdown)
+                          //     · Salvar link da aula (experimental)
+                          //     · Disparar (expCanSendDisparo / expCanShowDisparar)
+                          // ============================================================
+                          const expBookingIsCancelled = expEffectiveStatus === "cancelled";
+                          // expCanShowDisparar / expCanSendDisparo: remove a condicao
+                          // expBookingIsCancelled → agora mostra dispara mesmo se
+                          // cancelada (pois reagendamento sera feito e o lead precisa
+                          // receber as notificacoes).
+                          const expCanShowDisparar = !experimentalHasAnyDisparoConcluido(sl);
+                          const expCanSendDisparo = Boolean(expAssigned && expSavedLink && expHasPhone && !expSendingNotification && !experimentalLockedProf);
+                          const expLessonLinkSaveDisabled = (() => {
+                            const d = experimentalLessonLinkDraft.trim();
+                            if (!d && !expSavedLink) return true;
+                            if (d === expSavedLink) return true;
+                            // Removido: expBookingIsCancelled.
+                            if (expSavingLessonLink || experimentalLockedProf) return true;
+                            return false;
+                          })();
                         return (
                           <div className="relative overflow-hidden rounded-2xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] p-5 shadow-none">
                             <div className="flex flex-wrap items-start justify-between gap-3">

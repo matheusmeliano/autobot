@@ -266,27 +266,16 @@ export async function POST(req: Request, { params }: { params: Promise<{ leadId:
           return bt - at;
         })?.[0]?.id ?? null) as string | null;
 
-    if (!activeId) {
-      const { data: lastCancelEvents } = await admin
-        .from("atendimento_history_events")
-        .select("id, event_type, created_at")
-        .eq("lead_id", leadId)
-        .eq("event_type", "experimental_class_cancelled")
-        .order("created_at", { ascending: false })
-        .limit(1);
-      const lastCancelEvent =
-        Array.isArray(lastCancelEvents) && lastCancelEvents.length > 0 ? lastCancelEvents[0] : null;
-      if (lastCancelEvent) {
-        return Response.json(
-          {
-            ok: false,
-            error:
-              "A aula experimental não pode ser editada após a aula experimental ser cancelada.",
-          },
-          { status: 409 },
-        );
-      }
-    }
+    // ============================================================
+    // REGRA ALTERADA (user: 'podera sim!' 2026-09-29):
+    //   A aula experimental PODE ser editada mesmo após CANCELADA.
+    //   Os bloqueios que PERMANECEM:
+    //     · hasAttendance (comparecimento marcado: attended / no_show)
+    //     · notifications disparadas (rotina de email e zap ja roda, não desfaz)
+    //   REMOVIDOS:
+    //     · Bloqueio por evento experimental_class_cancelled (history events)
+    //     · Bloqueio isCancelled (status booking === cancelled)
+    // ============================================================
 
     if (activeId) {
       const { data: activeBookingState, error: stateErr } = await admin
@@ -298,22 +287,17 @@ export async function POST(req: Request, { params }: { params: Promise<{ leadId:
         .maybeSingle();
       if (stateErr) throw stateErr;
       if (activeBookingState) {
-        const statusRaw = String((activeBookingState as any).status ?? "").trim().toLowerCase();
         const attendanceRaw = String((activeBookingState as any).attendance_status ?? "").trim();
         const studentSent = Boolean(String((activeBookingState as any).student_start_notification_sent_at ?? "").trim());
         const attendantSent = Boolean(String((activeBookingState as any).attendant_start_notification_sent_at ?? "").trim());
-        const isCancelled = statusRaw === "cancelled";
         const hasAttendance = attendanceRaw === "attended" || attendanceRaw === "no_show";
         (globalThis as any).__experimentalBookingHadAnyNotificationBeforeEdit = studentSent || attendantSent;
         (globalThis as any).__experimentalBookingPreviousLeadStartAt = String((activeBookingState as any).lead_start_at ?? "").trim() || null;
         (globalThis as any).__experimentalBookingPreviousProfessorStartAt = String((activeBookingState as any).professor_start_at ?? "").trim() || null;
-        const isLocked = isCancelled || hasAttendance;
+        const isLocked = hasAttendance;
         if (isLocked) {
-          const reason = isCancelled
-            ? "após a aula experimental ser cancelada."
-            : "após comparecimento marcado.";
           return Response.json(
-            { ok: false, error: `A aula experimental não pode ser editada ${reason}` },
+            { ok: false, error: "A aula experimental não pode ser editada após comparecimento marcado." },
             { status: 409 },
           );
         }
