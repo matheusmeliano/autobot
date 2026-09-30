@@ -151,9 +151,12 @@ function getAvatarColorClassesForLead(
   const matriculaConcluida = isLeadMatriculaConcluida(lead);
 
   // --- REGRA 2: AZUL (matrícula EM PROCESSO) ---
-  // Tem step de matrícula ativa (>= 1) e ainda não concluiu.
+  // Tem recurring_registration_step > 0 (flat lead) E NÃO está com matrícula concluída.
+  const recurringRegistrationStep = (lead as any)?.recurring_registration_step;
   const matriculaEmProcesso =
-    !matriculaConcluida && typeof step?.recurringRegistrationStep === "number" && step.recurringRegistrationStep > 0;
+    !matriculaConcluida &&
+    typeof recurringRegistrationStep === "number" &&
+    recurringRegistrationStep > 0;
 
   // --- REGRA 3: AMARELO (dados básicos / nada pendente) ---
   const dadosBasicosOkNadaPendente =
