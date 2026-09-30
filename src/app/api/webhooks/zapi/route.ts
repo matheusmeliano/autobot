@@ -683,7 +683,7 @@ function cityResolutionIsReliable(
   params?: { stateSoFarCountry?: "BR" | "US" | null },
 ): resolution is NonNullable<ReturnType<typeof resolveTimeZoneFromCityInput>> {
   if (!resolution) return false;
-  if (resolution.source !== "city_match") return false;
+  if (resolution.source !== "city_match" && resolution.source !== "state_match") return false;
   if (!String(resolution.city ?? "").trim()) return false;
   const city = String(resolution.city ?? "").trim().toLowerCase();
   const state = String(resolution.state ?? "").trim().toLowerCase();
