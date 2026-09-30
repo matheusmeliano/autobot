@@ -110,9 +110,9 @@ export async function GET() {
       let bookingsError: any = null;
 
       const bookingsSelectWithLessonLink =
-        "id, lead_id, status, lesson_link, professor_timezone, lead_timezone, professor_date, professor_time, professor_start_at, lead_date, lead_time, lead_start_at, attendance_status, student_start_notification_sent_at, attendant_start_notification_sent_at, created_at, updated_at, assigned_professor_name, assigned_professor_phone";
+        "id, lead_id, status, lesson_link, professor_timezone, lead_timezone, professor_date, professor_time, professor_start_at, lead_date, lead_time, lead_start_at, attendance_status, student_start_notification_sent_at, attendant_start_notification_sent_at, post_attendance_message_sent_at, created_at, updated_at, assigned_professor_name, assigned_professor_phone";
       const bookingsSelectWithoutLessonLink =
-        "id, lead_id, status, professor_timezone, lead_timezone, professor_date, professor_time, professor_start_at, lead_date, lead_time, lead_start_at, attendance_status, student_start_notification_sent_at, attendant_start_notification_sent_at, created_at, updated_at, assigned_professor_name, assigned_professor_phone";
+        "id, lead_id, status, professor_timezone, lead_timezone, professor_date, professor_time, professor_start_at, lead_date, lead_time, lead_start_at, attendance_status, student_start_notification_sent_at, attendant_start_notification_sent_at, post_attendance_message_sent_at, created_at, updated_at, assigned_professor_name, assigned_professor_phone";
 
       const bookingsWithLessonLinkResult = await admin
         .from("atendimento_experimental_class_bookings")
@@ -147,6 +147,7 @@ export async function GET() {
           lesson_link: String((booking as any)?.lesson_link ?? "").trim() || null,
           student_start_notification_sent_at: String((booking as any)?.student_start_notification_sent_at ?? "").trim() || null,
           attendant_start_notification_sent_at: String((booking as any)?.attendant_start_notification_sent_at ?? "").trim() || null,
+          post_attendance_message_sent_at: String((booking as any)?.post_attendance_message_sent_at ?? "").trim() || null,
           attendance_status: String((booking as any)?.attendance_status ?? "").trim() || null,
           attendance_checked_at: null,
           professor_timezone: String((booking as any)?.professor_timezone ?? "").trim() || ATENDIMENTO_PROFESSOR_TIME_ZONE,

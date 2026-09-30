@@ -1266,9 +1266,9 @@ export async function sendExperimentalClassStartNotifications(now = new Date()) 
   // Step 1: Tabela real de bookings
   {
     const bookingsSelectWithLessonLink =
-      "id, lead_id, conversation_id, status, lesson_link, professor_timezone, lead_timezone, professor_date, professor_time, professor_start_at, lead_date, lead_time, lead_start_at, student_start_notification_sent_at, attendant_start_notification_sent_at, attendance_status, attendance_checked_at, created_at, updated_at, assigned_professor_name, assigned_professor_phone";
+      "id, lead_id, conversation_id, status, lesson_link, professor_timezone, lead_timezone, professor_date, professor_time, professor_start_at, lead_date, lead_time, lead_start_at, student_start_notification_sent_at, attendant_start_notification_sent_at, post_attendance_message_sent_at, attendance_status, attendance_checked_at, created_at, updated_at, assigned_professor_name, assigned_professor_phone";
     const bookingsSelectWithoutLessonLink =
-      "id, lead_id, conversation_id, status, professor_timezone, lead_timezone, professor_date, professor_time, professor_start_at, lead_date, lead_time, lead_start_at, student_start_notification_sent_at, attendant_start_notification_sent_at, attendance_status, attendance_checked_at, created_at, updated_at, assigned_professor_name, assigned_professor_phone";
+      "id, lead_id, conversation_id, status, professor_timezone, lead_timezone, professor_date, professor_time, professor_start_at, lead_date, lead_time, lead_start_at, student_start_notification_sent_at, attendant_start_notification_sent_at, post_attendance_message_sent_at, attendance_status, attendance_checked_at, created_at, updated_at, assigned_professor_name, assigned_professor_phone";
 
     let data: any[] | null = null;
     try {
