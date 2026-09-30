@@ -4103,6 +4103,39 @@ export function AtendimentoClient() {
                                 ? !matriculaConcluida
                                 : false;
 
+                              // =============== REGRA NOVA: FUNDO VERDE ===============
+                              // User pediu (2026-09-29):
+                              //   "Quando o professor for selecionado e o link da aula
+                              //    adicionado devera ficar fundo verde"
+                              //
+                              // Usa as mesmas funções já padronizadas do app (consistente
+                              // com programação-diária, disparo de notificações, summary):
+                              //   · PROFESSOR SELECIONADO → experimentalAssignedProfessorForLead
+                              //     retorna !== null (já lida com flat lead + booking).
+                              //   · LINK AULA ADICIONADO   → experimentalLessonLinkForLead
+                              //     retorna !== '' (lida com lead.experimental_class_link
+                              //     OU booking.lesson_link).
+                              //
+                              // TEM PRECEDÊNCIA SOBRE AMARELO e cor normal: se ambos os
+                              // marcadores acima estiverem OK → VERDE sempre (matricula
+                              // concluída continua na cor normal conforme regra original).
+                              const prof = experimentalAssignedProfessorForLead(lead);
+                              const link = experimentalLessonLinkForLead(lead);
+                              const temProfessor = prof !== null && prof !== undefined;
+                              const temLink = Boolean(link);
+                              const professorELinkOk = temProfessor && temLink && !matriculaConcluida;
+
+                              if (professorELinkOk) {
+                                return isSelected
+                                  // SELECIONADO verde: mesmo fundo (#16a34a green-600),
+                                  // anel + sombra para marcar seleção (igual amarelo),
+                                  // sem hover.
+                                  ? "!bg-[#16a34a] !text-white ring-[3px] ring-[#15803d] shadow-[0_2px_6px_rgba(22,163,74,0.42)] transition-none hover:!bg-[#16a34a] hover:!ring-[#15803d]"
+                                  // NÃO SELECIONADO verde: #16a34a (verde vivo), sem anel,
+                                  // sem hover, texto branco (contraste bom no verde).
+                                  : "!bg-[#16a34a] !text-white transition-none hover:!bg-[#16a34a]";
+                              }
+
                               if (dadosBasicosOkNadaPendente) {
                                 return isSelected
                                   // SELECIONADO → MESMO FUNDO AMARELO (#facc15) do unselected,
