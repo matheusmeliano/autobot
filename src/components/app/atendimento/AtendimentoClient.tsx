@@ -5643,9 +5643,10 @@ export function AtendimentoClient() {
                         </div>
                         <button
                           type="button"
-                          className="inline-flex h-9 items-center justify-center gap-2 rounded-xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] px-3.5 text-[12px] font-semibold text-[var(--app-text-85)] hover:bg-[var(--app-hover)]"
+                          onClick={() => handleOpenEditLocationSelected()}
+                          className="inline-flex h-11 min-h-[44px] items-center justify-center gap-2 rounded-xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] px-3.5 text-[12px] font-semibold text-[var(--app-text-85)] hover:bg-[var(--app-hover)] active:scale-[0.98] touch-manipulation"
                         >
-                          <Pencil className="h-3.5 w-3.5" />
+                          <Pencil className="h-3.5 w-3.5 shrink-0" />
                           Editar
                         </button>
                       </div>
@@ -5680,9 +5681,9 @@ export function AtendimentoClient() {
                         <button
                           type="button"
                           onClick={handleOpenEditSenha}
-                          className="inline-flex h-9 items-center justify-center gap-2 rounded-xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] px-3.5 text-[12px] font-semibold text-[var(--app-text-85)] hover:bg-[var(--app-hover)]"
+                          className="inline-flex h-11 min-h-[44px] items-center justify-center gap-2 rounded-xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] px-3.5 text-[12px] font-semibold text-[var(--app-text-85)] hover:bg-[var(--app-hover)] active:scale-[0.98] touch-manipulation"
                         >
-                          <Pencil className="h-3.5 w-3.5" />
+                          <Pencil className="h-3.5 w-3.5 shrink-0" />
                           Editar senha
                         </button>
                       </div>
