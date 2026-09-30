@@ -333,6 +333,40 @@ export async function POST(req: Request, { params }: { params: Promise<{ leadId:
         fallbackProfPhone = null;
       }
     }
+    if (!fallbackProfName && !fallbackProfPhone) {
+      // Fallback 3: ATENDIMENTO_HISTORY_EVENTS. Quando o cancelamento tem
+      // action=deleted_and_unlinked o booking É APAGADO DA TABELA e o
+      // fallback 1 não encontra nada. A única fonte restante é o histórico.
+      // Busca o último evento experimental_class_cancelled que tenha
+      // details.professor_name_before / details.professor_phone_before.
+      try {
+        const { data: lastCancelledEvents } = await admin
+          .from("atendimento_history_events")
+          .select("id,created_at,details")
+          .eq("lead_id", leadId)
+          .eq("event_type", "experimental_class_cancelled")
+          .order("created_at", { ascending: false })
+          .limit(5);
+        if (Array.isArray(lastCancelledEvents) && lastCancelledEvents.length > 0) {
+          for (const ev of lastCancelledEvents) {
+            try {
+              const d = (ev as any).details;
+              if (!d || typeof d !== "object") continue;
+              const nm = String(d.professor_name_before ?? "").trim();
+              const ph = String(d.professor_phone_before ?? "").trim();
+              if (nm || ph) {
+                fallbackProfName = nm || null;
+                fallbackProfPhone = ph || null;
+                break;
+              }
+            } catch { continue; }
+          }
+        }
+      } catch {
+        fallbackProfName = null;
+        fallbackProfPhone = null;
+      }
+    }
 
     // NORMALIZAÇÃO OBRIGATÓRIA: Converte fallbackProf para formato canônico
     // da EXPERIMENTAL_CLASS_PROFESSOR_ASSIGNMENT_ALLOWLIST. Isso resolve o

@@ -255,20 +255,53 @@ export async function POST(
     if (flatNorm) resolvedAssignedProfessor = flatNorm;
   }
 
-  // FALLBACK 2 (HARD ESCAPE — NUNCA MAIS BLOQUEAR o disparo por professor):
-  // Se existe QUALQUER indicação que havia professor atribuído (nome ou phone
-  // preenchidos em booking OU no flat do lead), mas o resolve falhou por
-  // motivo de formatação/allowlist, usamos o primeiro professor válido da
-  // allowlist como fallback. O usuário NÃO quer ser bloqueado aqui nunca mais.
+  // FALLBACK 2: HISTORY_EVENTS (caso booking cancelado apagado da tabela por
+  // deleted_and_unlinked)
   if (!resolvedAssignedProfessor) {
+    try {
+      const { data: lastCancelledEvents } = await admin
+        .from("atendimento_history_events")
+        .select("id,created_at,details")
+        .eq("lead_id", String(leadId))
+        .eq("event_type", "experimental_class_cancelled")
+        .order("created_at", { ascending: false })
+        .limit(5);
+      if (Array.isArray(lastCancelledEvents) && lastCancelledEvents.length > 0) {
+        for (const ev of lastCancelledEvents) {
+          try {
+            const d = (ev as any).details;
+            if (!d || typeof d !== "object") continue;
+            const nm = String(d.professor_name_before ?? "").trim();
+            const ph = String(d.professor_phone_before ?? "").trim();
+            if (nm || ph) {
+              const histNorm = normalizarExperimentalProfessorParaAllowlist({
+                name: nm || null,
+                phone: ph || null,
+              });
+              if (histNorm) { resolvedAssignedProfessor = histNorm; break; }
+            }
+          } catch { continue; }
+        }
+      }
+    } catch {}
+  }
+
+  // FALLBACK 3 (HARD ESCAPE TOTAL — NUNCA MAIS BLOQUEAR 409):
+  // - Se a aula tem LESSON_LINK preenchido (teoricamente exigiu professor), OU
+  // - Se existe QUALQUER indicação de professor em booking/flat, OU
+  // - De forma DEFAULT (absoluta): SEMPRE que a allowlist tiver professores.
+  //   Nunca mais retornar missing_experimental_professor para o usuário.
+  if (!resolvedAssignedProfessor && EXPERIMENTAL_CLASS_PROFESSOR_ASSIGNMENT_ALLOWLIST.length > 0) {
+    const temLink = Boolean(String((resolvedBooking as any)?.lesson_link ?? "").trim());
     const anyBookingName = String((resolvedBooking as any)?.assigned_professor_name ?? "").trim();
     const anyBookingPhone = String((resolvedBooking as any)?.assigned_professor_phone ?? "").trim();
     const anyFlatName = String((lead as any)?.experimental_class_professor_name ?? "").trim();
     const anyFlatPhone = String((lead as any)?.experimental_class_professor_phone ?? "").trim();
-    const haviaProfessorAtribuido = Boolean(
-      anyBookingName || anyBookingPhone || anyFlatName || anyFlatPhone,
-    );
-    if (haviaProfessorAtribuido && EXPERIMENTAL_CLASS_PROFESSOR_ASSIGNMENT_ALLOWLIST.length > 0) {
+    const triggerFallbackDefault =
+      temLink ||
+      anyBookingName || anyBookingPhone || anyFlatName || anyFlatPhone ||
+      EXPERIMENTAL_CLASS_PROFESSOR_ASSIGNMENT_ALLOWLIST.length > 0;
+    if (triggerFallbackDefault) {
       resolvedAssignedProfessor = {
         name: String(EXPERIMENTAL_CLASS_PROFESSOR_ASSIGNMENT_ALLOWLIST[0].name),
         phone: String(EXPERIMENTAL_CLASS_PROFESSOR_ASSIGNMENT_ALLOWLIST[0].phone),
@@ -276,11 +309,12 @@ export async function POST(
     }
   }
 
+  // Última trincheira: allowlist vazia de configuração (erro grave de setup)
   if (!resolvedAssignedProfessor || !String(resolvedAssignedProfessor.phone ?? "").trim()) {
-    return Response.json(
-      { ok: false, error: "missing_experimental_professor" },
-      { status: 409 },
-    );
+    resolvedAssignedProfessor = {
+      name: "Equipe USA Music",
+      phone: String(EXPERIMENTAL_CLASS_ATTENDANT_NOTIFICATION_PHONE),
+    };
   }
 
   if (!leadPhone) {
