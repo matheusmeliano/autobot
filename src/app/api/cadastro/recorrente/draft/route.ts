@@ -567,6 +567,13 @@ export async function PATCH(req: NextRequest) {
 
     if (safePassword) {
       patch.recurring_registration_password = safePassword;
+      const currentStepRaw = (lead as any)?.recurring_registration_step;
+      const currentStepNum = typeof currentStepRaw === "number" && Number.isFinite(currentStepRaw)
+        ? Math.max(0, Math.min(6, Math.trunc(currentStepRaw)))
+        : 0;
+      if (currentStepNum < 1) {
+        patch.recurring_registration_step = 1;
+      }
     }
 
     try {

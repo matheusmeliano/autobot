@@ -568,6 +568,12 @@ export default function CadastroRecorrenteBody() {
         !/^[•·*]{4,}$/.test(passwordRaw)
           ? passwordRaw.trim()
           : null;
+      const hasPassword = Boolean(safePassword);
+      const finalStep = (() => {
+        if (payload.step !== undefined && payload.step !== null) return payload.step;
+        if (hasPassword) return 1 as const;
+        return null;
+      })();
       await fetch("/api/cadastro/recorrente/draft", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
@@ -578,7 +584,7 @@ export default function CadastroRecorrenteBody() {
           weekdayLabel: payload.weekdayLabel ?? null,
           professorTime: payload.professorTime ?? null,
           leadTime: payload.leadTime ?? null,
-          step: payload.step ?? null,
+          step: finalStep,
           password: safePassword,
           state: payload.state ?? null,
           city: payload.city ?? null,
