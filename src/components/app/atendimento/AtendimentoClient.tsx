@@ -111,9 +111,10 @@ function buildInitials(name: string | null | undefined): string {
  *   · Avatar GRANDE topo detalhe MATRÍCULA   (size = "big" (h-16 w-16), includeRings = true)
  *
  * Regras — precedência de cima para baixo (a primeira que bater ganha):
- *   1) VERDE  #16a34a  = professor atribuído + link da aula definido + NÃO matriculado.
- *   2) AZUL   #2563eb  = MATRÍCULA EM PROCESSO: tem recurring_registration_step > 0
- *                        E NÃO está com matrícula concluída.
+ *   1) AZUL   #2563eb  = MATRÍCULA EM PROCESSO: tem recurring_registration_step > 0
+ *                        E NÃO está com matrícula concluída/aluno efetivo.
+ *   2) VERDE  #16a34a  = professor atribuído + link da aula definido + NÃO matriculado
+ *                        (SÓ vence se a matrícula NÃO estiver em processo).
  *   3) AMARELO #eab308 = Card Status "Dados básicos coletados / Nenhum passo pendente
  *                        nessa etapa" (step null e NÃO matriculado).
  *   4) LARANJA #ea580c = padrão (fallback; qualquer outro cenário).
@@ -140,7 +141,6 @@ function getAvatarColorClassesForLead(
   const sizeBase = bigSizeBase || smallSizeBase;
 
   if (!lead) {
-    // Sem lead → laranja padrão (includeRings só se isSelected ou size="big" está isolado no topo).
     if (isSelected) {
       return `${sizeBase} !bg-[#ea580c] !text-white ring-[3px] ring-[#c2410c] shadow-[0_2px_6px_rgba(234,88,12,0.42)] transition-none hover:!bg-[#ea580c] hover:!ring-[#c2410c]`;
     }
@@ -150,38 +150,38 @@ function getAvatarColorClassesForLead(
   const step = buildRecurringMetaForVisaoGeral(lead);
   const matriculaConcluida = isLeadMatriculaConcluida(lead);
 
-  // --- REGRA 2: AZUL (matrícula EM PROCESSO) ---
-  // Tem recurring_registration_step > 0 (flat lead) E NÃO está com matrícula concluída.
   const recurringRegistrationStep = (lead as any)?.recurring_registration_step;
   const matriculaEmProcesso =
     !matriculaConcluida &&
     typeof recurringRegistrationStep === "number" &&
     recurringRegistrationStep > 0;
 
-  // --- REGRA 3: AMARELO (dados básicos / nada pendente) ---
   const dadosBasicosOkNadaPendente =
     (step === null || step === undefined) && !matriculaConcluida;
 
-  // --- REGRA 1: VERDE (prof + link + NÃO matr concluída) ---
   const prof = experimentalAssignedProfessorForLead(lead);
   const link = experimentalLessonLinkForLead(lead);
   const temProfessor = prof !== null && prof !== undefined;
   const temLink = Boolean(link);
   const professorELinkOk = temProfessor && temLink && !matriculaConcluida;
 
+  // REGRA 1: AZUL (MATRÍCULA EM PROCESSO). VENCE DE TODAS AS OUTRAS CORES
+  // enquanto step>0 e ainda nao eh aluno matriculado. A fase de cadastro de
+  // matricula eh o status corrente do funil e deve sobrescrever cores antigas
+  // como verde (aula experimental concluida).
+  if (matriculaEmProcesso) {
+    if (isSelected || size === "big") {
+      return `${sizeBase} !bg-[#2563eb] !text-white ring-[3px] ring-[#1d4ed8] shadow-[0_2px_6px_rgba(37,99,235,0.42)] transition-none hover:!bg-[#2563eb] hover:!ring-[#1d4ed8]`;
+    }
+    return `${sizeBase} !bg-[#2563eb] !text-white transition-none hover:!bg-[#2563eb]`;
+  }
+
+  // REGRA 2: VERDE (prof + link + NÃO matrícula em processo)
   if (professorELinkOk) {
     if (isSelected || size === "big") {
       return `${sizeBase} !bg-[#16a34a] !text-white ring-[3px] ring-[#15803d] shadow-[0_2px_6px_rgba(22,163,74,0.42)] transition-none hover:!bg-[#16a34a] hover:!ring-[#15803d]`;
     }
     return `${sizeBase} !bg-[#16a34a] !text-white transition-none hover:!bg-[#16a34a]`;
-  }
-
-  if (matriculaEmProcesso) {
-    // AZUL — regra da legenda Palette (processo de cadastro de matrícula).
-    if (isSelected || size === "big") {
-      return `${sizeBase} !bg-[#2563eb] !text-white ring-[3px] ring-[#1d4ed8] shadow-[0_2px_6px_rgba(37,99,235,0.42)] transition-none hover:!bg-[#2563eb] hover:!ring-[#1d4ed8]`;
-    }
-    return `${sizeBase} !bg-[#2563eb] !text-white transition-none hover:!bg-[#2563eb]`;
   }
 
   if (dadosBasicosOkNadaPendente) {

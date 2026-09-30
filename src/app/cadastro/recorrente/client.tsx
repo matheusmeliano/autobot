@@ -1267,6 +1267,7 @@ export default function CadastroRecorrenteBody() {
       try {
         const opt = availableWeekdays.find((d) => d.id === selectedDayId);
         await saveDraftRecurring({
+          step: 3,
           weekday: selectedWeekday,
           weekdayLabel: opt?.displayLabel || opt?.label || null,
         });
@@ -1286,6 +1287,7 @@ export default function CadastroRecorrenteBody() {
       try {
         const opt = availableWeekdays.find((d) => d.id === selectedDayId);
         await saveDraftRecurring({
+          step: 4,
           weekday: selectedWeekday,
           weekdayLabel: opt?.displayLabel || opt?.label || selectedWeekdayLabel || null,
           professorTime: selectedTimeOpt.professorTime,
