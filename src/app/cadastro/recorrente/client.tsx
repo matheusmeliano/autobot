@@ -946,10 +946,24 @@ export default function CadastroRecorrenteBody() {
               : 0;
           if (stepNum > 6) stepNum = 0;
           hasPassword = Boolean(prog.has_password);
-          savedWeekdayRaw = String(prog.recurring_class_weekday ?? "").trim().toLowerCase();
-          savedWeekdayLabel = String(prog.recurring_class_weekday_label ?? "").trim();
-          savedProfessorTime = String(prog.recurring_class_professor_time ?? "").trim();
-          savedLeadTime = String(prog.recurring_class_lead_time ?? "").trim();
+          // REGRA: APENAS se step>=3 (usuario PASSOU pela selecao de dia semana e horario no proprio link de matricula)
+          // entao podemos restaurar weekday/horario salvos em recurring_class_*.
+          // Para step === 0, 1 ou 2 (ainda nao chegou na tela de horario), NAO restaurar NADA de
+          // weekday/horario, forca o usuario a selecionar DO ZERO no link.
+          // Isso evita que dados residualmente salvos da aula experimental ou de sessoes passadas
+          // sejam "reaproveitados" em um novo cadastro sem o usuario pedir.
+          if (stepNum >= 3) {
+            savedWeekdayRaw = String(prog.recurring_class_weekday ?? "").trim().toLowerCase();
+            savedWeekdayLabel = String(prog.recurring_class_weekday_label ?? "").trim();
+            savedProfessorTime = String(prog.recurring_class_professor_time ?? "").trim();
+            savedLeadTime = String(prog.recurring_class_lead_time ?? "").trim();
+          } else {
+            savedWeekdayRaw = "";
+            savedWeekdayLabel = "";
+            savedProfessorTime = "";
+            savedLeadTime = "";
+            resolvedWeekday = null;
+          }
 
           if (savedWeekdayRaw) {
             const isWd = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"].includes(savedWeekdayRaw);

@@ -4826,12 +4826,67 @@ export function AtendimentoClient() {
                             return null;
                           })()}
                         </div>
-                        {expMeta.tone === "success" ? (
-                          <>
-                            {(() => {
-                              const bk = (selectedLead as any)?.experimental_class_booking;
-                              const cancelled = String(bk?.status ?? "").trim().toLowerCase() === "cancelled";
-                              return cancelled ? (
+                        {(() => {
+                          const lead = selectedLead as any;
+                          const rrcs = String(lead?.recurring_registration_step ?? "").trim();
+                          const rrcsNum = rrcs !== "" && !Number.isNaN(Number(rrcs)) ? Number(rrcs) : (((lead as any)?.recurring_registration_step as number) ?? 0);
+                          const isConcluded = isLeadMatriculaConcluida(selectedLead);
+                          const matriculaEmProcesso = (typeof rrcsNum === "number" && rrcsNum > 0 && !isConcluded)
+                            || (String(lead?.recurring_class_status ?? "").trim().length > 0 && !isConcluded)
+                            || (Boolean(lead?.recurring_registration_password) && !isConcluded);
+
+                          if (matriculaEmProcesso) {
+                            const wd = String(lead?.recurring_class_weekday_label ?? lead?.recurring_class_weekday ?? "").trim();
+                            const tm = String(lead?.recurring_class_lead_time ?? lead?.recurring_class_professor_time ?? "").trim();
+                            const st = String(lead?.recurring_class_status ?? "").trim();
+                            const hasAny = Boolean(wd || tm || st);
+                            if (hasAny) {
+                              return (
+                                <div className="mt-4 flex items-start gap-3 rounded-xl border border-[#2563eb]/35 bg-[rgba(37,99,235,0.12)] px-4 py-3">
+                                  <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[#2563eb]/20 text-[#1d4ed8]">
+                                    <RefreshCw className="h-5 w-5" />
+                                  </div>
+                                  <div className="min-w-0">
+                                    <div className="font-semibold text-[#1e3a8a] truncate">
+                                      {(() => {
+                                        const parts: string[] = [];
+                                        if (wd) parts.push(`Dia: ${wd}`);
+                                        if (tm) parts.push(`às ${tm}`);
+                                        if (parts.length === 0 && st) parts.push(`Status: ${st}`);
+                                        if (parts.length === 0) return "Aula recorrente cadastrada.";
+                                        return parts.join(" ");
+                                      })()}
+                                    </div>
+                                    <div className="mt-0.5 text-[13px] text-[#1d4ed8]/80">
+                                      Aluno definiu dia e horário das aulas recorrentes no link de matrícula.
+                                    </div>
+                                  </div>
+                                </div>
+                              );
+                            }
+                            return (
+                              <div className="mt-4 flex items-start gap-3 rounded-xl border border-[#2563eb]/35 bg-[rgba(37,99,235,0.1)] px-4 py-3">
+                                <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[#2563eb]/20 text-[#1d4ed8]">
+                                  <CalendarIcon className="h-5 w-5" />
+                                </div>
+                                <div className="min-w-0">
+                                  <div className="font-semibold text-[#1e3a8a] truncate">
+                                    Aguardando agendamento recorrente
+                                  </div>
+                                  <div className="mt-0.5 text-[13px] text-[#1d4ed8]/80">
+                                    O aluno iniciou o cadastro no link de matrícula. Quando ele concluir as etapas de dia/horário no link, os dados das aulas recorrentes aparecerão aqui automaticamente.
+                                  </div>
+                                </div>
+                              </div>
+                            );
+                          }
+
+                          // ================== FLUXO EXPERIMENTAL (sem matrícula em andamento) ==================
+                          const bk = (selectedLead as any)?.experimental_class_booking;
+                          const cancelled = String(bk?.status ?? "").trim().toLowerCase() === "cancelled";
+                          if (cancelled) {
+                            return (
+                              <>
                                 <div className="mt-4 flex items-start gap-3 rounded-xl border border-red-500/35 bg-red-500/10 px-4 py-3">
                                   <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-red-500/20 text-red-700">
                                     <CalendarIcon className="h-5 w-5" />
@@ -4852,7 +4907,44 @@ export function AtendimentoClient() {
                                     </div>
                                   </div>
                                 </div>
-                              ) : (
+                                <div className="mt-4 flex justify-end gap-2">
+                                  <button
+                                    type="button"
+                                    onClick={() => handleOpenExpInfo(selectedLead)}
+                                    className="inline-flex h-10 items-center justify-center gap-2 rounded-full border border-[var(--app-border)] bg-[var(--app-solid-surface)] px-4 text-[13px] font-semibold text-[var(--app-text-85)] hover:bg-[var(--app-hover)] disabled:cursor-not-allowed disabled:opacity-55"
+                                    disabled
+                                    title="Agendamento cancelado."
+                                  >
+                                    <Info className="h-4 w-4" />
+                                    Mais informações
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleOpenExperimentalBooking(selectedLead)}
+                                    className="inline-flex h-10 items-center justify-center gap-2 rounded-full border border-[var(--app-border)] bg-[var(--app-solid-surface)] px-4 text-[13px] font-semibold text-[var(--app-text-85)] hover:bg-[var(--app-hover)] disabled:cursor-not-allowed disabled:opacity-55"
+                                    disabled
+                                    title="Agendamento cancelado. Não é possível reagendar."
+                                  >
+                                    <Plus className="h-4 w-4" />
+                                    Reagendar
+                                  </button>
+                                </div>
+                              </>
+                            );
+                          }
+
+                          if (expMeta.tone === "success") {
+                            const sl = selectedLead;
+                            const expBestBooking =
+                              (sl as any).latest_experimental_class_booking ??
+                              (sl as any).experimental_class_booking ??
+                              (sl as any).future_experimental_class_booking;
+                            const bk2 = expBestBooking as any;
+                            const expEffectiveStatus =
+                              String(bk2?.status ?? (sl as any).experimental_class_booking_status ?? (sl as any).experimental_class_status ?? "").trim().toLowerCase();
+                            const cancelled2 = expEffectiveStatus === "cancelled";
+                            return (
+                              <>
                                 <div className="mt-4 flex items-start gap-3 rounded-xl border border-emerald-500/35 bg-emerald-500/10 px-4 py-3">
                                   <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-emerald-500/20 text-emerald-700">
                                     <CalendarIcon className="h-5 w-5" />
@@ -4866,71 +4958,60 @@ export function AtendimentoClient() {
                                     </div>
                                   </div>
                                 </div>
-                              );
-                            })()}
-                            {(() => {
-                              const sl = selectedLead;
-                              const expBestBooking =
-                                (sl as any).latest_experimental_class_booking ??
-                                (sl as any).experimental_class_booking ??
-                                (sl as any).future_experimental_class_booking;
-                              const bk = expBestBooking as any;
-                              const expEffectiveStatus =
-                                String(bk?.status ?? (sl as any).experimental_class_booking_status ?? (sl as any).experimental_class_status ?? "").trim().toLowerCase();
-                              const cancelled = expEffectiveStatus === "cancelled";
-                              return (
-                            <div className="mt-4 flex justify-end gap-2">
-                              <button
-                                type="button"
-                                onClick={() => handleOpenExpInfo(selectedLead)}
-                                className="inline-flex h-10 items-center justify-center gap-2 rounded-full border border-[var(--app-border)] bg-[var(--app-solid-surface)] px-4 text-[13px] font-semibold text-[var(--app-text-85)] hover:bg-[var(--app-hover)] disabled:cursor-not-allowed disabled:opacity-55"
-                                disabled={cancelled}
-                                title={cancelled ? "Agendamento cancelado." : undefined}
-                              >
-                                <Info className="h-4 w-4" />
-                                Mais informações
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => handleOpenExperimentalBooking(selectedLead)}
-                                className="inline-flex h-10 items-center justify-center gap-2 rounded-full border border-[var(--app-border)] bg-[var(--app-solid-surface)] px-4 text-[13px] font-semibold text-[var(--app-text-85)] hover:bg-[var(--app-hover)] disabled:cursor-not-allowed disabled:opacity-55"
-                                disabled={cancelled}
-                                title={cancelled ? "Agendamento cancelado. Não é possível reagendar." : undefined}
-                              >
-                                <Plus className="h-4 w-4" />
-                                Reagendar
-                              </button>
-                            </div>
-                              );
-                            })()}
-                          </>
-                        ) : (
-                          <>
-                            <div className="mt-4 flex items-start gap-3 rounded-xl border border-[var(--app-border)] bg-[var(--app-solid-surface-2)] px-4 py-3">
-                              <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[var(--app-solid-surface)] border border-[var(--app-border)] text-[var(--app-text-70)]">
-                                <CalendarIcon className="h-5 w-5" />
-                              </div>
-                              <div className="min-w-0">
-                                <div className="font-semibold text-[var(--app-text-85)]">
-                                  Nenhuma aula agendada
+                                <div className="mt-4 flex justify-end gap-2">
+                                  <button
+                                    type="button"
+                                    onClick={() => handleOpenExpInfo(selectedLead)}
+                                    className="inline-flex h-10 items-center justify-center gap-2 rounded-full border border-[var(--app-border)] bg-[var(--app-solid-surface)] px-4 text-[13px] font-semibold text-[var(--app-text-85)] hover:bg-[var(--app-hover)] disabled:cursor-not-allowed disabled:opacity-55"
+                                    disabled={cancelled2}
+                                    title={cancelled2 ? "Agendamento cancelado." : undefined}
+                                  >
+                                    <Info className="h-4 w-4" />
+                                    Mais informações
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleOpenExperimentalBooking(selectedLead)}
+                                    className="inline-flex h-10 items-center justify-center gap-2 rounded-full border border-[var(--app-border)] bg-[var(--app-solid-surface)] px-4 text-[13px] font-semibold text-[var(--app-text-85)] hover:bg-[var(--app-hover)] disabled:cursor-not-allowed disabled:opacity-55"
+                                    disabled={cancelled2}
+                                    title={cancelled2 ? "Agendamento cancelado. Não é possível reagendar." : undefined}
+                                  >
+                                    <Plus className="h-4 w-4" />
+                                    Reagendar
+                                  </button>
                                 </div>
-                                <div className="mt-0.5 text-[13px] text-[var(--app-text-60)]">
-                                  Este registro ainda não possui aulas agendadas.
+                              </>
+                            );
+                          }
+
+                          return (
+                            <>
+                              <div className="mt-4 flex items-start gap-3 rounded-xl border border-[var(--app-border)] bg-[var(--app-solid-surface-2)] px-4 py-3">
+                                <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[var(--app-solid-surface)] border border-[var(--app-border)] text-[var(--app-text-70)]">
+                                  <CalendarIcon className="h-5 w-5" />
+                                </div>
+                                <div className="min-w-0">
+                                  <div className="font-semibold text-[var(--app-text-85)]">
+                                    Nenhuma aula agendada
+                                  </div>
+                                  <div className="mt-0.5 text-[13px] text-[var(--app-text-60)]">
+                                    Este registro ainda não possui aulas agendadas.
+                                  </div>
                                 </div>
                               </div>
-                            </div>
-                            <div className="mt-4 flex justify-end">
-                              <button
-                                type="button"
-                                onClick={() => handleOpenExperimentalBooking(selectedLead)}
-                                className="inline-flex h-10 items-center justify-center gap-2 rounded-full border border-[var(--app-border)] bg-[var(--app-solid-surface)] px-4 text-[13px] font-semibold text-[var(--app-text-85)] hover:bg-[var(--app-hover)]"
-                              >
-                                <Plus className="h-4 w-4" />
-                                Agendar
-                              </button>
-                            </div>
-                          </>
-                        )}
+                              <div className="mt-4 flex justify-end">
+                                <button
+                                  type="button"
+                                  onClick={() => handleOpenExperimentalBooking(selectedLead)}
+                                  className="inline-flex h-10 items-center justify-center gap-2 rounded-full border border-[var(--app-border)] bg-[var(--app-solid-surface)] px-4 text-[13px] font-semibold text-[var(--app-text-85)] hover:bg-[var(--app-hover)]"
+                                >
+                                  <Plus className="h-4 w-4" />
+                                  Agendar
+                                </button>
+                              </div>
+                            </>
+                          );
+                        })()}
                       </div>
                     </div>
                   ) : null}
