@@ -101,6 +101,100 @@ function buildInitials(name: string | null | undefined): string {
   return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
 }
 
+/**
+ * Helper ÚNICA para definir classes dos AVATARES de acordo com as
+ * 4 regras de cor do modal "Legenda das Cores" (Palette 🎨).
+ *
+ * APLICA-SE IDENTICAMENTE em:
+ *   · Avatar LISTA LATERAL  (sidebar: size = "small" (h-11 w-11), includeRings varia por isSelected)
+ *   · Avatar GRANDE topo detalhe EXPERIMENTAL (size = "big" (h-16 w-16), includeRings = true)
+ *   · Avatar GRANDE topo detalhe MATRÍCULA   (size = "big" (h-16 w-16), includeRings = true)
+ *
+ * Regras — precedência de cima para baixo (a primeira que bater ganha):
+ *   1) VERDE  #16a34a  = professor atribuído + link da aula definido + NÃO matriculado.
+ *   2) AZUL   #2563eb  = MATRÍCULA EM PROCESSO: tem recurring_registration_step > 0
+ *                        E NÃO está com matrícula concluída.
+ *   3) AMARELO #eab308 = Card Status "Dados básicos coletados / Nenhum passo pendente
+ *                        nessa etapa" (step null e NÃO matriculado).
+ *   4) LARANJA #ea580c = padrão (fallback; qualquer outro cenário).
+ */
+type AvatarSize = "small" | "big";
+function getAvatarColorClassesForLead(
+  lead: AtendimentoLeadListItem | null | undefined,
+  opts?: {
+    size?: AvatarSize;
+    isSelected?: boolean;
+  }
+): string {
+  const size = opts?.size ?? "small";
+  const isSelected = Boolean(opts?.isSelected);
+
+  const bigSizeBase =
+    size === "big"
+      ? "flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl sm:h-16 sm:w-16 sm:rounded-full text-[22px] font-semibold"
+      : "";
+  const smallSizeBase =
+    size === "small"
+      ? "flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-[14px] font-semibold"
+      : "";
+  const sizeBase = bigSizeBase || smallSizeBase;
+
+  if (!lead) {
+    // Sem lead → laranja padrão (includeRings só se isSelected ou size="big" está isolado no topo).
+    if (isSelected) {
+      return `${sizeBase} !bg-[#ea580c] !text-white ring-[3px] ring-[#c2410c] shadow-[0_2px_6px_rgba(234,88,12,0.42)] transition-none hover:!bg-[#ea580c] hover:!ring-[#c2410c]`;
+    }
+    return `${sizeBase} !bg-[#ea580c] !text-white transition-none hover:!bg-[#ea580c]`;
+  }
+
+  const step = buildRecurringMetaForVisaoGeral(lead);
+  const matriculaConcluida = isLeadMatriculaConcluida(lead);
+
+  // --- REGRA 2: AZUL (matrícula EM PROCESSO) ---
+  // Tem step de matrícula ativa (>= 1) e ainda não concluiu.
+  const matriculaEmProcesso =
+    !matriculaConcluida && typeof step?.recurringRegistrationStep === "number" && step.recurringRegistrationStep > 0;
+
+  // --- REGRA 3: AMARELO (dados básicos / nada pendente) ---
+  const dadosBasicosOkNadaPendente =
+    (step === null || step === undefined) && !matriculaConcluida;
+
+  // --- REGRA 1: VERDE (prof + link + NÃO matr concluída) ---
+  const prof = experimentalAssignedProfessorForLead(lead);
+  const link = experimentalLessonLinkForLead(lead);
+  const temProfessor = prof !== null && prof !== undefined;
+  const temLink = Boolean(link);
+  const professorELinkOk = temProfessor && temLink && !matriculaConcluida;
+
+  if (professorELinkOk) {
+    if (isSelected || size === "big") {
+      return `${sizeBase} !bg-[#16a34a] !text-white ring-[3px] ring-[#15803d] shadow-[0_2px_6px_rgba(22,163,74,0.42)] transition-none hover:!bg-[#16a34a] hover:!ring-[#15803d]`;
+    }
+    return `${sizeBase} !bg-[#16a34a] !text-white transition-none hover:!bg-[#16a34a]`;
+  }
+
+  if (matriculaEmProcesso) {
+    // AZUL — regra da legenda Palette (processo de cadastro de matrícula).
+    if (isSelected || size === "big") {
+      return `${sizeBase} !bg-[#2563eb] !text-white ring-[3px] ring-[#1d4ed8] shadow-[0_2px_6px_rgba(37,99,235,0.42)] transition-none hover:!bg-[#2563eb] hover:!ring-[#1d4ed8]`;
+    }
+    return `${sizeBase} !bg-[#2563eb] !text-white transition-none hover:!bg-[#2563eb]`;
+  }
+
+  if (dadosBasicosOkNadaPendente) {
+    if (isSelected || size === "big") {
+      return `${sizeBase} !bg-[#eab308] !text-white ring-[3px] ring-[#ca8a04] shadow-[0_2px_6px_rgba(202,138,4,0.5)] transition-none hover:!bg-[#eab308] hover:!ring-[#ca8a04]`;
+    }
+    return `${sizeBase} !bg-[#eab308] !text-white transition-none hover:!bg-[#eab308]`;
+  }
+
+  // --- REGRA 4: LARANJA padrão ---
+  if (isSelected || size === "big") {
+    return `${sizeBase} !bg-[#ea580c] !text-white ring-[3px] ring-[#c2410c] shadow-[0_2px_6px_rgba(234,88,12,0.42)] transition-none hover:!bg-[#ea580c] hover:!ring-[#c2410c]`;
+  }
+  return `${sizeBase} !bg-[#ea580c] !text-white transition-none hover:!bg-[#ea580c]`;
+}
+
 function deriveLeadEffectiveTimeZone(lead: AtendimentoLeadListItem | null | undefined): string {
   if (!lead) return ATENDIMENTO_PROFESSOR_TIME_ZONE;
   const cityRaw = String((lead as any).city ?? "").trim();
@@ -4193,83 +4287,7 @@ export function AtendimentoClient() {
                         ].join(" ")}
                       >
                         <div
-                          className={[
-                            "flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-[14px] font-semibold",
-                            (() => {
-                              // =============== REGRA NOVA: FUNDO AMARELO ===============
-                              // User pediu (2026-09-29):
-                              //   "Para ficar com fundo amarelo deve ser do status:
-                              //    Dados básicos coletados / Nenhum passo pendente nessa etapa.
-                              //    referente a aula experimental"
-                              //
-                              // Maqueteamento 1:1 com o CARD STATUS do painel (L4539-L4547):
-                              //   · Se buildRecurringMetaForVisaoGeral(lead) === null
-                              //        E
-                              //     !isLeadMatriculaConcluida(lead)
-                              //   → Card Status mostra EXATAMENTE:
-                              //       "Dados básicos coletados" + "Nenhum passo pendente nessa etapa."
-                              //   → Esse é o único caso onde o avatar fica AMARELO.
-                              const step = buildRecurringMetaForVisaoGeral(lead);
-                              const matriculaConcluida = isLeadMatriculaConcluida(lead);
-                              const dadosBasicosOkNadaPendente =
-                                step === null || step === undefined
-                                ? !matriculaConcluida
-                                : false;
-
-                              // =============== REGRA NOVA: FUNDO VERDE ===============
-                              // User pediu (2026-09-29):
-                              //   "Quando o professor for selecionado e o link da aula
-                              //    adicionado devera ficar fundo verde"
-                              //
-                              // Usa as mesmas funções já padronizadas do app (consistente
-                              // com programação-diária, disparo de notificações, summary):
-                              //   · PROFESSOR SELECIONADO → experimentalAssignedProfessorForLead
-                              //     retorna !== null (já lida com flat lead + booking).
-                              //   · LINK AULA ADICIONADO   → experimentalLessonLinkForLead
-                              //     retorna !== '' (lida com lead.experimental_class_link
-                              //     OU booking.lesson_link).
-                              //
-                              // TEM PRECEDÊNCIA SOBRE AMARELO e cor normal: se ambos os
-                              // marcadores acima estiverem OK → VERDE sempre (matricula
-                              // concluída continua na cor normal conforme regra original).
-                              const prof = experimentalAssignedProfessorForLead(lead);
-                              const link = experimentalLessonLinkForLead(lead);
-                              const temProfessor = prof !== null && prof !== undefined;
-                              const temLink = Boolean(link);
-                              const professorELinkOk = temProfessor && temLink && !matriculaConcluida;
-
-                              if (professorELinkOk) {
-                                return isSelected
-                                  // SELECIONADO verde: mesmo fundo (#16a34a green-600),
-                                  // anel + sombra para marcar seleção (igual amarelo),
-                                  // sem hover.
-                                  ? "!bg-[#16a34a] !text-white ring-[3px] ring-[#15803d] shadow-[0_2px_6px_rgba(22,163,74,0.42)] transition-none hover:!bg-[#16a34a] hover:!ring-[#15803d]"
-                                  // NÃO SELECIONADO verde: #16a34a (verde vivo), sem anel,
-                                  // sem hover, texto branco (contraste bom no verde).
-                                  : "!bg-[#16a34a] !text-white transition-none hover:!bg-[#16a34a]";
-                              }
-
-                              if (dadosBasicosOkNadaPendente) {
-                                return isSelected
-                                  // SELECIONADO → MESMO FUNDO AMARELO um pouco mais escuro (#eab308)
-                                  // do unselected, NÃO deixa mais escuro ainda. A seleção é marcada
-                                  // só por anel grosso (ring-[3px] #ca8a04) + sombra. Sem hover.
-                                  ? "!bg-[#eab308] !text-white ring-[3px] ring-[#ca8a04] shadow-[0_2px_6px_rgba(202,138,4,0.5)] transition-none hover:!bg-[#eab308] hover:!ring-[#ca8a04]"
-                                  // NÃO SELECIONADO → amarelo #eab308 (um pouco mais escuro que o antigo #facc15).
-                                  // Sem hover, sem anel, sem tom escuro extra.
-                                  : "!bg-[#eab308] !text-white transition-none hover:!bg-[#eab308]";
-                              }
-
-                              // Qualquer OUTRO status (matricula concluida / warning de falta
-                              // estado cidade / falta dia-horario) → laranja PERMANENTE
-                              // (não precisa selecionar para ficar laranja, conforme pedido).
-                              // Seleção é marcada só por anel + sombra (igual verde/amarelo),
-                              // sem mudar a cor do fundo.
-                              return isSelected
-                                ? "!bg-[#ea580c] !text-white ring-[3px] ring-[#c2410c] shadow-[0_2px_6px_rgba(234,88,12,0.42)] transition-none hover:!bg-[#ea580c] hover:!ring-[#c2410c]"
-                                : "!bg-[#ea580c] !text-white transition-none hover:!bg-[#ea580c]";
-                            })(),
-                          ].join(" ")}
+                          className={getAvatarColorClassesForLead(lead, { size: "small", isSelected })}
                         >
                           {buildInitials(lead.full_name)}
                         </div>
@@ -4434,9 +4452,10 @@ export function AtendimentoClient() {
                   {/* MOBILE (< sm): CONTEÚDO CENTRALIZADO. DESKTOP (sm+): layout lateral original */}
                   <div className="flex flex-col gap-5 sm:flex-row sm:items-start sm:justify-between">
                     <div className="flex flex-col items-center gap-4 text-center min-w-0 sm:flex-row sm:items-start sm:justify-start sm:text-left">
-                      <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl !bg-[#ea580c] text-[22px] font-semibold !text-white sm:h-16 sm:w-16 sm:text-[22px] sm:rounded-full">
+                      <div className={getAvatarColorClassesForLead(sl, { size: "big", isSelected: true })}>
                         {buildInitials(sl.full_name)}
                       </div>
+
                       <div className="min-w-0 flex-1 w-full">
                         <h2 className="truncate text-[20px] font-bold leading-tight text-[var(--app-text-85)] sm:text-[22px]">
                           {sl.full_name?.trim() || "Sem nome"}
@@ -5456,9 +5475,10 @@ export function AtendimentoClient() {
                 {/* MOBILE (< sm): CONTEÚDO CENTRALIZADO. DESKTOP (sm+): layout lateral original */}
                 <div className="flex flex-col gap-5 sm:flex-row sm:items-start sm:justify-between">
                   <div className="flex flex-col items-center gap-4 text-center min-w-0 sm:flex-row sm:items-start sm:justify-start sm:text-left">
-                    <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl bg-[var(--app-active)] text-[22px] font-semibold text-[#9a3412] sm:h-16 sm:w-16 sm:text-[22px] sm:rounded-full">
+                    <div className={getAvatarColorClassesForLead(sl, { size: "big", isSelected: true })}>
                       {buildInitials(sl.full_name)}
                     </div>
+
                     <div className="min-w-0 flex-1 w-full">
                       <h2 className="truncate text-[20px] font-bold leading-tight text-[var(--app-text-85)] sm:text-[22px]">
                         {sl.full_name?.trim() || "Sem nome"}
