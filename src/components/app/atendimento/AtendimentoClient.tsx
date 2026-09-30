@@ -4084,33 +4084,37 @@ export function AtendimentoClient() {
                             "flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-[14px] font-semibold",
                             (() => {
                               // =============== REGRA NOVA: FUNDO AMARELO ===============
-                              // User pediu: "Quando o professor ainda não foi selecionado
-                              //              E o link da aula experimental também não foi
-                              //              registrado! → fundo amarelo."
+                              // User pediu (2026-09-29):
+                              //   "Para ficar com fundo amarelo deve ser do status:
+                              //    Dados básicos coletados / Nenhum passo pendente nessa etapa.
+                              //    referente a aula experimental"
                               //
-                              // Implementação: a regra tem PRECEDÊNCIA SOBRE a cor normal:
-                              //   - Checa PROFESSOR: experimentalAssignedProfessorForLead
-                              //     (leva em conta flat lead + booking) retorna null?
-                              //   - Checa LINK: experimentalLessonLinkForLead
-                              //     (lead.experimental_class_link OU booking.lesson_link)
-                              //     retorna ""?
-                              //   - AMBOS verdadeiros → Fundo AMARELO.
+                              // Maqueteamento 1:1 com o CARD STATUS do painel (L4539-L4547):
+                              //   · Se buildRecurringMetaForVisaoGeral(lead) === null
+                              //        E
+                              //     !isLeadMatriculaConcluida(lead)
+                              //   → Card Status mostra EXATAMENTE:
+                              //       "Dados básicos coletados" + "Nenhum passo pendente nessa etapa."
+                              //   → Esse é o único caso onde o avatar fica AMARELO.
                               //
-                              // Se estiver selecionado (isSelected) → amarelo mais escuro
-                              // (amarelo 500 #eab308) para diferenciar do unselected.
-                              const prof = experimentalAssignedProfessorForLead(lead);
-                              const link = experimentalLessonLinkForLead(lead);
-                              const semProfessor = prof === null || prof === undefined;
-                              const semLink = !link;
-                              const avisarAmarelo = semProfessor && semLink;
+                              // Nota: a condição antiga (semProf && semLink) era INCORRETA pois
+                              // pegava quem ainda faltava preencher dados, ao invés de quem já
+                              // finalizou Dados Básicos e está em "etapa neutra".
+                              const step = buildRecurringMetaForVisaoGeral(lead);
+                              const matriculaConcluida = isLeadMatriculaConcluida(lead);
+                              const dadosBasicosOkNadaPendente =
+                                step === null || step === undefined
+                                ? !matriculaConcluida
+                                : false;
 
-                              if (avisarAmarelo) {
+                              if (dadosBasicosOkNadaPendente) {
                                 return isSelected
                                   ? "!bg-[#eab308] !text-black ring-2 ring-[#ca8a04] shadow-[0_1px_2px_rgba(234,179,8,0.35)]"
                                   : "!bg-[#fde047] !text-black";
                               }
 
-                              // Caso normal (tinha professor OU tem link):
+                              // Qualquer OUTRO status (matricula concluida / warning de falta
+                              // estado cidade / falta dia-horario) → cor normal.
                               return isSelected
                                 ? "bg-[#ea580c] !text-white"
                                 : "bg-[var(--app-active)] text-[#9a3412]";
