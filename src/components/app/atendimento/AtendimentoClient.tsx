@@ -2830,7 +2830,7 @@ export function AtendimentoClient() {
         cor: "bg-[#ea580c]",
         titulo: "Laranja",
         descricao:
-          "Cadastro incompleto e processo de agendamento para aula experimental.",
+          "Cadastro incompleto em processo de agendamento para aula experimental.",
         ring: "ring-[3px] ring-[#c2410c]",
       },
       {
