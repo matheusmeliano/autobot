@@ -4846,20 +4846,30 @@ export function AtendimentoClient() {
                           </div>
                         </div>
                         {(() => {
+                          // Como o gate de buildRecurringMetaForVisaoGeral hoje é
+                          // extremamente restrito, statusMeta === null GARANTIDAMENTE
+                          // significa FASE EXPERIMENTAL PURA / leads que nunca avançaram
+                          // no link de matricula (step<1 e sem senha recorrente).
+                          // Para esses casos, DEVE PERMANECER EXATAMENTE COMO ERA ANTES,
+                          // ou seja, VERDE "Dados básicos coletados" (mesmo texto e
+                          // mesmas classes de tailwind). Nada das alterações de azul
+                          // devem tocar este cenário.
                           if (!statusMeta) {
                             return (
-                              <div className="mt-4 rounded-xl border border-[#2563eb]/35 bg-[rgba(37,99,235,0.12)] px-4 py-3">
-                                <div className="font-semibold text-[#1e3a8a]">
-                                  Cadastro não iniciado
+                              <div className="mt-4 rounded-xl border border-emerald-500/35 bg-emerald-500/15 px-4 py-3">
+                                <div className="font-semibold text-emerald-800">
+                                  Dados básicos coletados
                                 </div>
-                                <div className="mt-0.5 text-[13px] text-[#1d4ed8]/80">
-                                  O aluno ainda não acessou o link de matrícula ou ainda não completou o registro inicial.
+                                <div className="mt-0.5 text-[13px] text-emerald-700/90">
+                                  Nenhum passo pendente nessa etapa.
                                 </div>
                               </div>
                             );
                           }
-                          // Todos os casos de matricula (info = em processo | success = concluida)
-                          // sao AZUIS para manter consistencia de cor com o avatar e o badge.
+                          // Todos os statusMeta retornados quando PASSOU pelo gate
+                          // (recorrente realmente iniciado OU pagamento confirmado)
+                          // sao AZUIS, como o usuario pediu (consistente com avatar e
+                          // badge Recorrente).
                           if (statusMeta.tone === "success" || statusMeta.tone === "info" || statusMeta.tone === "default") {
                             return (
                               <div className="mt-4 rounded-xl border border-[#2563eb]/35 bg-[rgba(37,99,235,0.12)] px-4 py-3">
@@ -4872,6 +4882,7 @@ export function AtendimentoClient() {
                               </div>
                             );
                           }
+                          // Apenas tone=warning continua em laranja (problemas/rejeicoes).
                           return (
                             <div className="mt-4 rounded-xl border border-[rgba(234,88,12,0.35)] bg-[rgba(234,88,12,0.14)] px-4 py-3">
                               <div className="flex items-start gap-3">
@@ -5974,12 +5985,12 @@ export function AtendimentoClient() {
                       {(() => {
                         if (!statusMeta) {
                           return (
-                            <div className="mt-4 rounded-xl border border-[#2563eb]/35 bg-[rgba(37,99,235,0.12)] px-4 py-3">
-                              <div className="font-semibold text-[#1e3a8a]">
-                                Cadastro não iniciado
+                            <div className="mt-4 rounded-xl border border-emerald-500/35 bg-emerald-500/15 px-4 py-3">
+                              <div className="font-semibold text-emerald-800">
+                                Dados básicos coletados
                               </div>
-                              <div className="mt-0.5 text-[13px] text-[#1d4ed8]/80">
-                                O aluno ainda não acessou o link de matrícula ou ainda não completou o registro inicial.
+                              <div className="mt-0.5 text-[13px] text-emerald-700/90">
+                                Nenhum passo pendente nessa etapa.
                               </div>
                             </div>
                           );
