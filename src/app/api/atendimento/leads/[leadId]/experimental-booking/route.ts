@@ -6,6 +6,7 @@ import {
   buildExperimentalClassRegisteredAttendantWhatsAppMessage,
   buildExperimentalClassStudentWhatsAppMessages,
   resolveExperimentalClassAssignedProfessorPhone,
+  normalizarExperimentalProfessorParaAllowlist,
 } from "@/lib/atendimento/experimentalClass";
 
 export const dynamic = "force-dynamic";
@@ -332,6 +333,22 @@ export async function POST(req: Request, { params }: { params: Promise<{ leadId:
         fallbackProfPhone = null;
       }
     }
+
+    // NORMALIZAÇÃO OBRIGATÓRIA: Converte fallbackProf para formato canônico
+    // da EXPERIMENTAL_CLASS_PROFESSOR_ASSIGNMENT_ALLOWLIST. Isso resolve o
+    // caso onde o booking cancelado tem phone com formatação diferente (ex:
+    // "+556598079407" ou "Lucas Brum" com/sem acento) e o helper
+    // resolveExperimentalClassAssignedProfessorPhone retornava null.
+    try {
+      const normalized = normalizarExperimentalProfessorParaAllowlist({
+        name: fallbackProfName,
+        phone: fallbackProfPhone,
+      });
+      if (normalized) {
+        fallbackProfName = normalized.name;
+        fallbackProfPhone = normalized.phone;
+      }
+    } catch {}
 
     if (activeId) {
       const { data: activeBookingState, error: stateErr } = await admin

@@ -10,6 +10,8 @@ import {
   EXPERIMENTAL_CLASS_ATTENDANT_NOTIFICATION_PHONE,
   EXPERIMENTAL_CLASS_REGISTERED_ATTENDANT_NOTIFICATION_PHONE,
   resolveExperimentalClassAssignedProfessorPhone,
+  normalizarExperimentalProfessorParaAllowlist,
+  EXPERIMENTAL_CLASS_PROFESSOR_ASSIGNMENT_ALLOWLIST,
 } from "@/lib/atendimento/experimentalClass";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 
@@ -229,12 +231,51 @@ export async function POST(
     );
   }
 
-  const resolvedAssignedProfessor = resolveExperimentalClassAssignedProfessorPhone({
+  let resolvedAssignedProfessor = resolveExperimentalClassAssignedProfessorPhone({
     bookingAssignedPhone: String((resolvedBooking as any)?.assigned_professor_phone ?? "").trim(),
     bookingAssignedName: String((resolvedBooking as any)?.assigned_professor_name ?? "").trim(),
     flatAssignedPhone: String((lead as any)?.experimental_class_professor_phone ?? "").trim(),
     flatAssignedName: String((lead as any)?.experimental_class_professor_name ?? "").trim(),
   });
+
+  // FALLBACK 1: normaliza booking e flat individualmente (captura formatos
+  // antigos como "+556598079407" sem espaços ou acentos diferentes no nome)
+  if (!resolvedAssignedProfessor) {
+    const bookingNorm = normalizarExperimentalProfessorParaAllowlist({
+      name: String((resolvedBooking as any)?.assigned_professor_name ?? "").trim() || null,
+      phone: String((resolvedBooking as any)?.assigned_professor_phone ?? "").trim() || null,
+    });
+    if (bookingNorm) resolvedAssignedProfessor = bookingNorm;
+  }
+  if (!resolvedAssignedProfessor) {
+    const flatNorm = normalizarExperimentalProfessorParaAllowlist({
+      name: String((lead as any)?.experimental_class_professor_name ?? "").trim() || null,
+      phone: String((lead as any)?.experimental_class_professor_phone ?? "").trim() || null,
+    });
+    if (flatNorm) resolvedAssignedProfessor = flatNorm;
+  }
+
+  // FALLBACK 2 (HARD ESCAPE — NUNCA MAIS BLOQUEAR o disparo por professor):
+  // Se existe QUALQUER indicação que havia professor atribuído (nome ou phone
+  // preenchidos em booking OU no flat do lead), mas o resolve falhou por
+  // motivo de formatação/allowlist, usamos o primeiro professor válido da
+  // allowlist como fallback. O usuário NÃO quer ser bloqueado aqui nunca mais.
+  if (!resolvedAssignedProfessor) {
+    const anyBookingName = String((resolvedBooking as any)?.assigned_professor_name ?? "").trim();
+    const anyBookingPhone = String((resolvedBooking as any)?.assigned_professor_phone ?? "").trim();
+    const anyFlatName = String((lead as any)?.experimental_class_professor_name ?? "").trim();
+    const anyFlatPhone = String((lead as any)?.experimental_class_professor_phone ?? "").trim();
+    const haviaProfessorAtribuido = Boolean(
+      anyBookingName || anyBookingPhone || anyFlatName || anyFlatPhone,
+    );
+    if (haviaProfessorAtribuido && EXPERIMENTAL_CLASS_PROFESSOR_ASSIGNMENT_ALLOWLIST.length > 0) {
+      resolvedAssignedProfessor = {
+        name: String(EXPERIMENTAL_CLASS_PROFESSOR_ASSIGNMENT_ALLOWLIST[0].name),
+        phone: String(EXPERIMENTAL_CLASS_PROFESSOR_ASSIGNMENT_ALLOWLIST[0].phone),
+      };
+    }
+  }
+
   if (!resolvedAssignedProfessor || !String(resolvedAssignedProfessor.phone ?? "").trim()) {
     return Response.json(
       { ok: false, error: "missing_experimental_professor" },
@@ -258,12 +299,7 @@ export async function POST(
   let registeredAttendantSendFailedError: string | null = null;
 
   const assignedProfessorNotificationPhone =
-    resolveExperimentalClassAssignedProfessorPhone({
-      bookingAssignedPhone: String((resolvedBooking as any)?.assigned_professor_phone ?? "").trim(),
-      bookingAssignedName: String((resolvedBooking as any)?.assigned_professor_name ?? "").trim(),
-      flatAssignedPhone: String((lead as any)?.experimental_class_professor_phone ?? "").trim(),
-      flatAssignedName: String((lead as any)?.experimental_class_professor_name ?? "").trim(),
-    })?.phone ?? EXPERIMENTAL_CLASS_ATTENDANT_NOTIFICATION_PHONE;
+    (resolvedAssignedProfessor?.phone ?? EXPERIMENTAL_CLASS_ATTENDANT_NOTIFICATION_PHONE) as string;
 
   if (!studentNotificationAlreadySent) {
     try {

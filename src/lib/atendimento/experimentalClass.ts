@@ -40,6 +40,49 @@ export function getExperimentalClassInternalStaffPhoneNumbers(): readonly string
   ];
 }
 
+export function normalizarExperimentalProfessorParaAllowlist(input: {
+  name?: string | null;
+  phone?: string | null;
+}): { name: string; phone: string } | null {
+  const rawName = String(input.name ?? "").trim();
+  const rawPhone = String(input.phone ?? "").trim();
+
+  const normalizePhone = (s: string): string => s.replace(/[^0-9+]/g, "");
+  const normalizeName = (s: string): string =>
+    s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+
+  if (rawName && rawPhone) {
+    const normPhone = normalizePhone(rawPhone);
+    const normName = normalizeName(rawName);
+    const exactBoth = EXPERIMENTAL_CLASS_PROFESSOR_ASSIGNMENT_ALLOWLIST.find((p) => {
+      const pn = normalizePhone(String(p.phone));
+      const pnn = normalizeName(String(p.name));
+      return pn === normPhone && pnn === normName;
+    });
+    if (exactBoth) return { name: exactBoth.name, phone: exactBoth.phone };
+  }
+
+  if (rawPhone) {
+    const normPhone = normalizePhone(rawPhone);
+    const byPhone = EXPERIMENTAL_CLASS_PROFESSOR_ASSIGNMENT_ALLOWLIST.find(
+      (p) => normalizePhone(String(p.phone)) === normPhone,
+    );
+    if (byPhone) return { name: byPhone.name, phone: byPhone.phone };
+  }
+
+  if (rawName) {
+    const normName = normalizeName(rawName);
+    const nameMatches = EXPERIMENTAL_CLASS_PROFESSOR_ASSIGNMENT_ALLOWLIST.filter(
+      (p) => normalizeName(String(p.name)) === normName,
+    );
+    if (nameMatches.length === 1) {
+      return { name: nameMatches[0].name, phone: nameMatches[0].phone };
+    }
+  }
+
+  return null;
+}
+
 export function resolveExperimentalClassAssignedProfessorPhone(input: {
   bookingAssignedPhone?: string | null;
   bookingAssignedName?: string | null;
@@ -64,6 +107,13 @@ export function resolveExperimentalClassAssignedProfessorPhone(input: {
     if (!phone) continue;
     const match = EXPERIMENTAL_CLASS_PROFESSOR_ASSIGNMENT_ALLOWLIST.find((p) => String(p.phone) === phone);
     if (match) return { name: match.name, phone: match.phone };
+  }
+  for (const c of candidates) {
+    const normalized = normalizarExperimentalProfessorParaAllowlist({
+      name: c.name ?? null,
+      phone: c.phone ?? null,
+    });
+    if (normalized) return normalized;
   }
   return null;
 }
