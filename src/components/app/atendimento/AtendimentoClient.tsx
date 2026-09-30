@@ -4148,10 +4148,13 @@ export function AtendimentoClient() {
                               }
 
                               // Qualquer OUTRO status (matricula concluida / warning de falta
-                              // estado cidade / falta dia-horario) → cor normal.
+                              // estado cidade / falta dia-horario) → laranja PERMANENTE
+                              // (não precisa selecionar para ficar laranja, conforme pedido).
+                              // Seleção é marcada só por anel + sombra (igual verde/amarelo),
+                              // sem mudar a cor do fundo.
                               return isSelected
-                                ? "bg-[#ea580c] !text-white"
-                                : "bg-[var(--app-active)] text-[#9a3412]";
+                                ? "!bg-[#ea580c] !text-white ring-[3px] ring-[#c2410c] shadow-[0_2px_6px_rgba(234,88,12,0.42)] transition-none hover:!bg-[#ea580c] hover:!ring-[#c2410c]"
+                                : "!bg-[#ea580c] !text-white transition-none hover:!bg-[#ea580c]";
                             })(),
                           ].join(" ")}
                         >
@@ -4318,7 +4321,7 @@ export function AtendimentoClient() {
                   {/* MOBILE (< sm): CONTEÚDO CENTRALIZADO. DESKTOP (sm+): layout lateral original */}
                   <div className="flex flex-col gap-5 sm:flex-row sm:items-start sm:justify-between">
                     <div className="flex flex-col items-center gap-4 text-center min-w-0 sm:flex-row sm:items-start sm:justify-start sm:text-left">
-                      <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl bg-[var(--app-active)] text-[22px] font-semibold text-[#9a3412] sm:h-16 sm:w-16 sm:text-[22px] sm:rounded-full">
+                      <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl !bg-[#ea580c] text-[22px] font-semibold !text-white sm:h-16 sm:w-16 sm:text-[22px] sm:rounded-full">
                         {buildInitials(sl.full_name)}
                       </div>
                       <div className="min-w-0 flex-1 w-full">
