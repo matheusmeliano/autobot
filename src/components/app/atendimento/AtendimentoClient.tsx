@@ -4141,10 +4141,10 @@ export function AtendimentoClient() {
                                   // SELECIONADO → MESMO FUNDO AMARELO (#facc15) do unselected,
                                   // NÃO deixa mais escuro. A seleção é marcada só por anel grosso
                                   // (ring-[3px] #a16207) + sombra mais forte. Sem hover.
-                                  ? "!bg-[#facc15] !text-black ring-[3px] ring-[#a16207] shadow-[0_2px_6px_rgba(161,98,7,0.45)] transition-none hover:!bg-[#facc15] hover:!ring-[#a16207]"
+                                  ? "!bg-[#facc15] !text-white ring-[3px] ring-[#a16207] shadow-[0_2px_6px_rgba(161,98,7,0.45)] transition-none hover:!bg-[#facc15] hover:!ring-[#a16207]"
                                   // NÃO SELECIONADO → amarelo #facc15 (exato do print "MP").
                                   // Sem hover, sem anel, sem tom escuro.
-                                  : "!bg-[#facc15] !text-black transition-none hover:!bg-[#facc15]";
+                                  : "!bg-[#facc15] !text-white transition-none hover:!bg-[#facc15]";
                               }
 
                               // Qualquer OUTRO status (matricula concluida / warning de falta
