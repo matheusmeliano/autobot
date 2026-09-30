@@ -480,6 +480,7 @@ export function AtendimentoClient() {
   const [showMobileLeadModal, setShowMobileLeadModal] = useState(false);
   const [showMetricsModal, setShowMetricsModal] = useState(false);
   const [showFiltersModal, setShowFiltersModal] = useState(false);
+  const [showColorLegendModal, setShowColorLegendModal] = useState(false);
   const [isMobileViewport, setIsMobileViewport] = useState(false);
   const [botExperimentalDisabled, setBotExperimentalDisabled] = useState<boolean>(false);
   const [botExperimentalLoading, setBotExperimentalLoading] = useState<boolean>(false);
@@ -2818,6 +2819,109 @@ export function AtendimentoClient() {
     }
   }
 
+  function renderColorLegendModal() {
+    const items: Array<{
+      cor: string;
+      titulo: string;
+      descricao: string;
+      ring?: string;
+    }> = [
+      {
+        cor: "bg-[#ea580c]",
+        titulo: "Laranja",
+        descricao:
+          "Cadastro incompleto e processo de agendamento para aula experimental.",
+        ring: "ring-[3px] ring-[#c2410c]",
+      },
+      {
+        cor: "bg-[#eab308]",
+        titulo: "Amarelo",
+        descricao:
+          "Aula experimental agendada, mas falta selecionar o professor e adicionar o link da aula.",
+        ring: "ring-[3px] ring-[#ca8a04]",
+      },
+      {
+        cor: "bg-[#16a34a]",
+        titulo: "Verde",
+        descricao:
+          "Sistema pronto para fazer o disparo agendado ou manual do link da aula e, após a aula, enviar o link da matrícula.",
+        ring: "ring-[3px] ring-[#15803d]",
+      },
+      {
+        cor: "bg-[#2563eb]",
+        titulo: "Azul",
+        descricao:
+          "Aluno em processo de cadastro de matrícula até finalmente se tornar aluno da plataforma.",
+        ring: "ring-[3px] ring-[#1d4ed8]",
+      },
+    ];
+    return (
+      <AppModal
+        open={showColorLegendModal}
+        onClose={() => setShowColorLegendModal(false)}
+        size="md"
+        position="center"
+        zIndexClass="z-[400]"
+        fullScreenOnMobile={false}
+        closeOnBackdrop
+        closeOnEscape
+      >
+        <div className="flex w-full flex-col gap-0">
+          <div className="flex shrink-0 items-center justify-between gap-3 pb-1">
+            <div className="flex items-center gap-3 min-w-0">
+              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-[rgba(37,99,235,0.12)]">
+                <Info className="h-5 w-5 text-[#1d4ed8]" />
+              </div>
+              <div className="min-w-0">
+                <h3 className="truncate text-[18px] font-bold leading-tight text-[var(--app-text-85)]">
+                  Legenda das cores
+                </h3>
+                <div className="mt-0.5 text-[12px] text-[var(--app-text-55)]">
+                  Entenda o que significa a cor do avatar de cada registro.
+                </div>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => setShowColorLegendModal(false)}
+              aria-label="Fechar"
+              className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-[var(--app-border)] bg-[var(--app-solid-surface)] text-[var(--app-text-70)] hover:bg-[var(--app-hover)] disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+
+          <div className="mt-5 flex flex-col gap-3">
+            {items.map((it) => (
+              <div
+                key={it.titulo}
+                className="flex w-full items-start gap-3 rounded-xl border border-[var(--app-border)] bg-[var(--app-solid-surface-2)] px-4 py-3"
+              >
+                <div
+                  className={[
+                    "flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-[14px] font-semibold text-white transition-none shadow-[0_2px_6px_rgba(15,23,42,0.18)]",
+                    it.cor,
+                    it.ring ?? "",
+                  ].join(" ")}
+                >
+                  {it.titulo.charAt(0)}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="text-[14px] font-bold leading-tight text-[var(--app-text-85)]">
+                    {it.titulo}
+                  </div>
+                  <div className="mt-1 text-[13px] leading-snug text-[var(--app-text-60)]">
+                    {it.descricao}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </AppModal>
+    );
+  }
+
   function renderEditLocationModal() {
     return (
       <AppModal
@@ -4012,6 +4116,15 @@ export function AtendimentoClient() {
               className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-[var(--app-border)] bg-[var(--app-solid-surface)] text-[var(--app-text-85)] hover:bg-[var(--app-hover)] disabled:cursor-not-allowed disabled:opacity-60 shadow-none"
             >
               <Plus className="h-4 w-4" />
+            </button>
+            <button
+              type="button"
+              onClick={() => setShowColorLegendModal(true)}
+              aria-label="Legenda das cores dos avatares"
+              title="Legenda das cores dos avatares"
+              className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] text-[var(--app-text-75)] hover:bg-[var(--app-hover)] shadow-none"
+            >
+              <Info className="h-5 w-5" />
             </button>
             <div className="relative shrink-0">
               <button
@@ -6339,6 +6452,9 @@ export function AtendimentoClient() {
 
       {/* Modal Criar Lead (placeholder para próxima etapa) */}
       {renderCreateLeadModal()}
+
+      {/* Modal Legenda Cores dos avatares (clicou no ícone Info ao lado do bot do bot) */}
+      {renderColorLegendModal()}
 
       {/* Modal Editar Lead (clicou no botão Editar no header) */}
       {renderEditLeadModal()}
