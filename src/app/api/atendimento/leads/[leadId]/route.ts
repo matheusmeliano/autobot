@@ -717,6 +717,12 @@ export async function PATCH(request: Request, context: { params: Promise<{ leadI
     recurring_class_professor_time: z.string().trim().max(20).nullable().optional(),
     recurring_class_status: z.string().trim().max(120).nullable().optional(),
     recurring_registration_step: z.number().int().min(0).max(12).nullable().optional(),
+    payment_status: z.string().trim().max(120).nullable().optional(),
+    payment_confirmed_at: z.string().trim().max(80).nullable().optional(),
+    payment_rejected_at: z.string().trim().max(80).nullable().optional(),
+    recurring_payment_status: z.string().trim().max(120).nullable().optional(),
+    recurring_payment_confirmed_at: z.string().trim().max(80).nullable().optional(),
+    enrollment_number: z.string().trim().max(120).nullable().optional(),
     internal_notes: z.string().max(5000).nullable().optional(),
   });
   const parsed = schema.safeParse(body);
@@ -1337,6 +1343,20 @@ export async function PATCH(request: Request, context: { params: Promise<{ leadI
     safeInternalNotes = String(internalNotesRaw).substring(0, 5000);
   }
 
+  const paymentStatusRaw = parsed.data.payment_status;
+  const paymentConfirmedAtRaw = parsed.data.payment_confirmed_at;
+  const paymentRejectedAtRaw = parsed.data.payment_rejected_at;
+  const recurringPaymentStatusRaw = parsed.data.recurring_payment_status;
+  const recurringPaymentConfirmedAtRaw = parsed.data.recurring_payment_confirmed_at;
+  const enrollmentNumberRaw = parsed.data.enrollment_number;
+
+  const safePaymentStatus = toSafeStringTrimOrNull(paymentStatusRaw);
+  const safePaymentConfirmedAt = toSafeStringTrimOrNull(paymentConfirmedAtRaw);
+  const safePaymentRejectedAt = toSafeStringTrimOrNull(paymentRejectedAtRaw);
+  const safeRecurringPaymentStatus = toSafeStringTrimOrNull(recurringPaymentStatusRaw);
+  const safeRecurringPaymentConfirmedAt = toSafeStringTrimOrNull(recurringPaymentConfirmedAtRaw);
+  const safeEnrollmentNumber = toSafeStringTrimOrNull(enrollmentNumberRaw);
+
   const admin = createSupabaseAdminClient();
   const updateData: Record<string, unknown> = {};
   if (safeFullName !== undefined) updateData.full_name = safeFullName;
@@ -1349,6 +1369,12 @@ export async function PATCH(request: Request, context: { params: Promise<{ leadI
   if (safeRecProfessorTime !== undefined) updateData.recurring_class_professor_time = safeRecProfessorTime;
   if (safeRecStatus !== undefined) updateData.recurring_class_status = safeRecStatus;
   if (safeRecStep !== undefined) updateData.recurring_registration_step = safeRecStep;
+  if (safePaymentStatus !== undefined) updateData.payment_status = safePaymentStatus;
+  if (safePaymentConfirmedAt !== undefined) updateData.payment_confirmed_at = safePaymentConfirmedAt;
+  if (safePaymentRejectedAt !== undefined) updateData.payment_rejected_at = safePaymentRejectedAt;
+  if (safeRecurringPaymentStatus !== undefined) updateData.recurring_payment_status = safeRecurringPaymentStatus;
+  if (safeRecurringPaymentConfirmedAt !== undefined) updateData.recurring_payment_confirmed_at = safeRecurringPaymentConfirmedAt;
+  if (safeEnrollmentNumber !== undefined) updateData.enrollment_number = safeEnrollmentNumber;
   if (safeCity !== undefined) updateData.city = safeCity;
   if (safeState !== undefined) updateData.state = safeState;
   if (safeCountry !== undefined) updateData.country = safeCountry;
@@ -1383,6 +1409,8 @@ export async function PATCH(request: Request, context: { params: Promise<{ leadI
     "experimental_class_professor_time","experimental_class_lead_start_at","experimental_class_professor_start_at",
     "experimental_class_link","experimental_class_professor_name","experimental_class_professor_phone","experimental_class_booking_id",
     "funnel_stage","internal_notes","timezone","country",
+    "payment_status","payment_confirmed_at","payment_rejected_at",
+    "recurring_payment_status","recurring_payment_confirmed_at","enrollment_number",
   ] as const;
   const extractCol = (err: unknown): string | null => {
     const m = String((err as any)?.message ?? "").match(/column "([^"]+)" (?:does not exist|of relation)/i);

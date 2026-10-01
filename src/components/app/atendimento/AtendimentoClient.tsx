@@ -1070,6 +1070,7 @@ export function AtendimentoClient() {
   const [recAssigningProfessor, setRecAssigningProfessor] = useState<boolean>(false);
   const [recSavingLessonLink, setRecSavingLessonLink] = useState<boolean>(false);
   const [recSendingNotification, setRecSendingNotification] = useState<boolean>(false);
+  const [confirmingPayment, setConfirmingPayment] = useState<boolean>(false);
   const [recLessonLinkDraftByLeadId, setRecLessonLinkDraftByLeadId] = useState<Record<string, string>>({});
 
   const recurringLessonLinkDraft = useMemo<string>(() => {
@@ -1254,6 +1255,58 @@ export function AtendimentoClient() {
       }
     } catch (_) {
       modalToast.error("Falha ao cancelar horário recorrente.");
+    }
+  }
+
+  async function handleConfirmPayment(lead: AtendimentoLeadListItem) {
+    if (confirmingPayment) return;
+    if (!window.confirm("Confirmar pagamento e concluir a matrícula deste registro?")) return;
+    setConfirmingPayment(true);
+    try {
+      const isoNow = new Date().toISOString();
+      let finalEnrollment: string | null = null;
+      const existingEnrollment = String((lead as any)?.enrollment_number ?? "").trim();
+      if (existingEnrollment) {
+        finalEnrollment = existingEnrollment;
+      } else {
+        try {
+          const y = new Date().getFullYear();
+          const randomPart = Math.floor(1000 + Math.random() * 9000);
+          finalEnrollment = `${y}-${randomPart}`;
+        } catch {
+          finalEnrollment = null;
+        }
+      }
+      const res = await fetch(`/api/atendimento/leads/${encodeURIComponent(lead.id)}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          payment_status: "confirmado",
+          payment_confirmed_at: isoNow,
+          recurring_payment_status: "confirmado",
+          recurring_payment_confirmed_at: isoNow,
+          funnel_stage: "pagamento_confirmado",
+          status: "matriculado",
+          recurring_registration_step: 5,
+          enrollment_number: finalEnrollment,
+        } as any),
+      });
+      const payload = (await res.json().catch(() => null)) as { ok?: boolean; error?: string } | null;
+      if (!res.ok || !payload?.ok) {
+        modalToast.error(payload?.error ?? "Falha ao confirmar pagamento.");
+        return;
+      }
+      modalToast.success("Pagamento confirmado e matrícula concluída.");
+      const fresh = await fetch(`/api/atendimento/leads/${encodeURIComponent(lead.id)}?skipEvents=1`, { cache: "no-store" })
+        .then(async (r) => (r.ok ? r.json().catch(() => null) : null))
+        .catch(() => null) as { ok?: boolean; lead?: Record<string, unknown> | null } | null;
+      if (fresh?.ok && fresh.lead?.id) {
+        setPanelLeads((cur) => cur.map((l) => (l.id === lead.id ? ({ ...l, ...fresh.lead } as AtendimentoLeadListItem) : l)));
+      }
+    } catch (_) {
+      modalToast.error("Falha ao confirmar pagamento.");
+    } finally {
+      setConfirmingPayment(false);
     }
   }
   // ---- Controladores do card "Aulas experimentais" (tab Agendamentos) DESKTOP + MOBILE ----
@@ -5095,15 +5148,38 @@ export function AtendimentoClient() {
                           // sao AZUIS, como o usuario pediu (consistente com avatar e
                           // badge Recorrente).
                           if (statusMeta.tone === "success" || statusMeta.tone === "info" || statusMeta.tone === "default") {
+                            const showConfirmPaymentButton = statusMeta.title === "Falta confirmar pagamento";
                             return (
-                              <div className="mt-4 rounded-xl border border-[#2563eb]/35 bg-[rgba(37,99,235,0.12)] px-4 py-3">
-                                <div className="font-semibold text-[#1e3a8a]">
-                                  {statusMeta.title}
+                              <>
+                                <div className="mt-4 rounded-xl border border-[#2563eb]/35 bg-[rgba(37,99,235,0.12)] px-4 py-3">
+                                  <div className="font-semibold text-[#1e3a8a]">
+                                    {statusMeta.title}
+                                  </div>
+                                  <div className="mt-0.5 text-[13px] text-[#1d4ed8]/80">
+                                    {statusMeta.body}
+                                  </div>
                                 </div>
-                                <div className="mt-0.5 text-[13px] text-[#1d4ed8]/80">
-                                  {statusMeta.body}
-                                </div>
-                              </div>
+                                {showConfirmPaymentButton ? (
+                                  <div className="mt-4">
+                                    <button
+                                      type="button"
+                                      onClick={() => void handleConfirmPayment(sl)}
+                                      disabled={confirmingPayment}
+                                      className="inline-flex min-h-[44px] w-full items-center justify-center gap-2 rounded-xl border border-[#2563eb]/35 bg-[#2563eb] px-5 text-[13px] font-semibold !text-white shadow-none transition hover:bg-[#1d4ed8] disabled:cursor-not-allowed disabled:opacity-65 sm:w-auto"
+                                    >
+                                      {confirmingPayment ? (
+                                        <Loader2 className="h-4 w-4 shrink-0 animate-spin" />
+                                      ) : (
+                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4 shrink-0">
+                                          <path d="M3 3v18h18" />
+                                          <path d="M7 14l4-4 4 4 5-5" />
+                                        </svg>
+                                      )}
+                                      {confirmingPayment ? "Confirmando..." : "Confirmar pagamento"}
+                                    </button>
+                                  </div>
+                                ) : null}
+                              </>
                             );
                           }
                           // Apenas tone=warning continua em laranja (problemas/rejeicoes).
@@ -6596,15 +6672,38 @@ export function AtendimentoClient() {
                           );
                         }
                         if (statusMeta.tone === "success" || statusMeta.tone === "info" || statusMeta.tone === "default") {
+                          const showConfirmPaymentButton = statusMeta.title === "Falta confirmar pagamento";
                           return (
-                            <div className="mt-4 rounded-xl border border-[#2563eb]/35 bg-[rgba(37,99,235,0.12)] px-4 py-3">
-                              <div className="font-semibold text-[#1e3a8a]">
-                                {statusMeta.title}
+                            <>
+                              <div className="mt-4 rounded-xl border border-[#2563eb]/35 bg-[rgba(37,99,235,0.12)] px-4 py-3">
+                                <div className="font-semibold text-[#1e3a8a]">
+                                  {statusMeta.title}
+                                </div>
+                                <div className="mt-0.5 text-[13px] text-[#1d4ed8]/80">
+                                  {statusMeta.body}
+                                </div>
                               </div>
-                              <div className="mt-0.5 text-[13px] text-[#1d4ed8]/80">
-                                {statusMeta.body}
-                              </div>
-                            </div>
+                              {showConfirmPaymentButton ? (
+                                <div className="mt-4">
+                                  <button
+                                    type="button"
+                                    onClick={() => void handleConfirmPayment(sl)}
+                                    disabled={confirmingPayment}
+                                    className="inline-flex min-h-[44px] w-full items-center justify-center gap-2 rounded-xl border border-[#2563eb]/35 bg-[#2563eb] px-5 text-[13px] font-semibold !text-white shadow-none transition hover:bg-[#1d4ed8] disabled:cursor-not-allowed disabled:opacity-65 sm:w-auto"
+                                  >
+                                    {confirmingPayment ? (
+                                      <Loader2 className="h-4 w-4 shrink-0 animate-spin" />
+                                    ) : (
+                                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4 shrink-0">
+                                        <path d="M3 3v18h18" />
+                                        <path d="M7 14l4-4 4 4 5-5" />
+                                      </svg>
+                                    )}
+                                    {confirmingPayment ? "Confirmando..." : "Confirmar pagamento"}
+                                  </button>
+                                </div>
+                              ) : null}
+                            </>
                           );
                         }
                         return (
