@@ -14,6 +14,7 @@ import {
   findExperimentalClassDateOption,
   findExperimentalClassTimeOption,
   listExperimentalClassAvailability,
+  listRecurringWeekdayAvailability,
 } from "./experimentalClass.ts";
 
 test("listExperimentalClassAvailability comeca no dia seguinte ao domingo atual, com todos os slots horarios", () => {
@@ -70,6 +71,80 @@ test("listExperimentalClassAvailability vira automaticamente para o proximo mes 
 
   assert.equal(availability.dates[0]?.professorDate, "2026-08-01");
   assert.equal(availability.dates.some((option) => option.professorDate === "2026-08-02"), false);
+});
+
+test("listExperimentalClassAvailability: sábado só mostra horários de início até 17:00 (última aula termina 18:00)", () => {
+  // 2026-07-24 (UTC) corresponde a um sábado em America/Cuiabá.
+  const availability = listExperimentalClassAvailability({
+    now: new Date("2026-07-23T10:00:00.000Z"),
+    leadTimeZone: "America/Cuiaba",
+    bookedProfessorStartAts: [],
+  });
+  const saturday = availability.dates.find((d) => d.professorDate === "2026-07-25");
+  assert.ok(saturday, "Dia 2026-07-25 (sábado) deveria existir na lista");
+  const slots = availability.slotsByProfessorDate.get(saturday.professorDate) ?? [];
+  const times = slots.map((s) => s.professorTime);
+  // 08..17 inclusive = 10 slots de 1h (08..17)
+  assert.deepEqual(times, [
+    "08:00",
+    "09:00",
+    "10:00",
+    "11:00",
+    "12:00",
+    "13:00",
+    "14:00",
+    "15:00",
+    "16:00",
+    "17:00",
+  ]);
+  assert.equal(times.includes("18:00"), false, "Sábado não deve aceitar 18:00 (acaba 18h, última aula 17:00");
+  assert.equal(times.includes("19:00"), false);
+  assert.equal(times.includes("20:00"), false);
+  assert.equal(times.includes("21:00"), false);
+  assert.equal(times.includes("22:00"), false);
+  // Segunda seguinte (2026-07-27) deve continuar com 08..22 (todos os slots)
+  const monday = availability.dates.find((d) => d.professorDate === "2026-07-27");
+  assert.ok(monday);
+  const mondaySlots = availability.slotsByProfessorDate.get(monday.professorDate) ?? [];
+  const mondayTimes = mondaySlots.map((s) => s.professorTime);
+  assert.ok(mondayTimes.includes("08:00"));
+  assert.ok(mondayTimes.includes("22:00"));
+});
+
+test("listRecurringWeekdayAvailability: sábados recorrentes só horários de início até 17:00", () => {
+  // 2026-07-13 é segunda; semanas atuais = sáb (sábado da semana atual: 2026-07-18.
+  const availability = listRecurringWeekdayAvailability({
+    now: new Date("2026-07-13T10:00:00.000Z"),
+    leadTimeZone: "America/Cuiaba",
+    bookedProfessorStartAts: [],
+    lookAheadWeeks: 2,
+  });
+  const satThisWeek = availability.dates.find(
+    (d) => d.weekday === "sat" && d.weekIndex === 0,
+  );
+  assert.ok(satThisWeek);
+  const slots = availability.slotsByWeekdayDate[satThisWeek.id] ?? [];
+  const times = slots.map((s) => s.professorTime).sort();
+  assert.deepEqual(times, [
+    "08:00",
+    "09:00",
+    "10:00",
+    "11:00",
+    "12:00",
+    "13:00",
+    "14:00",
+    "15:00",
+    "16:00",
+    "17:00",
+  ]);
+  assert.equal(times.includes("18:00"), false);
+  assert.equal(times.includes("22:00"), false);
+  // segunda atual (weekIndex 0) deve aceitar tarde noite (18:00..22:00)
+  const monThisWeek = availability.dates.find((d) => d.weekday === "mon" && d.weekIndex === 0);
+  assert.ok(monThisWeek);
+  const monSlots = availability.slotsByWeekdayDate[monThisWeek.id] ?? [];
+  const monTimes = monSlots.map((s) => s.professorTime);
+  assert.ok(monTimes.includes("22:00"));
 });
 
 test("buildExperimentalClassDatesMessages mostra as duas mensagens com conjuncao final", () => {

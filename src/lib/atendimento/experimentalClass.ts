@@ -20,6 +20,22 @@ export const EXPERIMENTAL_CLASS_SLOT_TIMES = [
 ] as const;
 
 function professorTimeIsAllowed({ weekdayShort, professorTimeHHMM }: { weekdayShort: string; professorTimeHHMM: string }): boolean {
+  const wd = String(weekdayShort ?? "").trim().toLowerCase();
+  const t = String(professorTimeHHMM ?? "").trim();
+  if (!t) return false;
+  if (wd === "sat") {
+    // sábados: atendimento disponível até às 18h.
+    // última aula de 60 minutos começa 17:00 (termina 18:00).
+    const [hhStr, mmStr] = t.split(":");
+    const hh = Number.parseInt(String(hhStr ?? ""), 10);
+    const mm = Number.parseInt(String(mmStr ?? "0"), 10);
+    if (!Number.isFinite(hh) || !Number.isFinite(mm)) return false;
+    if (hh > 17) return false;
+    if (hh === 17 && mm > 0) return false;
+    return true;
+  }
+  // domingos são bloqueados externamente (não entram na coleção)
+  // seg-sex: aceita todos os slots definidos
   return true;
 }
 
