@@ -24,14 +24,14 @@ function professorTimeIsAllowed({ weekdayShort, professorTimeHHMM }: { weekdaySh
   const t = String(professorTimeHHMM ?? "").trim();
   if (!t) return false;
   if (wd === "sat") {
-    // sábados: atendimento disponível até às 18h.
-    // última aula de 60 minutos começa 17:00 (termina 18:00).
+    // sábados: horário de disponibilidade do professor até às 18:00 (horário de início).
+    // última aula começa 18:00.
     const [hhStr, mmStr] = t.split(":");
     const hh = Number.parseInt(String(hhStr ?? ""), 10);
     const mm = Number.parseInt(String(mmStr ?? "0"), 10);
     if (!Number.isFinite(hh) || !Number.isFinite(mm)) return false;
-    if (hh > 17) return false;
-    if (hh === 17 && mm > 0) return false;
+    if (hh > 18) return false;
+    if (hh === 18 && mm > 0) return false;
     return true;
   }
   // domingos são bloqueados externamente (não entram na coleção)

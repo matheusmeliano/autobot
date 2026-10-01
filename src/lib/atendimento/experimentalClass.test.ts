@@ -73,8 +73,8 @@ test("listExperimentalClassAvailability vira automaticamente para o proximo mes 
   assert.equal(availability.dates.some((option) => option.professorDate === "2026-08-02"), false);
 });
 
-test("listExperimentalClassAvailability: sábado só mostra horários de início até 17:00 (última aula termina 18:00)", () => {
-  // 2026-07-24 (UTC) corresponde a um sábado em America/Cuiabá.
+test("listExperimentalClassAvailability: sábado só mostra horários de início até 18:00 (disponibilidade do professor)", () => {
+  // 2026-07-25 = sábado
   const availability = listExperimentalClassAvailability({
     now: new Date("2026-07-23T10:00:00.000Z"),
     leadTimeZone: "America/Cuiaba",
@@ -84,7 +84,7 @@ test("listExperimentalClassAvailability: sábado só mostra horários de início
   assert.ok(saturday, "Dia 2026-07-25 (sábado) deveria existir na lista");
   const slots = availability.slotsByProfessorDate.get(saturday.professorDate) ?? [];
   const times = slots.map((s) => s.professorTime);
-  // 08..17 inclusive = 10 slots de 1h (08..17)
+  // 08..18 inclusive = 11 slots de 1h (última aula começa 18:00)
   assert.deepEqual(times, [
     "08:00",
     "09:00",
@@ -96,8 +96,8 @@ test("listExperimentalClassAvailability: sábado só mostra horários de início
     "15:00",
     "16:00",
     "17:00",
+    "18:00",
   ]);
-  assert.equal(times.includes("18:00"), false, "Sábado não deve aceitar 18:00 (acaba 18h, última aula 17:00");
   assert.equal(times.includes("19:00"), false);
   assert.equal(times.includes("20:00"), false);
   assert.equal(times.includes("21:00"), false);
@@ -111,8 +111,7 @@ test("listExperimentalClassAvailability: sábado só mostra horários de início
   assert.ok(mondayTimes.includes("22:00"));
 });
 
-test("listRecurringWeekdayAvailability: sábados recorrentes só horários de início até 17:00", () => {
-  // 2026-07-13 é segunda; semanas atuais = sáb (sábado da semana atual: 2026-07-18.
+test("listRecurringWeekdayAvailability: sábados recorrentes só horários de início até 18:00", () => {
   const availability = listRecurringWeekdayAvailability({
     now: new Date("2026-07-13T10:00:00.000Z"),
     leadTimeZone: "America/Cuiaba",
@@ -136,10 +135,10 @@ test("listRecurringWeekdayAvailability: sábados recorrentes só horários de in
     "15:00",
     "16:00",
     "17:00",
+    "18:00",
   ]);
-  assert.equal(times.includes("18:00"), false);
+  assert.equal(times.includes("19:00"), false);
   assert.equal(times.includes("22:00"), false);
-  // segunda atual (weekIndex 0) deve aceitar tarde noite (18:00..22:00)
   const monThisWeek = availability.dates.find((d) => d.weekday === "mon" && d.weekIndex === 0);
   assert.ok(monThisWeek);
   const monSlots = availability.slotsByWeekdayDate[monThisWeek.id] ?? [];
