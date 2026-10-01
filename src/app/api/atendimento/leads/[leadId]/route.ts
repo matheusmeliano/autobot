@@ -551,6 +551,100 @@ export async function GET(request: Request, context: { params: Promise<{ leadId:
       }
     }
 
+    const CONTRACT_RANK_META: Record<string, number> = {
+      coletando_dados: 5, aguardando_aceite: 10, assinado: 20,
+      contrato_coletando_dados: 5, contrato_aguardando_aceite: 10, contrato_assinado: 20,
+    };
+    const CONTRACT_PRIORITY_EVENT: Record<string, { status: string; rank: number }> = {
+      contrato_assinado: { status: "assinado", rank: 20 },
+      contrato_aguardando_aceite: { status: "aguardando_aceite", rank: 10 },
+      contrato_coletando_dados: { status: "coletando_dados", rank: 5 },
+    };
+    let histContractBest: {
+      contract_status: string | null;
+      contract_signed_at: string | null;
+      contract_pdf_url: string | null;
+      funnel_stage: string | null;
+      status: string | null;
+      rank: number;
+    } | null = null;
+    for (const ev of allHistoryForLead ?? []) {
+      const eventType = String((ev as any)?.event_type ?? "").trim().toLowerCase();
+      const eca = String((ev as any)?.created_at ?? "").trim() || null;
+      const details = ((ev as any)?.details ?? {}) as Record<string, unknown>;
+      const p = CONTRACT_PRIORITY_EVENT[eventType];
+      if (p) {
+        const signedAt =
+          (typeof details?.contract_signed_at === "string" ? String(details.contract_signed_at).trim() : "") ||
+          (typeof details?.signed_at === "string" ? String(details.signed_at).trim() : "") ||
+          eca ||
+          null;
+        const pdf =
+          typeof details?.contract_pdf_url === "string" ? String(details.contract_pdf_url).trim() : null;
+        const rank =
+          p.rank +
+          (CONTRACT_RANK_META[String(details?.funnel_stage ?? "").toLowerCase()] ?? 0) +
+          (CONTRACT_RANK_META[String(details?.status ?? "").toLowerCase()] ?? 0);
+        if (!histContractBest || rank > histContractBest.rank) {
+          histContractBest = {
+            contract_status: p.status,
+            contract_signed_at: signedAt,
+            contract_pdf_url: pdf,
+            funnel_stage:
+              typeof details?.funnel_stage === "string" ? String(details.funnel_stage).trim() : null,
+            status: typeof details?.status === "string" ? String(details.status).trim() : null,
+            rank,
+          };
+        }
+      } else if (eventType === "contract_finalized" || eventType === "contract_init_requested" || eventType === "contract_field_submitted") {
+        const statusFromDetails = String(details?.contract_status ?? details?.status ?? "").trim().toLowerCase();
+        const baseStatus =
+          eventType === "contract_finalized" ? "assinado" :
+          eventType === "contract_init_requested" ? "coletando_dados" :
+          statusFromDetails || "coletando_dados";
+        const signedAt =
+          (typeof details?.contract_signed_at === "string" ? String(details.contract_signed_at).trim() : "") ||
+          (typeof details?.signed_at === "string" ? String(details.signed_at).trim() : "") ||
+          (eventType === "contract_finalized" ? eca : null) ||
+          null;
+        const pdf =
+          typeof details?.contract_pdf_url === "string" ? String(details.contract_pdf_url).trim() : null;
+        const rank =
+          (CONTRACT_RANK_META[baseStatus] ?? 0) +
+          (CONTRACT_RANK_META[String(details?.funnel_stage ?? "").toLowerCase()] ?? 0) +
+          (CONTRACT_RANK_META[String(details?.status ?? "").toLowerCase()] ?? 0);
+        if (!histContractBest || rank > histContractBest.rank) {
+          histContractBest = {
+            contract_status: baseStatus,
+            contract_signed_at: signedAt,
+            contract_pdf_url: pdf,
+            funnel_stage:
+              typeof details?.funnel_stage === "string" ? String(details.funnel_stage).trim() : null,
+            status: typeof details?.status === "string" ? String(details.status).trim() : null,
+            rank,
+          };
+        }
+      }
+    }
+    const rowContractStatus = String((lead as any)?.contract_status ?? "").trim().toLowerCase();
+    const rowContractSignedAt = String((lead as any)?.contract_signed_at ?? "").trim() || null;
+    const rowContractPdf = String((lead as any)?.contract_pdf_url ?? "").trim() || null;
+    const rowContractFunnel = String((lead as any)?.funnel_stage ?? "").trim().toLowerCase();
+    const rowContractLeadStatus = String((lead as any)?.status ?? "").trim().toLowerCase();
+    const rowContractRank =
+      (CONTRACT_RANK_META[rowContractStatus] ?? 0) +
+      (CONTRACT_RANK_META[rowContractFunnel] ?? 0) +
+      (CONTRACT_RANK_META[rowContractLeadStatus] ?? 0);
+    const histRank = histContractBest ? histContractBest.rank : 0;
+    const useContractHistoryFallback = !!histContractBest && (rowContractRank < histRank || (!rowContractStatus && histContractBest.contract_status));
+    const finalContractStatus = useContractHistoryFallback
+      ? histContractBest!.contract_status
+      : rowContractStatus || null;
+    const finalContractSignedAt =
+      rowContractSignedAt || (useContractHistoryFallback ? histContractBest!.contract_signed_at : null);
+    const finalContractPdfUrl =
+      rowContractPdf || (useContractHistoryFallback ? histContractBest!.contract_pdf_url : null);
+
     const finalBookingForField = bookingWithFallback
       ? {
           ...bookingWithFallback,
@@ -571,6 +665,9 @@ export async function GET(request: Request, context: { params: Promise<{ leadId:
         latest_past_class_meta: latestPastClassMeta,
         latest_experimental_class_cancelled_at: cancelledAt,
         latest_experimental_class_event: latestClassEvent,
+        contract_status: finalContractStatus || String((lead as any)?.contract_status ?? "") || null,
+        contract_signed_at: finalContractSignedAt,
+        contract_pdf_url: finalContractPdfUrl || String((lead as any)?.contract_pdf_url ?? "") || null,
       },
       events: (events ?? []) as any[],
     });
