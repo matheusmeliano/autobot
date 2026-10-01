@@ -9,7 +9,10 @@ import { resolveTimeZoneFromCityInput, zonedDateTimeToUtcIso } from "@/lib/timez
 import type { AtendimentoLeadListItem, AtendimentoSummary } from "@/lib/atendimento/types";
 import { modalToast } from "@/lib/modalToast";
 import { formatAtendimentoDate, formatAtendimentoDateTime, leadMatchesSearchQuery } from "@/lib/atendimento/utils";
-import { buildExperimentalClassPostAttendanceWhatsAppMessages } from "@/lib/atendimento/experimentalClass";
+import {
+  buildExperimentalClassPostAttendanceWhatsAppMessages,
+  EXPERIMENTAL_CLASS_DEFAULT_STUDENT_DASHBOARD_LINK,
+} from "@/lib/atendimento/experimentalClass";
 import { AppModal } from "@/components/app/AppModal";
 import { AppDateRangePicker, type AppDateRange } from "@/components/app/AppDateRangePicker";
 
@@ -641,12 +644,25 @@ function buildRecurringClassUrl(lead: AtendimentoLeadListItem): string {
   return rel;
 }
 
-const STUDENT_DASHBOARD_DEFAULT_URL = "https://www.autobot.business/atendimento";
+const STUDENT_DASHBOARD_DEFAULT_URL = (() => {
+  try {
+    const v = String(EXPERIMENTAL_CLASS_DEFAULT_STUDENT_DASHBOARD_LINK ?? "").trim();
+    if (v) return v;
+  } catch {}
+  return "https://www.autobot.business/cadastro/recorrente";
+})();
 
 function buildStudentDashboardUrl(lead: AtendimentoLeadListItem): string {
   const phoneDigits = String(lead.phone ?? "").replace(/\D/g, "").trim();
+  const leadFullName = String(lead.full_name ?? "").trim();
+  const firstName = (() => {
+    const parts = leadFullName.split(/\s+/).filter(Boolean);
+    if (!parts.length) return "";
+    return parts[0];
+  })();
   const base = STUDENT_DASHBOARD_DEFAULT_URL;
   const qs = new URLSearchParams();
+  if (firstName) qs.set("nome", firstName);
   if (phoneDigits.length >= 10) qs.set("telefone", phoneDigits);
   if (String(lead.id ?? "").trim()) qs.set("id", String(lead.id).trim());
   const qsStr = qs.toString();
