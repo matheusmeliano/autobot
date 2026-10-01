@@ -6010,12 +6010,155 @@ export function AtendimentoClient() {
                     </div>
                   ) : null}
 
-                  {/* ============== HISTÓRICO ============== */}
+                  {/* ============== HISTÓRICO (Contrato) ============== */}
                   {activeTab === "historico" ? (
-                    <div className="mt-4 rounded-xl border border-[var(--app-border)] bg-[var(--app-solid-surface-2)] px-4 py-3 text-center">
-                      <div className="text-[13px] font-semibold text-[var(--app-text-60)]">
-                        Esse registro ainda não possui nenhum contrato de matrícula assinado.
-                      </div>
+                    <div className="w-full rounded-2xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] p-5 shadow-none">
+                      {(() => {
+                        const csRaw = String((sl as any)?.contract_status ?? "").trim().toLowerCase();
+                        const signedAtRaw = String((sl as any)?.contract_signed_at ?? "").trim();
+                        const pdfUrlRaw = String((sl as any)?.contract_pdf_url ?? "").trim();
+                        const hasContract =
+                          Boolean(csRaw) || Boolean(signedAtRaw) || Boolean(pdfUrlRaw);
+                        let statusBadge: {
+                          label: string;
+                          tone: "ok" | "warn" | "muted" | "info";
+                        } | null = null;
+                        if (csRaw === "assinado" || signedAtRaw || pdfUrlRaw) {
+                          statusBadge = { label: "Assinado", tone: "ok" };
+                        } else if (csRaw === "aguardando_aceite") {
+                          statusBadge = { label: "Aguardando aceite", tone: "warn" };
+                        } else if (csRaw === "coletando_dados") {
+                          statusBadge = { label: "Preenchendo dados", tone: "info" };
+                        } else if (hasContract) {
+                          statusBadge = { label: "Em andamento", tone: "info" };
+                        }
+                        const signedAtNice = (() => {
+                          if (!signedAtRaw) return "";
+                          try {
+                            const d = new Date(signedAtRaw);
+                            if (!Number.isFinite(d.getTime())) return signedAtRaw;
+                            return d.toLocaleString("pt-BR", {
+                              day: "2-digit",
+                              month: "2-digit",
+                              year: "numeric",
+                              hour: "2-digit",
+                              minute: "2-digit",
+                            });
+                          } catch {
+                            return signedAtRaw;
+                          }
+                        })();
+                        const wrapperCls = (tone: NonNullable<typeof statusBadge>["tone"]) => {
+                          switch (tone) {
+                            case "ok":
+                              return "border-emerald-500/30 bg-emerald-500/10 text-emerald-800";
+                            case "warn":
+                              return "border-amber-500/30 bg-amber-500/10 text-amber-800";
+                            case "info":
+                              return "border-[#2563eb]/35 bg-[rgba(37,99,235,0.10)] text-[#1e3a8a]";
+                            default:
+                              return "border-[var(--app-border)] bg-[var(--app-solid-surface-2)] text-[var(--app-text-70)]";
+                          }
+                        };
+                        return (
+                          <div className="w-full">
+                            <div className="flex items-start justify-between gap-4">
+                              <div className="flex items-start gap-3">
+                                <div className="mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-[var(--app-border)] bg-[var(--app-solid-surface-2)] text-[var(--app-text-70)]">
+                                  <FileText className="h-5 w-5" strokeWidth={2.25} />
+                                </div>
+                                <div className="min-w-0">
+                                  <div className="text-[15px] font-bold text-[var(--app-text-85)]">
+                                    Contrato de matrícula
+                                  </div>
+                                  <div className="mt-0.5 text-[12px] text-[var(--app-text-60)]">
+                                    Documento do aluno referente ao processo de matrícula recorrente.
+                                  </div>
+                                </div>
+                              </div>
+                              {statusBadge ? (
+                                <div className={[
+                                  "inline-flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1 text-[11px] font-bold uppercase tracking-[0.12em]",
+                                  wrapperCls(statusBadge.tone),
+                                ].join(" ")}>
+                                  {statusBadge.label}
+                                </div>
+                              ) : null}
+                            </div>
+
+                            <div className="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-2">
+                              <div className="rounded-xl border border-[var(--app-border)] bg-[var(--app-solid-surface-2)] px-4 py-3">
+                                <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--app-text-60)]">
+                                  Status
+                                </div>
+                                <div className="mt-1 text-[14px] font-semibold text-[var(--app-text-85)]">
+                                  {statusBadge ? statusBadge.label : "Não iniciado"}
+                                </div>
+                              </div>
+                              <div className="rounded-xl border border-[var(--app-border)] bg-[var(--app-solid-surface-2)] px-4 py-3">
+                                <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--app-text-60)]">
+                                  Assinado em
+                                </div>
+                                <div className="mt-1 text-[14px] font-semibold text-[var(--app-text-85)]">
+                                  {signedAtNice || "—"}
+                                </div>
+                              </div>
+                            </div>
+
+                            <div className="mt-5 flex flex-col items-stretch justify-start gap-3 sm:flex-row">
+                              <a
+                                href={pdfUrlRaw || "#"}
+                                target="_blank"
+                                rel="noreferrer noopener"
+                                onClick={(e) => { if (!pdfUrlRaw) e.preventDefault(); }}
+                                className={[
+                                  "inline-flex min-h-[44px] items-center justify-center gap-2 rounded-xl border px-5 text-[13px] font-semibold transition",
+                                  pdfUrlRaw
+                                    ? "border-[#2563eb]/35 bg-[#2563eb] !text-white hover:bg-[#1d4ed8]"
+                                    : "border-[var(--app-border)] bg-[var(--app-solid-surface-2)] text-[var(--app-text-55)] cursor-not-allowed",
+                                ].join(" ")}
+                              >
+                                <ExternalLink className="h-4 w-4 shrink-0" />
+                                {pdfUrlRaw ? "Abrir contrato em PDF" : "PDF indisponível no momento"}
+                              </a>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  if (!pdfUrlRaw) return;
+                                  const a = document.createElement("a");
+                                  a.href = pdfUrlRaw;
+                                  a.download = "contrato-matricula.pdf";
+                                  a.rel = "noreferrer noopener";
+                                  document.body.appendChild(a);
+                                  a.click();
+                                  document.body.removeChild(a);
+                                }}
+                                disabled={!pdfUrlRaw}
+                                className={[
+                                  "inline-flex min-h-[44px] items-center justify-center gap-2 rounded-xl border px-5 text-[13px] font-semibold transition",
+                                  pdfUrlRaw
+                                    ? "border-[var(--app-border)] bg-[var(--app-solid-surface-2)] text-[var(--app-text-85)] hover:bg-[var(--app-hover)]"
+                                    : "border-[var(--app-border)] bg-[var(--app-solid-surface-2)] text-[var(--app-text-55)] cursor-not-allowed disabled:opacity-60",
+                                ].join(" ")}
+                              >
+                                <Save className="h-4 w-4 shrink-0" />
+                                Baixar PDF
+                              </button>
+                            </div>
+
+                            {!hasContract ? (
+                              <div className="mt-5 rounded-xl border border-[var(--app-border)] bg-[var(--app-solid-surface-2)] px-4 py-3">
+                                <div className="text-[13px] font-semibold text-[var(--app-text-70)]">
+                                  Nenhum contrato encontrado para este registro.
+                                </div>
+                                <div className="mt-0.5 text-[12px] text-[var(--app-text-60)]">
+                                  Quando o aluno avançar no link de matrícula e aceitar o contrato, os dados serão exibidos aqui.
+                                </div>
+                              </div>
+                            ) : null}
+                          </div>
+                        );
+                      })()}
                     </div>
                   ) : null}
 
