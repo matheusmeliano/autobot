@@ -4803,6 +4803,39 @@ export function AtendimentoClient() {
                         <div className="mt-1 text-[13px] font-medium text-[var(--app-text-60)] sm:text-[14px] sm:font-semibold">
                           Criado em: {formatAtendimentoDateTime(sl.created_at)}
                         </div>
+                        {(() => {
+                          const stepRaw = Number((sl as any)?.recurring_registration_step ?? NaN);
+                          const hasStep = Number.isFinite(stepRaw) && stepRaw >= 1;
+                          const hasPass =
+                            Boolean((sl as any)?.recurring_registration_password) ||
+                            Boolean(String((sl as any)?.signup_password_raw_temp ?? "").trim());
+                          const payRaw = String((sl as any)?.recurring_payment_status ?? (sl as any)?.payment_status ?? "").trim().toLowerCase();
+                          const fsRaw = String((sl as any)?.funnel_stage ?? "").trim().toLowerCase();
+                          const sRaw = String((sl as any)?.status ?? "").trim().toLowerCase();
+                          const payConfirmedGlobal =
+                            payRaw === "confirmado" ||
+                            payRaw === "pago" ||
+                            payRaw === "aprovado" ||
+                            payRaw === "confirmada" ||
+                            payRaw === "matricula_confirmada" ||
+                            fsRaw === "pagamento_confirmado" ||
+                            sRaw === "pagamento_confirmado" ||
+                            sRaw === "matriculado" ||
+                            sRaw === "aluno" ||
+                            fsRaw === "contrato_assinado" ||
+                            sRaw === "contrato_assinado" ||
+                            Boolean((sl as any)?.enrollment_number);
+                          const recurringTrulyStarted = hasStep || hasPass || payConfirmedGlobal;
+                          if (!recurringTrulyStarted) return null;
+                          const enrollment = String((sl as any)?.enrollment_number ?? "").trim();
+                          if (!enrollment) return null;
+                          return (
+                            <div className="mt-1 inline-flex w-max max-w-full items-center gap-1.5 rounded-full border border-[#2563eb]/30 bg-[rgba(37,99,235,0.08)] px-3 py-1 text-[12px] font-bold text-[#1e3a8a] sm:text-[13px]">
+                              <FileText className="h-3.5 w-3.5 shrink-0" strokeWidth={2.25} />
+                              Matrícula nº {enrollment}
+                            </div>
+                          );
+                        })()}
                       </div>
                     </div>
 
@@ -6282,6 +6315,39 @@ export function AtendimentoClient() {
                       <div className="mt-1 text-[13px] font-medium text-[var(--app-text-60)] sm:text-[14px] sm:font-semibold">
                         Criado em: {formatAtendimentoDateTime(sl.created_at)}
                       </div>
+                      {(() => {
+                        const stepRaw = Number((sl as any)?.recurring_registration_step ?? NaN);
+                        const hasStep = Number.isFinite(stepRaw) && stepRaw >= 1;
+                        const hasPass =
+                          Boolean((sl as any)?.recurring_registration_password) ||
+                          Boolean(String((sl as any)?.signup_password_raw_temp ?? "").trim());
+                        const payRaw = String((sl as any)?.recurring_payment_status ?? (sl as any)?.payment_status ?? "").trim().toLowerCase();
+                        const fsRaw = String((sl as any)?.funnel_stage ?? "").trim().toLowerCase();
+                        const sRaw = String((sl as any)?.status ?? "").trim().toLowerCase();
+                        const payConfirmedGlobal =
+                          payRaw === "confirmado" ||
+                          payRaw === "pago" ||
+                          payRaw === "aprovado" ||
+                          payRaw === "confirmada" ||
+                          payRaw === "matricula_confirmada" ||
+                          fsRaw === "pagamento_confirmado" ||
+                          sRaw === "pagamento_confirmado" ||
+                          sRaw === "matriculado" ||
+                          sRaw === "aluno" ||
+                          fsRaw === "contrato_assinado" ||
+                          sRaw === "contrato_assinado" ||
+                          Boolean((sl as any)?.enrollment_number);
+                        const recurringTrulyStarted = hasStep || hasPass || payConfirmedGlobal;
+                        if (!recurringTrulyStarted) return null;
+                        const enrollment = String((sl as any)?.enrollment_number ?? "").trim();
+                        if (!enrollment) return null;
+                        return (
+                          <div className="mt-1 inline-flex w-max max-w-full items-center gap-1.5 rounded-full border border-[#2563eb]/30 bg-[rgba(37,99,235,0.08)] px-3 py-1 text-[12px] font-bold text-[#1e3a8a] sm:text-[13px]">
+                            <FileText className="h-3.5 w-3.5 shrink-0" strokeWidth={2.25} />
+                            Matrícula nº {enrollment}
+                          </div>
+                        );
+                      })()}
                     </div>
                   </div>
 
