@@ -25,6 +25,82 @@ function isExperimentalClassBookingsLessonLinkColumnUnavailable(error: unknown) 
   );
 }
 
+function extractLeadFlatColFromUndefinedError(raw: unknown): string | null {
+  const text = typeof raw === "string" ? raw : String((raw as any)?.message ?? String(raw ?? ""));
+  if (!text) return null;
+  {
+    const m = text.match(/column "?([a-zA-Z_][a-zA-Z0-9_]*)"? of relation/);
+    if (m && m[1]) return String(m[1]);
+  }
+  {
+    const m = text.match(/42703.*?([a-zA-Z_][a-zA-Z0-9_]*)/);
+    if (m && m[1]) return String(m[1]);
+  }
+  {
+    const m = text.match(/could not find the '([^']+)' column of 'public\.atendimento_leads'/i);
+    if (m && m[1]) return String(m[1]);
+  }
+  {
+    const m = text.match(/could not find the '([^']+)' column/i);
+    if (m && m[1]) return String(m[1]);
+  }
+  return null;
+}
+
+const SUSPECT_LEAD_MISSING_FLAT_COLS = [
+  "experimental_class_link",
+  "experimental_class_status",
+  "experimental_class_booking_id",
+  "experimental_class_lead_date",
+  "experimental_class_lead_time",
+  "experimental_class_professor_date",
+  "experimental_class_professor_time",
+  "experimental_class_lead_start_at",
+  "experimental_class_professor_start_at",
+  "experimental_class_professor_name",
+  "experimental_class_professor_phone",
+  "experimental_class_attendance_status",
+  "experimental_class_attendance_checked_at",
+  "latest_experimental_class_cancelled_at",
+  "experimental_class_post_attendance_message_sent_at",
+  "recurring_class_link",
+  "recurring_class_status",
+  "recurring_class_weekday",
+  "recurring_class_weekday_label",
+  "recurring_class_lead_time",
+  "recurring_class_professor_time",
+  "recurring_class_professor_name",
+  "recurring_class_professor_phone",
+  "recurring_registration_step",
+  "recurring_registration_password",
+  "contract_status",
+  "contract_signed_at",
+  "contract_pdf_url",
+  "payment_status",
+  "payment_confirmed_at",
+  "enrollment_number",
+];
+
+function stripLeadUndefinedFlatCol(patchObj: Record<string, unknown>, error: unknown): {
+  next: Record<string, unknown> | null;
+  stripped: string | null;
+} {
+  const col = extractLeadFlatColFromUndefinedError(error);
+  if (col && patchObj[col] !== undefined) {
+    const next = { ...patchObj };
+    delete next[col];
+    return { next, stripped: col };
+  }
+  for (const suspect of SUSPECT_LEAD_MISSING_FLAT_COLS) {
+    if (patchObj[suspect] !== undefined) {
+      const next = { ...patchObj };
+      delete next[suspect];
+      return { next, stripped: suspect };
+    }
+  }
+  return { next: null, stripped: null };
+}
+
 export async function POST(
   req: Request,
   { params }: { params: Promise<{ bookingId: string }> },
@@ -268,6 +344,39 @@ export async function POST(
         source: "table",
       };
     }
+  }
+
+  // --- SINCRONISMO FLAT COLUMN: atendimento_leads.experimental_class_link ---
+  // O frontend lê a flat coluna do lead (nao da booking) para determinar a cor
+  // do avatar e exibicao do link. Sem esse sync, depois de salvar a booking,
+  // a cor nao atualizava e um F5 voltava o link antigo.
+  try {
+    if (leadId) {
+      let leadPatch: Record<string, unknown> = {
+        experimental_class_link: lessonLink,
+        updated_at: new Date().toISOString(),
+      };
+      const maxRetries = 12;
+      for (let i = 0; i < maxRetries; i++) {
+        const { data: leadUpd, error: leadErr } = await admin
+          .from("atendimento_leads")
+          .update(leadPatch)
+          .eq("id", String(leadId))
+          .select("id")
+          .maybeSingle();
+        if (!leadErr) {
+          void leadUpd;
+          break;
+        }
+        const stripped = stripLeadUndefinedFlatCol(leadPatch, leadErr);
+        if (!stripped.next || stripped.stripped === null) {
+          break;
+        }
+        leadPatch = stripped.next;
+      }
+    }
+  } catch {
+    // nunca bloqueia o return do endpoint
   }
 
   await appendHistoryEvent({
