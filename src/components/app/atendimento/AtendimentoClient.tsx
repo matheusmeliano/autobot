@@ -5270,14 +5270,15 @@ export function AtendimentoClient() {
                             const rrcs = String((lead as any)?.recurring_registration_step ?? "").trim();
                             const rrcsNum = rrcs !== "" && !Number.isNaN(Number(rrcs)) ? Number(rrcs) : (((lead as any)?.recurring_registration_step as number) ?? 0);
                             const isRecurringConcluded = isLeadMatriculaConcluida(lead);
-                            const matriculaEmProcesso = (
-                              typeof rrcsNum === "number" && rrcsNum > 0 && !isRecurringConcluded
-                            ) || (
-                              String((lead as any)?.recurring_class_status ?? "").trim().length > 0 &&
-                              !isRecurringConcluded
-                            ) || (
-                              Boolean((lead as any)?.recurring_registration_password) && !isRecurringConcluded
-                            );
+                            const hasStep = typeof rrcsNum === "number" && rrcsNum > 0;
+                            const hasRecurringPass =
+                              typeof (lead as any)?.recurring_registration_password === "string" &&
+                              String((lead as any).recurring_registration_password).trim().length >= 4;
+                            const hasLegacyTempPass =
+                              typeof (lead as any)?.signup_password_raw_temp === "string" &&
+                              String((lead as any).signup_password_raw_temp).trim().length >= 4;
+                            const cadastroOuConcluido = hasStep || hasRecurringPass || hasLegacyTempPass || isRecurringConcluded;
+
                             const hasExp = Boolean(
                               lead?.future_experimental_class_booking ||
                                 lead?.experimental_class_booking ||
@@ -5288,8 +5289,9 @@ export function AtendimentoClient() {
                             const timeRaw = String(lead?.recurring_start_time ?? "").trim();
                             const freqRaw = String(lead?.recurring_frequency ?? "").trim();
                             const hasRec = Boolean(weekdayRaw || timeRaw || freqRaw);
-                            // REGRA DE PRECEDENCIA: MATRICULA EM PROCESSO SEMPRE PRIMEIRO = AZUL "Recorrente"
-                            if (matriculaEmProcesso) {
+                            // REGRA DE PRECEDENCIA 100% IGUAL AO AVATAR:
+                            // PASSOU DO CADASTRO INICIAL OU JA CONCLUIU -> SEMPLE AZUL "Recorrente" e nunca "Experimental".
+                            if (cadastroOuConcluido) {
                               return (
                                 <div className="inline-flex h-7 shrink-0 items-center justify-center rounded-full border border-[#2563eb]/30 bg-[rgba(37,99,235,0.12)] px-3 text-[11px] font-bold uppercase tracking-wide text-[#1d4ed8]">
                                   Recorrente
@@ -5321,15 +5323,44 @@ export function AtendimentoClient() {
                           const rrcs = String(lead?.recurring_registration_step ?? "").trim();
                           const rrcsNum = rrcs !== "" && !Number.isNaN(Number(rrcs)) ? Number(rrcs) : (((lead as any)?.recurring_registration_step as number) ?? 0);
                           const isConcluded = isLeadMatriculaConcluida(selectedLead);
-                          const matriculaEmProcesso = (typeof rrcsNum === "number" && rrcsNum > 0 && !isConcluded)
-                            || (String(lead?.recurring_class_status ?? "").trim().length > 0 && !isConcluded)
-                            || (Boolean(lead?.recurring_registration_password) && !isConcluded);
+                          const hasStep = typeof rrcsNum === "number" && rrcsNum > 0;
+                          const hasRecurringPass =
+                            typeof (lead as any)?.recurring_registration_password === "string" &&
+                            String((lead as any).recurring_registration_password).trim().length >= 4;
+                          const hasLegacyTempPass =
+                            typeof (lead as any)?.signup_password_raw_temp === "string" &&
+                            String((lead as any).signup_password_raw_temp).trim().length >= 4;
+                          const cadastroOuConcluido = hasStep || hasRecurringPass || hasLegacyTempPass || isConcluded;
 
-                          if (matriculaEmProcesso) {
+                          if (cadastroOuConcluido) {
                             const wd = String(lead?.recurring_class_weekday_label ?? lead?.recurring_class_weekday ?? "").trim();
                             const tm = String(lead?.recurring_class_lead_time ?? lead?.recurring_class_professor_time ?? "").trim();
                             const st = String(lead?.recurring_class_status ?? "").trim();
                             const hasAny = Boolean(wd || tm || st);
+                            if (isConcluded) {
+                              return (
+                                <div className="mt-4 flex items-start gap-3 rounded-xl border border-[#2563eb]/35 bg-[rgba(37,99,235,0.12)] px-4 py-3">
+                                  <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[#2563eb]/20 text-[#1d4ed8]">
+                                    <RefreshCw className="h-5 w-5" />
+                                  </div>
+                                  <div className="min-w-0">
+                                    <div className="font-semibold text-[#1e3a8a] truncate">
+                                      {(() => {
+                                        const parts: string[] = [];
+                                        if (wd) parts.push(`Dia: ${wd}`);
+                                        if (tm) parts.push(`às ${tm}`);
+                                        if (parts.length === 0 && st) parts.push(`Status: ${st}`);
+                                        if (parts.length === 0) return "Aulas recorrentes ativas.";
+                                        return `${parts.join(" ")} (semanal)`;
+                                      })()}
+                                    </div>
+                                    <div className="mt-0.5 text-[13px] text-[#1d4ed8]/80">
+                                      Matrícula confirmada. Aulas recorrentes semanais para este aluno.
+                                    </div>
+                                  </div>
+                                </div>
+                              );
+                            }
                             if (hasAny) {
                               return (
                                 <div className="mt-4 flex items-start gap-3 rounded-xl border border-[#2563eb]/35 bg-[rgba(37,99,235,0.12)] px-4 py-3">
@@ -5371,7 +5402,7 @@ export function AtendimentoClient() {
                             );
                           }
 
-                          // ================== FLUXO EXPERIMENTAL (sem matrícula em andamento) ==================
+                          // ================== FLUXO EXPERIMENTAL (sem cadastro recorrente iniciado) ==================
                           const bk = (selectedLead as any)?.experimental_class_booking;
                           const cancelled = String(bk?.status ?? "").trim().toLowerCase() === "cancelled";
                           if (cancelled) {
@@ -6810,6 +6841,18 @@ export function AtendimentoClient() {
                         </div>
                         {(() => {
                           const lead = selectedLead as any;
+                          const rrcs = String((lead as any)?.recurring_registration_step ?? "").trim();
+                          const rrcsNum = rrcs !== "" && !Number.isNaN(Number(rrcs)) ? Number(rrcs) : (((lead as any)?.recurring_registration_step as number) ?? 0);
+                          const isRecurringConcluded = isLeadMatriculaConcluida(lead);
+                          const hasStep = typeof rrcsNum === "number" && rrcsNum > 0;
+                          const hasRecurringPass =
+                            typeof (lead as any)?.recurring_registration_password === "string" &&
+                            String((lead as any).recurring_registration_password).trim().length >= 4;
+                          const hasLegacyTempPass =
+                            typeof (lead as any)?.signup_password_raw_temp === "string" &&
+                            String((lead as any).signup_password_raw_temp).trim().length >= 4;
+                          const cadastroOuConcluido = hasStep || hasRecurringPass || hasLegacyTempPass || isRecurringConcluded;
+
                           const hasExp = Boolean(
                             lead?.future_experimental_class_booking ||
                               lead?.experimental_class_booking ||
@@ -6820,6 +6863,15 @@ export function AtendimentoClient() {
                           const timeRaw = String(lead?.recurring_start_time ?? "").trim();
                           const freqRaw = String(lead?.recurring_frequency ?? "").trim();
                           const hasRec = Boolean(weekdayRaw || timeRaw || freqRaw);
+                          // REGRA DE PRECEDENCIA 100% IGUAL AO AVATAR + DESKTOP:
+                          // PASSOU DO CADASTRO INICIAL OU JA CONCLUIU -> SEMPRE AZUL "Recorrente" e nunca "Experimental".
+                          if (cadastroOuConcluido) {
+                            return (
+                              <div className="inline-flex h-7 shrink-0 items-center justify-center rounded-full border border-[#2563eb]/30 bg-[rgba(37,99,235,0.12)] px-3 text-[11px] font-bold uppercase tracking-wide text-[#1d4ed8]">
+                                Recorrente
+                              </div>
+                            );
+                          }
                           const isExpFirst = !hasRec && hasExp;
                           const isRecFirst = hasRec && !hasExp;
                           if (isExpFirst) return (
@@ -6840,111 +6892,194 @@ export function AtendimentoClient() {
                           return null;
                         })()}
                       </div>
-                      {expMeta.tone === "success" ? (
-                        <>
-                          {(() => {
-                            const bk = (selectedLead as any)?.experimental_class_booking;
-                            const cancelled = String(bk?.status ?? "").trim().toLowerCase() === "cancelled";
-                            return cancelled ? (
-                              <div className="mt-4 flex items-start gap-3 rounded-xl border border-red-500/35 bg-red-500/10 px-4 py-3">
-                                <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-red-500/20 text-red-700">
-                                  <CalendarIcon className="h-5 w-5" />
+                      {(() => {
+                        const lead = selectedLead as any;
+                        const rrcs = String(lead?.recurring_registration_step ?? "").trim();
+                        const rrcsNum = rrcs !== "" && !Number.isNaN(Number(rrcs)) ? Number(rrcs) : (((lead as any)?.recurring_registration_step as number) ?? 0);
+                        const isConcluded = isLeadMatriculaConcluida(selectedLead);
+                        const hasStep = typeof rrcsNum === "number" && rrcsNum > 0;
+                        const hasRecurringPass =
+                          typeof (lead as any)?.recurring_registration_password === "string" &&
+                          String((lead as any).recurring_registration_password).trim().length >= 4;
+                        const hasLegacyTempPass =
+                          typeof (lead as any)?.signup_password_raw_temp === "string" &&
+                          String((lead as any).signup_password_raw_temp).trim().length >= 4;
+                        const cadastroOuConcluido = hasStep || hasRecurringPass || hasLegacyTempPass || isConcluded;
+
+                        if (cadastroOuConcluido) {
+                          const wd = String(lead?.recurring_class_weekday_label ?? lead?.recurring_class_weekday ?? "").trim();
+                          const tm = String(lead?.recurring_class_lead_time ?? lead?.recurring_class_professor_time ?? "").trim();
+                          const st = String(lead?.recurring_class_status ?? "").trim();
+                          const hasAny = Boolean(wd || tm || st);
+                          if (isConcluded) {
+                            return (
+                              <div className="mt-4 flex items-start gap-3 rounded-xl border border-[#2563eb]/35 bg-[rgba(37,99,235,0.12)] px-4 py-3">
+                                <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[#2563eb]/20 text-[#1d4ed8]">
+                                  <RefreshCw className="h-5 w-5" />
                                 </div>
                                 <div className="min-w-0">
-                                  <div className="font-semibold text-red-800 truncate">
+                                  <div className="font-semibold text-[#1e3a8a] truncate">
                                     {(() => {
-                                      const label = String(expMeta.label ?? "").trim();
-                                      if (!label) return "Aula cancelada";
-                                      if (label.toLowerCase().startsWith("aula em:")) {
-                                        return "Aula cancelada em:" + label.slice("aula em:".length);
-                                      }
-                                      return label.replace(/^Aula em:\s*/i, "Aula cancelada em: ");
+                                      const parts: string[] = [];
+                                      if (wd) parts.push(`Dia: ${wd}`);
+                                      if (tm) parts.push(`às ${tm}`);
+                                      if (parts.length === 0 && st) parts.push(`Status: ${st}`);
+                                      if (parts.length === 0) return "Aulas recorrentes ativas.";
+                                      return `${parts.join(" ")} (semanal)`;
                                     })()}
                                   </div>
-                                  <div className="mt-0.5 text-[13px] text-red-700/80">
-                                    Horário cancelado.
+                                  <div className="mt-0.5 text-[13px] text-[#1d4ed8]/80">
+                                    Matrícula confirmada. Aulas recorrentes semanais para este aluno.
                                   </div>
                                 </div>
                               </div>
-                            ) : (
-                              <div className="mt-4 flex items-start gap-3 rounded-xl border border-emerald-500/35 bg-emerald-500/10 px-4 py-3">
-                                <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-emerald-500/20 text-emerald-700">
-                                  <CalendarIcon className="h-5 w-5" />
+                            );
+                          }
+                          if (hasAny) {
+                            return (
+                              <div className="mt-4 flex items-start gap-3 rounded-xl border border-[#2563eb]/35 bg-[rgba(37,99,235,0.12)] px-4 py-3">
+                                <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[#2563eb]/20 text-[#1d4ed8]">
+                                  <RefreshCw className="h-5 w-5" />
                                 </div>
                                 <div className="min-w-0">
-                                  <div className="font-semibold text-emerald-800 truncate">
-                                    {expMeta.label}
+                                  <div className="font-semibold text-[#1e3a8a] truncate">
+                                    {(() => {
+                                      const parts: string[] = [];
+                                      if (wd) parts.push(`Dia: ${wd}`);
+                                      if (tm) parts.push(`às ${tm}`);
+                                      if (parts.length === 0 && st) parts.push(`Status: ${st}`);
+                                      if (parts.length === 0) return "Aula recorrente cadastrada.";
+                                      return parts.join(" ");
+                                    })()}
                                   </div>
-                                  <div className="mt-0.5 text-[13px] text-emerald-700/80">
-                                    Horário confirmado para o registro.
+                                  <div className="mt-0.5 text-[13px] text-[#1d4ed8]/80">
+                                    Aluno definiu dia e horário das aulas recorrentes no link de matrícula.
                                   </div>
                                 </div>
                               </div>
                             );
-                          })()}
-                          {(() => {
-                            const sl = selectedLead;
-                            const expBestBooking =
-                              (sl as any).latest_experimental_class_booking ??
-                              (sl as any).experimental_class_booking ??
-                              (sl as any).future_experimental_class_booking;
-                            const bk = expBestBooking as any;
-                            const expEffectiveStatus =
-                              String(bk?.status ?? (sl as any).experimental_class_booking_status ?? (sl as any).experimental_class_status ?? "").trim().toLowerCase();
-                            const cancelled = expEffectiveStatus === "cancelled";
-                            return (
-                          <div className="mt-4 flex justify-end gap-2">
-                            <button
-                              type="button"
-                              onClick={() => handleOpenExpInfo(selectedLead)}
-                              className="inline-flex h-10 items-center justify-center gap-2 rounded-full border border-[var(--app-border)] bg-[var(--app-solid-surface)] px-4 text-[13px] font-semibold text-[var(--app-text-85)] hover:bg-[var(--app-hover)] disabled:cursor-not-allowed disabled:opacity-55"
-                              disabled={cancelled}
-                              title={cancelled ? "Agendamento cancelado." : undefined}
-                            >
-                              <Info className="h-4 w-4" />
-                              Mais informações
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => handleOpenExperimentalBooking(selectedLead)}
-                              className="inline-flex h-10 items-center justify-center gap-2 rounded-full border border-[var(--app-border)] bg-[var(--app-solid-surface)] px-4 text-[13px] font-semibold text-[var(--app-text-85)] hover:bg-[var(--app-hover)] disabled:cursor-not-allowed disabled:opacity-55"
-                              disabled={cancelled}
-                              title={cancelled ? "Agendamento cancelado. Não é possível reagendar." : undefined}
-                            >
-                              <Plus className="h-4 w-4" />
-                              Reagendar
-                            </button>
-                          </div>
-                            );
-                          })()}
-                        </>
-                      ) : (
-                        <>
-                          <div className="mt-4 flex items-start gap-3 rounded-xl border border-[var(--app-border)] bg-[var(--app-solid-surface-2)] px-4 py-3">
-                            <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[var(--app-solid-surface)] border border-[var(--app-border)] text-[var(--app-text-70)]">
-                              <CalendarIcon className="h-5 w-5" />
-                            </div>
-                            <div className="min-w-0">
-                              <div className="font-semibold text-[var(--app-text-85)]">
-                                Nenhuma aula agendada
+                          }
+                          return (
+                            <div className="mt-4 flex items-start gap-3 rounded-xl border border-[#2563eb]/35 bg-[rgba(37,99,235,0.1)] px-4 py-3">
+                              <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[#2563eb]/20 text-[#1d4ed8]">
+                                <CalendarIcon className="h-5 w-5" />
                               </div>
-                              <div className="mt-0.5 text-[13px] text-[var(--app-text-60)]">
-                                Este registro ainda não possui aulas agendadas.
+                              <div className="min-w-0">
+                                <div className="font-semibold text-[#1e3a8a] truncate">
+                                  Aguardando agendamento recorrente
+                                </div>
+                                <div className="mt-0.5 text-[13px] text-[#1d4ed8]/80">
+                                  O aluno iniciou o cadastro no link de matrícula. Quando ele concluir as etapas de dia/horário no link, os dados das aulas recorrentes aparecerão aqui automaticamente.
+                                </div>
                               </div>
                             </div>
-                          </div>
-                          <div className="mt-4 flex justify-end">
-                            <button
-                              type="button"
-                              onClick={() => handleOpenExperimentalBooking(selectedLead)}
-                              className="inline-flex h-10 items-center justify-center gap-2 rounded-full border border-[var(--app-border)] bg-[var(--app-solid-surface)] px-4 text-[13px] font-semibold text-[var(--app-text-85)] hover:bg-[var(--app-hover)]"
-                            >
-                              <Plus className="h-4 w-4" />
-                              Agendar
-                            </button>
-                          </div>
-                        </>
-                      )}
+                          );
+                        }
+
+                        // ================== FLUXO EXPERIMENTAL (sem cadastro recorrente iniciado) ==================
+                        if (expMeta.tone === "success") {
+                          const bk = (selectedLead as any)?.experimental_class_booking;
+                          const cancelled = String(bk?.status ?? "").trim().toLowerCase() === "cancelled";
+                          const sl = selectedLead;
+                          const expBestBooking =
+                            (sl as any).latest_experimental_class_booking ??
+                            (sl as any).experimental_class_booking ??
+                            (sl as any).future_experimental_class_booking;
+                          const expBk = expBestBooking as any;
+                          const expEffectiveStatus =
+                            String(expBk?.status ?? (sl as any).experimental_class_booking_status ?? (sl as any).experimental_class_status ?? "").trim().toLowerCase();
+                          const expCancelled = expEffectiveStatus === "cancelled";
+                          return (
+                            <>
+                              {cancelled ? (
+                                <div className="mt-4 flex items-start gap-3 rounded-xl border border-red-500/35 bg-red-500/10 px-4 py-3">
+                                  <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-red-500/20 text-red-700">
+                                    <CalendarIcon className="h-5 w-5" />
+                                  </div>
+                                  <div className="min-w-0">
+                                    <div className="font-semibold text-red-800 truncate">
+                                      {(() => {
+                                        const label = String(expMeta.label ?? "").trim();
+                                        if (!label) return "Aula cancelada";
+                                        if (label.toLowerCase().startsWith("aula em:")) {
+                                          return "Aula cancelada em:" + label.slice("aula em:".length);
+                                        }
+                                        return label.replace(/^Aula em:\s*/i, "Aula cancelada em: ");
+                                      })()}
+                                    </div>
+                                    <div className="mt-0.5 text-[13px] text-red-700/80">
+                                      Horário cancelado.
+                                    </div>
+                                  </div>
+                                </div>
+                              ) : (
+                                <div className="mt-4 flex items-start gap-3 rounded-xl border border-emerald-500/35 bg-emerald-500/10 px-4 py-3">
+                                  <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-emerald-500/20 text-emerald-700">
+                                    <CalendarIcon className="h-5 w-5" />
+                                  </div>
+                                  <div className="min-w-0">
+                                    <div className="font-semibold text-emerald-800 truncate">
+                                      {expMeta.label}
+                                    </div>
+                                    <div className="mt-0.5 text-[13px] text-emerald-700/80">
+                                      Horário confirmado para o registro.
+                                    </div>
+                                  </div>
+                                </div>
+                              )}
+                              <div className="mt-4 flex justify-end gap-2">
+                                <button
+                                  type="button"
+                                  onClick={() => handleOpenExpInfo(selectedLead)}
+                                  className="inline-flex h-10 items-center justify-center gap-2 rounded-full border border-[var(--app-border)] bg-[var(--app-solid-surface)] px-4 text-[13px] font-semibold text-[var(--app-text-85)] hover:bg-[var(--app-hover)] disabled:cursor-not-allowed disabled:opacity-55"
+                                  disabled={expCancelled}
+                                  title={expCancelled ? "Agendamento cancelado." : undefined}
+                                >
+                                  <Info className="h-4 w-4" />
+                                  Mais informações
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => handleOpenExperimentalBooking(selectedLead)}
+                                  className="inline-flex h-10 items-center justify-center gap-2 rounded-full border border-[var(--app-border)] bg-[var(--app-solid-surface)] px-4 text-[13px] font-semibold text-[var(--app-text-85)] hover:bg-[var(--app-hover)] disabled:cursor-not-allowed disabled:opacity-55"
+                                  disabled={expCancelled}
+                                  title={expCancelled ? "Agendamento cancelado. Não é possível reagendar." : undefined}
+                                >
+                                  <Plus className="h-4 w-4" />
+                                  Reagendar
+                                </button>
+                              </div>
+                            </>
+                          );
+                        }
+                        return (
+                          <>
+                            <div className="mt-4 flex items-start gap-3 rounded-xl border border-[var(--app-border)] bg-[var(--app-solid-surface-2)] px-4 py-3">
+                              <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[var(--app-solid-surface)] border border-[var(--app-border)] text-[var(--app-text-70)]">
+                                <CalendarIcon className="h-5 w-5" />
+                              </div>
+                              <div className="min-w-0">
+                                <div className="font-semibold text-[var(--app-text-85)]">
+                                  Nenhuma aula agendada
+                                </div>
+                                <div className="mt-0.5 text-[13px] text-[var(--app-text-60)]">
+                                  Este registro ainda não possui aulas agendadas.
+                                </div>
+                              </div>
+                            </div>
+                            <div className="mt-4 flex justify-end">
+                              <button
+                                type="button"
+                                onClick={() => handleOpenExperimentalBooking(selectedLead)}
+                                className="inline-flex h-10 items-center justify-center gap-2 rounded-full border border-[var(--app-border)] bg-[var(--app-solid-surface)] px-4 text-[13px] font-semibold text-[var(--app-text-85)] hover:bg-[var(--app-hover)]"
+                              >
+                                <Plus className="h-4 w-4" />
+                                Agendar
+                              </button>
+                            </div>
+                          </>
+                        );
+                      })()}
                     </div>
                   </div>
                 ) : null}
