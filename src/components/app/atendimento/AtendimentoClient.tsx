@@ -1065,6 +1065,197 @@ export function AtendimentoClient() {
     );
   }, [selectedLead]);
 
+  // ---- Controladores do card "Aulas recorrentes" (aba Agendamentos) para quem REALMENTE passou do cadastro inicial ----
+  const [recAssignProfDropdownOpen, setRecAssignProfDropdownOpen] = useState<boolean>(false);
+  const [recAssigningProfessor, setRecAssigningProfessor] = useState<boolean>(false);
+  const [recSavingLessonLink, setRecSavingLessonLink] = useState<boolean>(false);
+  const [recSendingNotification, setRecSendingNotification] = useState<boolean>(false);
+  const [recLessonLinkDraftByLeadId, setRecLessonLinkDraftByLeadId] = useState<Record<string, string>>({});
+
+  const recurringLessonLinkDraft = useMemo<string>(() => {
+    const current = recLessonLinkDraftByLeadId[selectedLead?.id ?? ""];
+    if (typeof current === "string") return current;
+    return String((selectedLead as any)?.recurring_class_link ?? "").trim();
+  }, [recLessonLinkDraftByLeadId, selectedLead]);
+
+  useEffect(() => {
+    if (!selectedLead?.id) return;
+    setRecAssignProfDropdownOpen(false);
+    setRecLessonLinkDraftByLeadId((prev) => {
+      if (typeof prev[selectedLead.id] === "string") return prev;
+      return { ...prev, [selectedLead.id]: String((selectedLead as any)?.recurring_class_link ?? "").trim() };
+    });
+  }, [selectedLead?.id]);
+
+  function recurringAssignedProfessorForLead(lead: AtendimentoLeadListItem | null): { name: string; phone: string } | null {
+    if (!lead) return null;
+    const nm = String((lead as any)?.recurring_class_professor_name ?? "").trim();
+    const ph = String((lead as any)?.recurring_class_professor_phone ?? "").trim();
+    if (!nm && !ph) return null;
+    const fallback = EXPERIMENTAL_PROFESSOR_OPTIONS_CLIENT.find((p) => p.phone === ph && p.name === nm)
+      || EXPERIMENTAL_PROFESSOR_OPTIONS_CLIENT.find((p) => p.phone === ph)
+      || EXPERIMENTAL_PROFESSOR_OPTIONS_CLIENT.find((p) => p.name.toLowerCase() === nm.toLowerCase());
+    return fallback ? { name: fallback.name, phone: fallback.phone } : { name: nm, phone: ph };
+  }
+
+  async function handleAssignProfessorRecurring(lead: AtendimentoLeadListItem, prof: { name: string; phone: string }) {
+    if (recAssigningProfessor) return;
+    setRecAssigningProfessor(true);
+    try {
+      const res = await fetch(`/api/atendimento/leads/${encodeURIComponent(lead.id)}/experimental-booking/assign-professor`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ professor_name: prof.name, professor_phone: prof.phone, scope: "recurring" }),
+      });
+      const payload = (await res.json().catch(() => null)) as { ok?: boolean; error?: string } | null;
+      if (!res.ok || !payload?.ok) {
+        modalToast.error(payload?.error ?? "Falha ao vincular professor às aulas recorrentes.");
+        return;
+      }
+      setPanelLeads((cur) =>
+        cur.map((l) =>
+          l.id === lead.id
+            ? ({
+                ...l,
+                recurring_class_professor_name: prof.name,
+                recurring_class_professor_phone: prof.phone,
+              } as AtendimentoLeadListItem)
+            : l,
+        ),
+      );
+      const fresh = await fetch(`/api/atendimento/leads/${encodeURIComponent(lead.id)}?skipEvents=1`, { cache: "no-store" })
+        .then(async (r) => (r.ok ? r.json().catch(() => null) : null))
+        .catch(() => null) as { ok?: boolean; lead?: Record<string, unknown> | null } | null;
+      if (fresh?.ok && fresh.lead?.id) {
+        setPanelLeads((cur) => cur.map((l) => (l.id === lead.id ? ({ ...l, ...fresh.lead } as AtendimentoLeadListItem) : l)));
+      }
+      modalToast.success("Professor vinculado às aulas recorrentes.");
+    } finally {
+      setRecAssigningProfessor(false);
+    }
+  }
+
+  async function handleSaveLessonLinkRecurring(lead: AtendimentoLeadListItem) {
+    if (recSavingLessonLink) return;
+    const saved = String((lead as any)?.recurring_class_link ?? "").trim();
+    const draft = recurringLessonLinkDraft.trim();
+    if (!draft && !saved) {
+      modalToast.warning("Informe o link fixo da aula recorrente antes de salvar.");
+      return;
+    }
+    if (draft === saved) {
+      modalToast.info("Nenhuma alteração no link fixo da aula recorrente.");
+      return;
+    }
+    setRecSavingLessonLink(true);
+    try {
+      const res = await fetch(`/api/atendimento/leads/${encodeURIComponent(lead.id)}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ recurring_class_link: draft || null }),
+      });
+      const payload = (await res.json().catch(() => null)) as { ok?: boolean; error?: string } | null;
+      if (!res.ok || !payload?.ok) {
+        modalToast.error(payload?.error ?? "Falha ao atualizar link fixo da aula recorrente.");
+        return;
+      }
+      setPanelLeads((cur) =>
+        cur.map((l) =>
+          l.id === lead.id
+            ? ({ ...l, recurring_class_link: draft || null } as AtendimentoLeadListItem)
+            : l,
+        ),
+      );
+      setRecLessonLinkDraftByLeadId((prev) => ({ ...prev, [lead.id]: draft || "" }));
+      const fresh = await fetch(`/api/atendimento/leads/${encodeURIComponent(lead.id)}?skipEvents=1`, { cache: "no-store" })
+        .then(async (r) => (r.ok ? r.json().catch(() => null) : null))
+        .catch(() => null) as { ok?: boolean; lead?: Record<string, unknown> | null } | null;
+      if (fresh?.ok && fresh.lead?.id) {
+        setPanelLeads((cur) => cur.map((l) => (l.id === lead.id ? ({ ...l, ...fresh.lead } as AtendimentoLeadListItem) : l)));
+      }
+      modalToast.success("Link fixo da aula recorrente atualizado.");
+    } finally {
+      setRecSavingLessonLink(false);
+    }
+  }
+
+  async function handleSendRecurringDisparo(lead: AtendimentoLeadListItem) {
+    if (recSendingNotification) return;
+    const phone = String(lead?.phone ?? "").trim();
+    if (!phone) {
+      modalToast.warning("Registro não possui telefone cadastrado.");
+      return;
+    }
+    const recProf = recurringAssignedProfessorForLead(lead);
+    if (!recProf) {
+      modalToast.warning("Selecione o professor das aulas recorrentes antes de disparar.");
+      return;
+    }
+    const recLink = String((lead as any)?.recurring_class_link ?? "").trim();
+    if (!recLink) {
+      modalToast.warning("Adicione o link fixo da aula recorrente antes de disparar.");
+      return;
+    }
+    setRecSendingNotification(true);
+    try {
+      const res = await fetch(`/api/atendimento/leads/${encodeURIComponent(lead.id)}/send-recurring-notification`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+      });
+      const payload = (await res.json().catch(() => null)) as { ok?: boolean; error?: string } | null;
+      if (!res.ok || !payload?.ok) {
+        modalToast.error(payload?.error ?? "Falha ao disparar lembretes da aula recorrente.");
+        return;
+      }
+      modalToast.success("Disparo recorrente realizado. WhatsApp enviado para aluno e professor.");
+      const fresh = await fetch(`/api/atendimento/leads/${encodeURIComponent(lead.id)}?skipEvents=1`, { cache: "no-store" })
+        .then(async (r) => (r.ok ? r.json().catch(() => null) : null))
+        .catch(() => null) as { ok?: boolean; lead?: Record<string, unknown> | null } | null;
+      if (fresh?.ok && fresh.lead?.id) {
+        setPanelLeads((cur) => cur.map((l) => (l.id === lead.id ? ({ ...l, ...fresh.lead } as AtendimentoLeadListItem) : l)));
+      }
+    } finally {
+      setRecSendingNotification(false);
+    }
+  }
+
+  async function handleCancelRecurring(lead: AtendimentoLeadListItem) {
+    const recProf = recurringAssignedProfessorForLead(lead);
+    if (!recProf) {
+      modalToast.warning("Selecione o professor das aulas recorrentes antes de cancelar.");
+      return;
+    }
+    if (!window.confirm("Deseja realmente fechar o horário recorrente atual deste registro?")) {
+      return;
+    }
+    try {
+      const res = await fetch(`/api/atendimento/leads/${encodeURIComponent(lead.id)}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          recurring_class_weekday: null,
+          recurring_class_weekday_label: null,
+          recurring_class_lead_time: null,
+          recurring_class_professor_time: null,
+          recurring_class_status: "cancelado_horario_atual",
+        } as any),
+      });
+      const payload = (await res.json().catch(() => null)) as { ok?: boolean; error?: string } | null;
+      if (!res.ok || !payload?.ok) {
+        modalToast.error(payload?.error ?? "Falha ao cancelar horário recorrente.");
+        return;
+      }
+      modalToast.success("Horário recorrente cancelado.");
+      const fresh = await fetch(`/api/atendimento/leads/${encodeURIComponent(lead.id)}?skipEvents=1`, { cache: "no-store" })
+        .then(async (r) => (r.ok ? r.json().catch(() => null) : null))
+        .catch(() => null) as { ok?: boolean; lead?: Record<string, unknown> | null } | null;
+      if (fresh?.ok && fresh.lead?.id) {
+        setPanelLeads((cur) => cur.map((l) => (l.id === lead.id ? ({ ...l, ...fresh.lead } as AtendimentoLeadListItem) : l)));
+      }
+    } catch (_) {
+      modalToast.error("Falha ao cancelar horário recorrente.");
+    }
+  }
   // ---- Controladores do card "Aulas experimentais" (tab Agendamentos) DESKTOP + MOBILE ----
   const [expAssignProfDropdownOpen, setExpAssignProfDropdownOpen] = useState<boolean>(false);
   const [expAssigningProfessor, setExpAssigningProfessor] = useState<boolean>(false);
@@ -5163,38 +5354,238 @@ export function AtendimentoClient() {
                     <div className="grid w-full grid-cols-1 gap-4 xl:grid-cols-1">
                       {(() => {
                         if (showRecurringCard) {
+                          const recAssigned = recurringAssignedProfessorForLead(sl);
+                          const recSavedLink = String((sl as any).recurring_class_link ?? "").trim();
+                          const recHasPhone = Boolean(String(sl?.phone ?? "").trim());
+                          const recWdRaw = String((sl as any).recurring_class_weekday ?? (sl as any).recurring_class_weekday_label ?? "").trim().toLowerCase();
+                          const recWdOk = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"].includes(
+                            recWdRaw === "segunda" || recWdRaw === "seg" ? "mon"
+                              : recWdRaw === "terça" || recWdRaw === "terca" || recWdRaw === "ter" ? "tue"
+                              : recWdRaw === "quarta" || recWdRaw === "qua" ? "wed"
+                              : recWdRaw === "quinta" || recWdRaw === "qui" ? "thu"
+                              : recWdRaw === "sexta" || recWdRaw === "sex" ? "fri"
+                              : recWdRaw === "sábado" || recWdRaw === "sabado" || recWdRaw === "sab" ? "sat"
+                              : recWdRaw === "domingo" || recWdRaw === "dom" ? "sun"
+                              : recWdRaw
+                          );
+                          const recProfTimeRaw = String((sl as any).recurring_class_professor_time ?? "").trim();
+                          const recLeadTimeRaw = String((sl as any).recurring_class_lead_time ?? "").trim();
+                          const recTimeOk = Boolean(recProfTimeRaw) || Boolean(recLeadTimeRaw);
+                          const recSchedOk = recWdOk && recTimeOk;
+                          const recCanSendDisparo = Boolean(recAssigned && recSavedLink && recHasPhone && !recSendingNotification);
+                          const recLessonLinkSaveDisabled = (() => {
+                            const d = recurringLessonLinkDraft.trim();
+                            if (!d && !recSavedLink) return true;
+                            if (d === recSavedLink) return true;
+                            if (recSavingLessonLink) return true;
+                            return false;
+                          })();
+                          const recHorarioLabel = (() => {
+                            const wdLabelRaw = String((sl as any).recurring_class_weekday_label ?? "").trim();
+                            const wd = (wdLabelRaw || recWdRaw).toLowerCase();
+                            const toPT: Record<string, string> = {
+                              mon: "Segunda-feira", tue: "Terça-feira", wed: "Quarta-feira", thu: "Quinta-feira",
+                              fri: "Sexta-feira", sat: "Sábado", sun: "Domingo",
+                              segunda: "Segunda-feira", terca: "Terça-feira", "terça": "Terça-feira",
+                              quarta: "Quarta-feira", quinta: "Quinta-feira", sexta: "Sexta-feira",
+                              sabado: "Sábado", "sábado": "Sábado", domingo: "Domingo",
+                              seg: "Segunda-feira", ter: "Terça-feira", qua: "Quarta-feira",
+                              qui: "Quinta-feira", sex: "Sexta-feira", sab: "Sábado", dom: "Domingo",
+                            };
+                            const wdNice = toPT[wd] || (wdLabelRaw || (recWdOk ? recWdRaw.toUpperCase() : "") || "");
+                            const t = recProfTimeRaw || recLeadTimeRaw || "";
+                            if (!wdNice && !t) return "Horário recorrente ainda não definido pelo aluno no link de matrícula.";
+                            if (wdNice && !t) return `${wdNice} — horário ainda não definido.`;
+                            if (!wdNice && t) return `Horário: ${t} — dia da semana ainda não definido.`;
+                            return `${wdNice} às ${t}h (recorrente semanal).`;
+                          })();
                           return (
-                            <div className="overflow-hidden rounded-2xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] p-5 shadow-none">
-                              <div className="flex items-center gap-2">
-                                <RefreshCw className="h-5 w-5 text-[var(--app-text-70)]" />
-                                <div className="text-[15px] font-bold text-[var(--app-text-85)]">
-                                  Aulas recorrentes
+                            <div className="relative overflow-hidden rounded-2xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] p-5 shadow-none">
+                              <div className="flex flex-wrap items-start justify-between gap-3">
+                                <div className="flex items-center gap-2 shrink-0 min-w-[190px] max-w-full min-[1201px]:self-center">
+                                  <RefreshCw className="h-5 w-5 shrink-0 text-[var(--app-text-70)]" />
+                                  <div className="text-[15px] font-bold text-[var(--app-text-85)] truncate">
+                                    Aulas recorrentes
+                                  </div>
+                                </div>
+                                <div className="flex flex-wrap items-stretch justify-start sm:justify-end gap-2 sm:gap-3 w-full sm:w-auto min-w-0 sm:mt-0 mt-6">
+                                  <div className="flex w-full sm:w-auto shrink-0">
+                                    <button
+                                      type="button"
+                                      onClick={() => void handleSendRecurringDisparo(sl)}
+                                      disabled={!recCanSendDisparo}
+                                      title={(() => {
+                                        if (!recSavedLink && !recAssigned) return "Adicione o link fixo da aula recorrente e selecione o professor antes de disparar.";
+                                        if (!recSavedLink) return "Adicione o link fixo da aula recorrente antes de disparar.";
+                                        if (!recAssigned) return "Selecione o professor das aulas recorrentes antes de disparar.";
+                                        if (!recHasPhone) return "Registro não possui telefone cadastrado para receber a notificação.";
+                                        return "Disparar lembretes recorrentes agora.";
+                                      })()}
+                                      className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl transition-all bg-[var(--app-btn-primary-bg)] px-5 text-[13px] font-semibold !text-[var(--app-btn-primary-fg)] shadow-none disabled:cursor-not-allowed disabled:opacity-55 sm:w-auto"
+                                    >
+                                      <Zap className="h-4 w-4 shrink-0" />
+                                      {recSendingNotification ? "Disparando..." : "Disparar"}
+                                    </button>
+                                  </div>
+                                  <div className="flex w-full sm:w-auto shrink-0">
+                                    <button
+                                      type="button"
+                                      onClick={() => handleOpenExperimentalBooking(sl)}
+                                      title="Reagendar aula recorrente."
+                                      className="inline-flex h-10 w-full items-center justify-center gap-2 rounded-full border border-[var(--app-border)] bg-[var(--app-solid-surface)] px-4 text-[13px] font-semibold text-[var(--app-text-85)] hover:bg-[var(--app-hover)] disabled:cursor-not-allowed disabled:opacity-55 sm:w-auto"
+                                    >
+                                      <Plus className="h-4 w-4" />
+                                      Reagendar
+                                    </button>
+                                  </div>
+                                  <div className="relative w-full sm:w-auto shrink-0 min-w-0 sm:max-w-[320px]">
+                                    <button
+                                      type="button"
+                                      onClick={() => setRecAssignProfDropdownOpen((v) => !v)}
+                                      onBlur={() => { setTimeout(() => setRecAssignProfDropdownOpen(false), 180); }}
+                                      disabled={recAssigningProfessor}
+                                      className="inline-flex h-10 w-full items-center justify-center gap-2 rounded-xl border border-[var(--app-border)] bg-[var(--app-solid-surface-2)] px-4 text-[13px] font-semibold text-[var(--app-text-85)] transition hover:bg-[var(--app-hover)] disabled:cursor-not-allowed disabled:opacity-55 sm:w-auto"
+                                      title={recAssigned ? `Professor vinculado: ${recAssigned.name}` : "Selecionar professor para as aulas recorrentes."}
+                                    >
+                                      {recAssigningProfessor ? (
+                                        <Loader2 className="h-4 w-4 shrink-0 animate-spin" />
+                                      ) : (
+                                        <CheckCircle2 className="h-4 w-4 shrink-0 text-[var(--app-text-65)]" />
+                                      )}
+                                      <span className="truncate">
+                                        {recAssigned ? `${recAssigned.name}` : "Selecionar professor"}
+                                      </span>
+                                      <ChevronDown className="h-4 w-4 shrink-0 text-[var(--app-text-65)]" />
+                                    </button>
+                                    {recAssignProfDropdownOpen ? (
+                                      <div className="absolute right-0 top-full z-[380] mt-2 flex w-[300px] flex-col gap-1 overflow-hidden rounded-2xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] p-1.5 shadow-lg">
+                                        {EXPERIMENTAL_PROFESSOR_OPTIONS_CLIENT.map((opt) => {
+                                          const isActive = recAssigned?.phone === opt.phone && recAssigned?.name === opt.name;
+                                          const optionDisabled = recAssigningProfessor;
+                                          return (
+                                            <button
+                                              key={opt.phone}
+                                              type="button"
+                                              disabled={optionDisabled}
+                                              onClick={() => {
+                                                setRecAssignProfDropdownOpen(false);
+                                                void handleAssignProfessorRecurring(sl, { name: opt.name, phone: opt.phone });
+                                              }}
+                                              className={[
+                                                "flex w-full items-center justify-between gap-3 rounded-xl px-3.5 py-3 text-left transition",
+                                                isActive
+                                                  ? "border border-emerald-500/30 bg-emerald-500/10"
+                                                  : "border border-transparent hover:bg-[var(--app-hover)]",
+                                                "disabled:cursor-not-allowed disabled:opacity-55",
+                                              ].join(" ")}
+                                            >
+                                              <div className="min-w-0 flex-1">
+                                                <div className="truncate text-[13px] font-semibold text-[var(--app-text-85)]">
+                                                  {opt.name}
+                                                </div>
+                                              </div>
+                                              {isActive ? (
+                                                <div className="inline-flex shrink-0 items-center gap-1 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.12em] text-emerald-700">
+                                                  <Check className="h-3 w-3 shrink-0" />
+                                                  Atual
+                                                </div>
+                                              ) : null}
+                                            </button>
+                                          );
+                                        })}
+                                      </div>
+                                    ) : null}
+                                  </div>
+                                  <button
+                                    type="button"
+                                    onClick={() => void handleCancelRecurring(sl)}
+                                    disabled={!recSchedOk}
+                                    title={recSchedOk ? "Fechar horário recorrente atual." : "Defina dia e horário antes de poder fechar o horário recorrente atual."}
+                                    className="hidden sm:inline-flex h-10 w-10 shrink-0 items-center justify-center gap-2 rounded-xl border border-red-500/30 bg-red-500/10 text-red-700 transition hover:bg-red-500/15 disabled:cursor-not-allowed disabled:opacity-55"
+                                  >
+                                    <X className="h-4 w-4 shrink-0" />
+                                  </button>
+                                </div>
+                                <div className="flex sm:hidden absolute top-5 right-5 z-10 items-center gap-2">
+                                  <button
+                                    type="button"
+                                    onClick={() => void handleCancelRecurring(sl)}
+                                    disabled={!recSchedOk}
+                                    title={recSchedOk ? "Fechar horário recorrente atual." : "Defina dia e horário antes."}
+                                    className="inline-flex h-10 w-10 shrink-0 items-center justify-center gap-2 rounded-xl border border-red-500/30 bg-red-500/10 text-red-700 transition hover:bg-red-500/15 disabled:cursor-not-allowed disabled:opacity-55"
+                                  >
+                                    <X className="h-4 w-4 shrink-0" />
+                                  </button>
                                 </div>
                               </div>
-                              <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
-                                <div>
-                                  <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--app-text-60)]">Dia</div>
-                                  <div className="mt-1 text-[14px] font-semibold text-[var(--app-text-85)]">
-                                    {String((sl as any).recurring_class_weekday_label ?? (sl as any).recurring_class_weekday ?? "-").trim() || "-"}
+                              {!recSchedOk ? (
+                                <div className="mt-4 flex items-start gap-3 rounded-xl border border-[#2563eb]/35 bg-[rgba(37,99,235,0.10)] px-4 py-3">
+                                  <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[#2563eb]/20 text-[#1e40af]">
+                                    <RefreshCw className="h-5 w-5" />
+                                  </div>
+                                  <div className="min-w-0">
+                                    <div className="font-semibold text-[#1e3a8a] truncate">
+                                      Aguardando dia e horário recorrente
+                                    </div>
+                                    <div className="mt-0.5 text-[13px] text-[#1d4ed8]/80">
+                                      Quando o aluno concluir a etapa de dia e horário no link de matrícula, os dados aparecem aqui.
+                                    </div>
                                   </div>
                                 </div>
-                                <div>
-                                  <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--app-text-60)]">Horário</div>
-                                  <div className="mt-1 text-[14px] font-semibold text-[var(--app-text-85)]">
-                                    {String((sl as any).recurring_class_professor_time ?? (sl as any).recurring_class_lead_time ?? "-").trim() || "-"}
+                              ) : (
+                                <div className="mt-4 flex items-start gap-3 rounded-xl border border-[#2563eb]/35 bg-[rgba(37,99,235,0.10)] px-4 py-3">
+                                  <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[#2563eb]/20 text-[#1e40af]">
+                                    <CalendarIcon className="h-5 w-5" />
+                                  </div>
+                                  <div className="min-w-0">
+                                    <div className="font-semibold text-[#1e3a8a] truncate">
+                                      {recHorarioLabel}
+                                    </div>
+                                    <div className="mt-0.5 text-[13px] text-[#1d4ed8]/80">
+                                      Horário semanal recorrente salvo para o registro.
+                                    </div>
                                   </div>
                                 </div>
-                                <div>
-                                  <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--app-text-60)]">Status</div>
-                                  <div className="mt-1 text-[14px] font-semibold text-[var(--app-text-85)]">
-                                    {String((sl as any).recurring_class_status ?? "-").trim() || "-"}
+                              )}
+                              <div className="mt-5">
+                                <div className="flex flex-col items-stretch gap-3 min-[600px]:flex-row min-[600px]:items-end">
+                                  <div className="min-w-0 flex-1">
+                                    <label className="mb-1.5 block text-[12px] font-semibold text-[var(--app-text-70)]">
+                                      Link fixo da aula recorrente
+                                    </label>
+                                    <input
+                                      type="url"
+                                      inputMode="url"
+                                      placeholder="https://meet.google.com/..."
+                                      value={recurringLessonLinkDraft}
+                                      onChange={(e) =>
+                                        setRecLessonLinkDraftByLeadId((prev) => ({
+                                          ...prev,
+                                          [sl.id]: e.target.value,
+                                        }))
+                                      }
+                                      className="w-full min-w-0 rounded-xl border border-[var(--app-border)] bg-[var(--app-solid-surface-2)] px-4 py-3 text-[13px] font-semibold text-[var(--app-text-85)] placeholder:text-[var(--app-text-45)] transition focus:border-[var(--app-border-strong)] focus:outline-none disabled:cursor-not-allowed disabled:opacity-55"
+                                      disabled={recSavingLessonLink}
+                                    />
                                   </div>
-                                </div>
-                                <div>
-                                  <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--app-text-60)]">Etapa</div>
-                                  <div className="mt-1 text-[14px] font-semibold text-[var(--app-text-85)]">
-                                    Passo {Number((sl as any).recurring_registration_step ?? 0) || "-"}/12
-                                  </div>
+                                  <button
+                                    type="button"
+                                    onClick={() => void handleSaveLessonLinkRecurring(sl)}
+                                    disabled={recLessonLinkSaveDisabled}
+                                    className="inline-flex h-[46px] w-full items-center justify-center gap-2 rounded-xl border border-[var(--app-border)] bg-[var(--app-solid-surface-2)] px-4 text-[13px] font-semibold text-[var(--app-text-85)] transition hover:bg-[var(--app-hover)] min-[600px]:w-auto disabled:cursor-not-allowed disabled:opacity-55"
+                                  >
+                                    {recSavingLessonLink ? (
+                                      <>
+                                        <Loader2 className="h-4 w-4 shrink-0 animate-spin" />
+                                        Salvando...
+                                      </>
+                                    ) : (
+                                      <>
+                                        <Save className="h-4 w-4 shrink-0" />
+                                        {recSavedLink ? "Atualizar" : "Salvar"}
+                                      </>
+                                    )}
+                                  </button>
                                 </div>
                               </div>
                             </div>

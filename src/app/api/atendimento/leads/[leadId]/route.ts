@@ -596,6 +596,8 @@ export async function PATCH(request: Request, context: { params: Promise<{ leadI
   const schema = z.object({
     full_name: z.string().trim().max(160).nullable().optional(),
     recurring_class_link: z.string().trim().max(500).nullable().optional(),
+    recurring_class_professor_name: z.string().trim().max(160).nullable().optional(),
+    recurring_class_professor_phone: z.string().trim().max(40).nullable().optional(),
     city: z.string().trim().max(160).nullable().optional(),
     state: z.string().trim().max(160).nullable().optional(),
     country: z.string().trim().max(120).nullable().optional(),
@@ -612,6 +614,12 @@ export async function PATCH(request: Request, context: { params: Promise<{ leadI
     experimental_class_professor_name: z.string().trim().max(160).nullable().optional(),
     experimental_class_professor_phone: z.string().trim().max(40).nullable().optional(),
     experimental_class_booking_id: z.string().trim().max(120).nullable().optional(),
+    recurring_class_weekday: z.string().trim().max(60).nullable().optional(),
+    recurring_class_weekday_label: z.string().trim().max(120).nullable().optional(),
+    recurring_class_lead_time: z.string().trim().max(20).nullable().optional(),
+    recurring_class_professor_time: z.string().trim().max(20).nullable().optional(),
+    recurring_class_status: z.string().trim().max(120).nullable().optional(),
+    recurring_registration_step: z.number().int().min(0).max(12).nullable().optional(),
     internal_notes: z.string().max(5000).nullable().optional(),
   });
   const parsed = schema.safeParse(body);
@@ -1209,6 +1217,19 @@ export async function PATCH(request: Request, context: { params: Promise<{ leadI
   const safeExpProfessorPhone = toSafeStringTrimOrNull(parsed.data.experimental_class_professor_phone);
   const safeExpBookingId = toSafeStringTrimOrNull(parsed.data.experimental_class_booking_id);
 
+  const safeRecProfessorName = toSafeStringTrimOrNull(parsed.data.recurring_class_professor_name);
+  const safeRecProfessorPhone = toSafeStringTrimOrNull(parsed.data.recurring_class_professor_phone);
+  const safeRecWeekday = toSafeStringTrimOrNull(parsed.data.recurring_class_weekday);
+  const safeRecWeekdayLabel = toSafeStringTrimOrNull(parsed.data.recurring_class_weekday_label);
+  const safeRecLeadTime = toSafeStringTrimOrNull(parsed.data.recurring_class_lead_time);
+  const safeRecProfessorTime = toSafeStringTrimOrNull(parsed.data.recurring_class_professor_time);
+  const safeRecStatus = toSafeStringTrimOrNull(parsed.data.recurring_class_status);
+  const rawRecStep = parsed.data.recurring_registration_step;
+  let safeRecStep: number | null | undefined = undefined;
+  if (rawRecStep === undefined) safeRecStep = undefined;
+  else if (rawRecStep === null) safeRecStep = null;
+  else safeRecStep = Number.isFinite(rawRecStep) ? Math.max(0, Math.min(12, Math.trunc(rawRecStep))) : null;
+
   const internalNotesRaw = parsed.data.internal_notes;
   let safeInternalNotes: undefined | null | string = undefined;
   if (internalNotesRaw === undefined) {
@@ -1223,6 +1244,14 @@ export async function PATCH(request: Request, context: { params: Promise<{ leadI
   const updateData: Record<string, unknown> = {};
   if (safeFullName !== undefined) updateData.full_name = safeFullName;
   if (safeRecurringLink !== undefined) updateData.recurring_class_link = safeRecurringLink;
+  if (safeRecProfessorName !== undefined) updateData.recurring_class_professor_name = safeRecProfessorName;
+  if (safeRecProfessorPhone !== undefined) updateData.recurring_class_professor_phone = safeRecProfessorPhone;
+  if (safeRecWeekday !== undefined) updateData.recurring_class_weekday = safeRecWeekday;
+  if (safeRecWeekdayLabel !== undefined) updateData.recurring_class_weekday_label = safeRecWeekdayLabel;
+  if (safeRecLeadTime !== undefined) updateData.recurring_class_lead_time = safeRecLeadTime;
+  if (safeRecProfessorTime !== undefined) updateData.recurring_class_professor_time = safeRecProfessorTime;
+  if (safeRecStatus !== undefined) updateData.recurring_class_status = safeRecStatus;
+  if (safeRecStep !== undefined) updateData.recurring_registration_step = safeRecStep;
   if (safeCity !== undefined) updateData.city = safeCity;
   if (safeState !== undefined) updateData.state = safeState;
   if (safeCountry !== undefined) updateData.country = safeCountry;
@@ -1245,51 +1274,69 @@ export async function PATCH(request: Request, context: { params: Promise<{ leadI
     return Response.json({ ok: true, lead: null });
   }
 
-  const selectFull = "id, full_name, recurring_class_link, city, state, country, timezone, funnel_stage, experimental_class_status, experimental_class_lead_date, experimental_class_lead_time, experimental_class_professor_date, experimental_class_professor_time, experimental_class_lead_start_at, experimental_class_professor_start_at, experimental_class_link, experimental_class_professor_name, experimental_class_professor_phone, experimental_class_booking_id, internal_notes, updated_at";
+  const selectFull = "id, full_name, recurring_class_link, recurring_class_professor_name, recurring_class_professor_phone, recurring_class_weekday, recurring_class_weekday_label, recurring_class_lead_time, recurring_class_professor_time, recurring_class_status, recurring_registration_step, city, state, country, timezone, funnel_stage, experimental_class_status, experimental_class_lead_date, experimental_class_lead_time, experimental_class_professor_date, experimental_class_professor_time, experimental_class_lead_start_at, experimental_class_professor_start_at, experimental_class_link, experimental_class_professor_name, experimental_class_professor_phone, experimental_class_booking_id, internal_notes, updated_at";
   const selectSafe = "id, full_name, recurring_class_link, city, state, country, timezone, updated_at";
 
   let updated: any = null;
   let runErr: any = null;
-  {
+  const MIGRATION_UNKNOWN_COLS_PROBE = [
+    "recurring_class_professor_name","recurring_class_professor_phone","recurring_class_weekday","recurring_class_weekday_label",
+    "recurring_class_lead_time","recurring_class_professor_time","recurring_class_status","recurring_registration_step","recurring_class_link",
+    "experimental_class_status","experimental_class_lead_date","experimental_class_lead_time","experimental_class_professor_date",
+    "experimental_class_professor_time","experimental_class_lead_start_at","experimental_class_professor_start_at",
+    "experimental_class_link","experimental_class_professor_name","experimental_class_professor_phone","experimental_class_booking_id",
+    "funnel_stage","internal_notes","timezone","country",
+  ] as const;
+  const extractCol = (err: unknown): string | null => {
+    const m = String((err as any)?.message ?? "").match(/column "([^"]+)" (?:does not exist|of relation)/i);
+    if (m && m[1]) return m[1];
+    const m2 = String((err as any)?.message ?? "").match(/could not find the '([^']+)' column/i);
+    if (m2 && m2[1]) return m2[1];
+    return null;
+  };
+  const stripSingleCol = (patch: Record<string, unknown>, col: string | null): Record<string, unknown> => {
+    const next = { ...patch };
+    if (col && next[col] !== undefined) delete next[col];
+    return next;
+  };
+  let workingPatch = { ...updateData };
+  let probeLoops = 0;
+  while (probeLoops < 26) {
+    probeLoops++;
     const { data: d1, error: e1 } = await admin
       .from("atendimento_leads")
-      .update(updateData)
+      .update(workingPatch)
       .eq("id", leadId)
       .eq("assigned_user_email", "atendimento.usa.music@gmail.com")
-      .select(selectFull)
+      .select(selectSafe)
       .maybeSingle();
-    if (!e1 && d1) {
-      updated = d1;
-    } else if (e1 && isUndefinedColumnError(e1)) {
-      const strippedUpdate: Record<string, unknown> = {};
-      for (const k of Object.keys(updateData)) {
-        if (k.startsWith("experimental_class_")) continue;
-        strippedUpdate[k] = updateData[k];
-      }
-      if (Object.keys(strippedUpdate).length === 0) {
-        const { data: fallbackLead } = await admin
-          .from("atendimento_leads")
-          .select(selectSafe)
-          .eq("id", leadId)
-          .eq("assigned_user_email", "atendimento.usa.music@gmail.com")
-          .maybeSingle();
-        updated = fallbackLead ?? null;
-      } else {
-        const { data: d2, error: e2 } = await admin
-          .from("atendimento_leads")
-          .update(strippedUpdate)
-          .eq("id", leadId)
-          .eq("assigned_user_email", "atendimento.usa.music@gmail.com")
-          .select(selectSafe)
-          .maybeSingle();
-        if (!e2) {
-          updated = d2 ?? null;
-        } else {
-          runErr = e2;
-        }
-      }
-    } else {
+    if (!e1) {
+      updated = d1 ?? null;
+      break;
+    }
+    if (!isUndefinedColumnError(e1)) {
       runErr = e1;
+      break;
+    }
+    const bad = extractCol(e1);
+    const beforeLen = Object.keys(workingPatch).length;
+    workingPatch = stripSingleCol(workingPatch, bad);
+    if (Object.keys(workingPatch).length === beforeLen) {
+      let removedAny = false;
+      for (const col of MIGRATION_UNKNOWN_COLS_PROBE) {
+        if (workingPatch[col] !== undefined) { delete workingPatch[col]; removedAny = true; break; }
+      }
+      if (!removedAny) { runErr = e1; break; }
+    }
+    if (Object.keys(workingPatch).length === 0) {
+      const { data: fallbackLead } = await admin
+        .from("atendimento_leads")
+        .select(selectSafe)
+        .eq("id", leadId)
+        .eq("assigned_user_email", "atendimento.usa.music@gmail.com")
+        .maybeSingle();
+      updated = fallbackLead ?? null;
+      break;
     }
   }
 
