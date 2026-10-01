@@ -36,8 +36,12 @@ function toErrorMessage(raw: unknown, fallback = "Erro desconhecido."): string {
 function isUndefinedColumnError(error: unknown): boolean {
   const code = String((error as any)?.code ?? "").trim();
   if (code === "42703") return true;
+  if (code === "PGRST204") return true;
   const msg = String(error instanceof Error ? error.message : (error as any)?.message ?? "").toLowerCase();
-  return msg.includes("column") && msg.includes("does not exist");
+  if (msg.includes("column") && msg.includes("does not exist")) return true;
+  if (/could not find the '([^']+)' column/i.test(msg)) return true;
+  if (/in the schema cache/i.test(msg) && /column/i.test(msg)) return true;
+  return false;
 }
 
 function buildEnrollmentNumber({
