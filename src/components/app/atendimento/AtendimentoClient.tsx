@@ -5421,7 +5421,7 @@ export function AtendimentoClient() {
                                         if (!recHasPhone) return "Registro não possui telefone cadastrado para receber a notificação.";
                                         return "Disparar lembretes recorrentes agora.";
                                       })()}
-                                      className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl transition-all bg-[var(--app-btn-primary-bg)] px-5 text-[13px] font-semibold !text-[var(--app-btn-primary-fg)] shadow-none disabled:cursor-not-allowed disabled:opacity-55 sm:w-auto"
+                                      className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl transition-all bg-[#2563eb] px-5 text-[13px] font-semibold !text-white shadow-none disabled:cursor-not-allowed disabled:opacity-55 sm:w-auto"
                                     >
                                       <Zap className="h-4 w-4 shrink-0" />
                                       {recSendingNotification ? "Disparando..." : "Disparar"}
@@ -6645,7 +6645,7 @@ export function AtendimentoClient() {
                                       if (!recHasPhone) return "Registro não possui telefone cadastrado para receber a notificação.";
                                       return "Disparar lembretes recorrentes agora.";
                                     })()}
-                                    className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl transition-all bg-[var(--app-btn-primary-bg)] px-5 text-[13px] font-semibold !text-[var(--app-btn-primary-fg)] shadow-none disabled:cursor-not-allowed disabled:opacity-55 sm:w-auto"
+                                    className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl transition-all bg-[#2563eb] px-5 text-[13px] font-semibold !text-white shadow-none disabled:cursor-not-allowed disabled:opacity-55 sm:w-auto"
                                   >
                                     <Zap className="h-4 w-4 shrink-0" />
                                     {recSendingNotification ? "Disparando..." : "Disparar"}
