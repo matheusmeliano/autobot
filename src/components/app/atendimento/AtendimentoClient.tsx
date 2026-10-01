@@ -632,6 +632,20 @@ function buildRecurringClassUrl(lead: AtendimentoLeadListItem): string {
   return rel;
 }
 
+const STUDENT_DASHBOARD_DEFAULT_URL = "https://www.autobot.business/atendimento";
+
+function buildStudentDashboardUrl(lead: AtendimentoLeadListItem): string {
+  const phoneDigits = String(lead.phone ?? "").replace(/\D/g, "").trim();
+  const base = STUDENT_DASHBOARD_DEFAULT_URL;
+  const qs = new URLSearchParams();
+  if (phoneDigits.length >= 10) qs.set("telefone", phoneDigits);
+  if (String(lead.id ?? "").trim()) qs.set("id", String(lead.id).trim());
+  const qsStr = qs.toString();
+  if (!qsStr) return base;
+  const sep = base.includes("?") ? "&" : "?";
+  return `${base}${sep}${qsStr}`;
+}
+
 function isLeadMatriculaConcluida(lead: AtendimentoLeadListItem): boolean {
   const payStatusRaw = String((lead as any)?.payment_status ?? "").trim().toLowerCase();
   const payConfirmedAtRaw = String((lead as any)?.payment_confirmed_at ?? "").trim();
@@ -1263,45 +1277,50 @@ export function AtendimentoClient() {
     if (!window.confirm("Confirmar pagamento e concluir a matrícula deste registro?")) return;
     setConfirmingPayment(true);
     try {
-      const isoNow = new Date().toISOString();
-      let finalEnrollment: string | null = null;
-      const existingEnrollment = String((lead as any)?.enrollment_number ?? "").trim();
-      if (existingEnrollment) {
-        finalEnrollment = existingEnrollment;
-      } else {
-        try {
-          const y = new Date().getFullYear();
-          const randomPart = Math.floor(1000 + Math.random() * 9000);
-          finalEnrollment = `${y}-${randomPart}`;
-        } catch {
-          finalEnrollment = null;
-        }
-      }
-      const res = await fetch(`/api/atendimento/leads/${encodeURIComponent(lead.id)}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          payment_status: "confirmado",
-          payment_confirmed_at: isoNow,
-          recurring_payment_status: "confirmado",
-          recurring_payment_confirmed_at: isoNow,
-          funnel_stage: "pagamento_confirmado",
-          status: "matriculado",
-          recurring_registration_step: 5,
-          enrollment_number: finalEnrollment,
-        } as any),
-      });
-      const payload = (await res.json().catch(() => null)) as { ok?: boolean; error?: string } | null;
+      const res = await fetch(
+        `/api/atendimento/leads/${encodeURIComponent(lead.id)}/confirm-recurring-payment`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({}),
+        },
+      );
+      const payload = (await res.json().catch(() => null)) as
+        | { ok?: boolean; error?: string; lead?: Record<string, unknown> | null }
+        | null;
       if (!res.ok || !payload?.ok) {
         modalToast.error(payload?.error ?? "Falha ao confirmar pagamento.");
         return;
       }
-      modalToast.success("Pagamento confirmado e matrícula concluída.");
-      const fresh = await fetch(`/api/atendimento/leads/${encodeURIComponent(lead.id)}?skipEvents=1`, { cache: "no-store" })
-        .then(async (r) => (r.ok ? r.json().catch(() => null) : null))
-        .catch(() => null) as { ok?: boolean; lead?: Record<string, unknown> | null } | null;
-      if (fresh?.ok && fresh.lead?.id) {
-        setPanelLeads((cur) => cur.map((l) => (l.id === lead.id ? ({ ...l, ...fresh.lead } as AtendimentoLeadListItem) : l)));
+      modalToast.success(
+        "Pagamento confirmado. Matrícula concluída e boas-vindas enviada.",
+      );
+      if (payload?.lead?.id) {
+        setPanelLeads((cur) =>
+          cur.map((l) =>
+            l.id === lead.id
+              ? ({ ...l, ...(payload.lead as any) } as AtendimentoLeadListItem)
+              : l,
+          ),
+        );
+      } else {
+        const fresh = (await fetch(
+          `/api/atendimento/leads/${encodeURIComponent(lead.id)}?skipEvents=1`,
+          { cache: "no-store" },
+        )
+          .then(async (r) => (r.ok ? r.json().catch(() => null) : null))
+          .catch(() => null)) as
+          | { ok?: boolean; lead?: Record<string, unknown> | null }
+          | null;
+        if (fresh?.ok && fresh.lead?.id) {
+          setPanelLeads((cur) =>
+            cur.map((l) =>
+              l.id === lead.id
+                ? ({ ...l, ...fresh.lead } as AtendimentoLeadListItem)
+                : l,
+            ),
+          );
+        }
       }
     } catch (_) {
       modalToast.error("Falha ao confirmar pagamento.");
@@ -5051,63 +5070,83 @@ export function AtendimentoClient() {
                         </div>
                       </div>
 
-                      {/* CARD 2: Link de Matrícula */}
-                      <div className="overflow-hidden rounded-2xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] p-5 shadow-none">
-                        <div className="flex items-start justify-between gap-3">
-                          <div className="flex items-center gap-2">
-                            <ExternalLink className="h-5 w-5 text-[var(--app-text-70)]" />
-                            <div className="text-[15px] font-bold text-[var(--app-text-85)]">
-                              Link de Matrícula
+                      {/* CARD 2: Link de Matrícula OU Painel do aluno */}
+                      {(() => {
+                        const concl = isLeadMatriculaConcluida(sl);
+                        const displayUrl = concl ? buildStudentDashboardUrl(sl) : buildRecurringClassUrl(sl);
+                        const copyAction = () => {
+                          if (concl) {
+                            void navigator.clipboard?.writeText(displayUrl).then(() => modalToast.success("Link do painel do aluno copiado.")).catch(() => modalToast.error("Falha ao copiar link."));
+                            return;
+                          }
+                          handleCopyMatriculaLink(sl);
+                        };
+                        const openAction = () => {
+                          if (concl) {
+                            window.open(displayUrl, "_blank", "noopener,noreferrer");
+                            return;
+                          }
+                          handleOpenMatriculaLink(sl);
+                        };
+                        return (
+                          <div className="overflow-hidden rounded-2xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] p-5 shadow-none">
+                            <div className="flex items-start justify-between gap-3">
+                              <div className="flex items-center gap-2">
+                                <ExternalLink className="h-5 w-5 text-[var(--app-text-70)]" />
+                                <div className="text-[15px] font-bold text-[var(--app-text-85)]">
+                                  {concl ? "Painel do aluno" : "Link de Matrícula"}
+                                </div>
+                              </div>
+                              <button
+                                type="button"
+                                onClick={handleOpenEditSenha}
+                                className="inline-flex h-9 items-center justify-center gap-2 rounded-xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] px-3.5 text-[12px] font-semibold text-[var(--app-text-85)] hover:bg-[var(--app-hover)]"
+                              >
+                                <Pencil className="h-3.5 w-3.5" />
+                                Editar senha
+                              </button>
+                            </div>
+                            <div className="mt-4">
+                              <div className="relative overflow-hidden rounded-xl border border-[var(--app-border)] bg-[var(--app-solid-surface-2)] pr-12">
+                                <div className="min-h-[44px] w-full truncate px-4 py-3 text-[13px] font-semibold text-[var(--app-text-85)]">
+                                  {displayUrl}
+                                </div>
+                                <button
+                                  type="button"
+                                  onClick={copyAction}
+                                  className="absolute right-1.5 top-1/2 inline-flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-lg bg-[var(--app-solid-surface)] border border-[var(--app-border)] text-[var(--app-text-75)] hover:bg-[var(--app-hover)]"
+                                  aria-label="Copiar link"
+                                >
+                                  <Copy className="h-4 w-4" />
+                                </button>
+                              </div>
+                            </div>
+                            <div className="mt-4 grid grid-cols-2 gap-3">
+                              <button
+                                type="button"
+                                onClick={openAction}
+                                className={[
+                                  "inline-flex min-h-[44px] items-center justify-center gap-2 rounded-xl px-4 text-[13px] font-semibold !text-white shadow-none transition",
+                                  concl
+                                    ? "bg-sky-600 hover:bg-sky-500"
+                                    : "bg-emerald-600 hover:bg-emerald-500",
+                                ].join(" ")}
+                              >
+                                <ExternalLink className="h-4 w-4" />
+                                {concl ? "Abrir painel" : "Abrir matrícula"}
+                              </button>
+                              <button
+                                type="button"
+                                onClick={copyAction}
+                                className="inline-flex min-h-[44px] items-center justify-center gap-2 rounded-xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] px-4 text-[13px] font-semibold text-[var(--app-text-85)] hover:bg-[var(--app-hover)]"
+                              >
+                                <Copy className="h-4 w-4" />
+                                {concl ? "Copiar painel" : "Copiar link"}
+                              </button>
                             </div>
                           </div>
-                          <button
-                            type="button"
-                            onClick={handleOpenEditSenha}
-                            className="inline-flex h-9 items-center justify-center gap-2 rounded-xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] px-3.5 text-[12px] font-semibold text-[var(--app-text-85)] hover:bg-[var(--app-hover)]"
-                          >
-                            <Pencil className="h-3.5 w-3.5" />
-                            Editar senha
-                          </button>
-                        </div>
-                        <div className="mt-4">
-                          <div className="relative overflow-hidden rounded-xl border border-[var(--app-border)] bg-[var(--app-solid-surface-2)] pr-12">
-                            <div className="min-h-[44px] w-full truncate px-4 py-3 text-[13px] font-semibold text-[var(--app-text-85)]">
-                              {buildRecurringClassUrl(sl)}
-                            </div>
-                            <button
-                              type="button"
-                              onClick={() => handleCopyMatriculaLink(sl)}
-                              className="absolute right-1.5 top-1/2 inline-flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-lg bg-[var(--app-solid-surface)] border border-[var(--app-border)] text-[var(--app-text-75)] hover:bg-[var(--app-hover)]"
-                              aria-label="Copiar link"
-                            >
-                              <Copy className="h-4 w-4" />
-                            </button>
-                          </div>
-                        </div>
-                        <div className="mt-4 grid grid-cols-2 gap-3">
-                          <button
-                            type="button"
-                            onClick={() => handleOpenMatriculaLink(sl)}
-                            className={[
-                              "inline-flex min-h-[44px] items-center justify-center gap-2 rounded-xl px-4 text-[13px] font-semibold !text-white shadow-none transition",
-                              isLeadMatriculaConcluida(sl)
-                                ? "bg-sky-600 hover:bg-sky-500"
-                                : "bg-emerald-600 hover:bg-emerald-500",
-                            ].join(" ")}
-                          >
-                            <ExternalLink className="h-4 w-4" />
-                            {isLeadMatriculaConcluida(sl) ? "Abrir painel" : "Abrir matrícula"}
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => handleCopyMatriculaLink(sl)}
-                            className="inline-flex min-h-[44px] items-center justify-center gap-2 rounded-xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] px-4 text-[13px] font-semibold text-[var(--app-text-85)] hover:bg-[var(--app-hover)]"
-                          >
-                            <Copy className="h-4 w-4" />
-                            Copiar link
-                          </button>
-                        </div>
-                      </div>
+                        );
+                      })()}
 
                       {/* CARD 3: Status */}
                       <div className="overflow-hidden rounded-2xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] p-5 shadow-none">
@@ -6587,63 +6626,83 @@ export function AtendimentoClient() {
                       </div>
                     </div>
 
-                    {/* CARD 2: Link de Matrícula */}
-                    <div className="overflow-hidden rounded-2xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] p-5 shadow-none">
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="flex items-center gap-2">
-                          <ExternalLink className="h-5 w-5 text-[var(--app-text-70)]" />
-                          <div className="text-[15px] font-bold text-[var(--app-text-85)]">
-                            Link de Matrícula
+                    {/* CARD 2: Link de Matrícula OU Painel do aluno */}
+                    {(() => {
+                      const concl = isLeadMatriculaConcluida(sl);
+                      const displayUrl = concl ? buildStudentDashboardUrl(sl) : buildRecurringClassUrl(sl);
+                      const copyAction = () => {
+                        if (concl) {
+                          void navigator.clipboard?.writeText(displayUrl).then(() => modalToast.success("Link do painel do aluno copiado.")).catch(() => modalToast.error("Falha ao copiar link."));
+                          return;
+                        }
+                        handleCopyMatriculaLink(sl);
+                      };
+                      const openAction = () => {
+                        if (concl) {
+                          window.open(displayUrl, "_blank", "noopener,noreferrer");
+                          return;
+                        }
+                        handleOpenMatriculaLink(sl);
+                      };
+                      return (
+                        <div className="overflow-hidden rounded-2xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] p-5 shadow-none">
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="flex items-center gap-2">
+                              <ExternalLink className="h-5 w-5 text-[var(--app-text-70)]" />
+                              <div className="text-[15px] font-bold text-[var(--app-text-85)]">
+                                {concl ? "Painel do aluno" : "Link de Matrícula"}
+                              </div>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={handleOpenEditSenha}
+                              className="inline-flex h-11 min-h-[44px] items-center justify-center gap-2 rounded-xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] px-3.5 text-[12px] font-semibold text-[var(--app-text-85)] hover:bg-[var(--app-hover)] active:scale-[0.98] touch-manipulation"
+                            >
+                              <Pencil className="h-3.5 w-3.5 shrink-0" />
+                              Editar senha
+                            </button>
+                          </div>
+                          <div className="mt-4">
+                            <div className="relative overflow-hidden rounded-xl border border-[var(--app-border)] bg-[var(--app-solid-surface-2)] pr-12">
+                              <div className="min-h-[44px] w-full truncate px-4 py-3 text-[13px] font-semibold text-[var(--app-text-85)]">
+                                {displayUrl}
+                              </div>
+                              <button
+                                type="button"
+                                onClick={copyAction}
+                                className="absolute right-1.5 top-1/2 inline-flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-lg bg-[var(--app-solid-surface)] border border-[var(--app-border)] text-[var(--app-text-75)] hover:bg-[var(--app-hover)]"
+                                aria-label="Copiar link"
+                              >
+                                <Copy className="h-4 w-4" />
+                              </button>
+                            </div>
+                          </div>
+                          <div className="mt-4 grid grid-cols-2 gap-3">
+                            <button
+                              type="button"
+                              onClick={openAction}
+                              className={[
+                                "inline-flex min-h-[44px] items-center justify-center gap-2 rounded-xl px-4 text-[13px] font-semibold !text-white shadow-none transition",
+                                concl
+                                  ? "bg-sky-600 hover:bg-sky-500"
+                                  : "bg-emerald-600 hover:bg-emerald-500",
+                              ].join(" ")}
+                            >
+                              <ExternalLink className="h-4 w-4" />
+                              {concl ? "Abrir painel" : "Abrir matrícula"}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={copyAction}
+                              className="inline-flex min-h-[44px] items-center justify-center gap-2 rounded-xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] px-4 text-[13px] font-semibold text-[var(--app-text-85)] hover:bg-[var(--app-hover)]"
+                            >
+                              <Copy className="h-4 w-4" />
+                              {concl ? "Copiar painel" : "Copiar link"}
+                            </button>
                           </div>
                         </div>
-                        <button
-                          type="button"
-                          onClick={handleOpenEditSenha}
-                          className="inline-flex h-11 min-h-[44px] items-center justify-center gap-2 rounded-xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] px-3.5 text-[12px] font-semibold text-[var(--app-text-85)] hover:bg-[var(--app-hover)] active:scale-[0.98] touch-manipulation"
-                        >
-                          <Pencil className="h-3.5 w-3.5 shrink-0" />
-                          Editar senha
-                        </button>
-                      </div>
-                      <div className="mt-4">
-                        <div className="relative overflow-hidden rounded-xl border border-[var(--app-border)] bg-[var(--app-solid-surface-2)] pr-12">
-                          <div className="min-h-[44px] w-full truncate px-4 py-3 text-[13px] font-semibold text-[var(--app-text-85)]">
-                            {buildRecurringClassUrl(sl)}
-                          </div>
-                          <button
-                            type="button"
-                            onClick={() => handleCopyMatriculaLink(sl)}
-                            className="absolute right-1.5 top-1/2 inline-flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-lg bg-[var(--app-solid-surface)] border border-[var(--app-border)] text-[var(--app-text-75)] hover:bg-[var(--app-hover)]"
-                            aria-label="Copiar link"
-                          >
-                            <Copy className="h-4 w-4" />
-                          </button>
-                        </div>
-                      </div>
-                      <div className="mt-4 grid grid-cols-2 gap-3">
-                        <button
-                          type="button"
-                          onClick={() => handleOpenMatriculaLink(sl)}
-                          className={[
-                            "inline-flex min-h-[44px] items-center justify-center gap-2 rounded-xl px-4 text-[13px] font-semibold !text-white shadow-none transition",
-                            isLeadMatriculaConcluida(sl)
-                              ? "bg-sky-600 hover:bg-sky-500"
-                              : "bg-emerald-600 hover:bg-emerald-500",
-                          ].join(" ")}
-                        >
-                          <ExternalLink className="h-4 w-4" />
-                          {isLeadMatriculaConcluida(sl) ? "Abrir painel" : "Abrir matrícula"}
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => handleCopyMatriculaLink(sl)}
-                          className="inline-flex min-h-[44px] items-center justify-center gap-2 rounded-xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] px-4 text-[13px] font-semibold text-[var(--app-text-85)] hover:bg-[var(--app-hover)]"
-                        >
-                          <Copy className="h-4 w-4" />
-                          Copiar link
-                        </button>
-                      </div>
-                    </div>
+                      );
+                    })()}
 
                     {/* CARD 3: Status */}
                     <div className="overflow-hidden rounded-2xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] p-5 shadow-none">
