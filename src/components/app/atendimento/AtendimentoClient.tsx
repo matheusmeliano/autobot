@@ -151,32 +151,41 @@ function getAvatarColorClassesForLead(
   const matriculaConcluida = isLeadMatriculaConcluida(lead);
 
   const recurringRegistrationStep = (lead as any)?.recurring_registration_step;
-  const matriculaEmProcesso =
-    !matriculaConcluida &&
-    typeof recurringRegistrationStep === "number" &&
-    recurringRegistrationStep > 0;
+  const hasStep = typeof recurringRegistrationStep === "number" && recurringRegistrationStep > 0;
+  const hasRecurringPass =
+    typeof (lead as any)?.recurring_registration_password === "string" &&
+    String((lead as any).recurring_registration_password).trim().length >= 4;
+  const hasLegacyTempPass =
+    typeof (lead as any)?.signup_password_raw_temp === "string" &&
+    String((lead as any).signup_password_raw_temp).trim().length >= 4;
+  const recurringTrulyStarted =
+    hasStep || hasRecurringPass || hasLegacyTempPass || matriculaConcluida;
+
+  const azulPorCadastroIniciadoOuConcluido = recurringTrulyStarted;
+  const matriculaEmProcesso = !matriculaConcluida && hasStep;
 
   const dadosBasicosOkNadaPendente =
-    (step === null || step === undefined) && !matriculaConcluida;
+    (step === null || step === undefined) && !matriculaConcluida && !recurringTrulyStarted;
 
   const prof = experimentalAssignedProfessorForLead(lead);
   const link = experimentalLessonLinkForLead(lead);
   const temProfessor = prof !== null && prof !== undefined;
   const temLink = Boolean(link);
-  const professorELinkOk = temProfessor && temLink && !matriculaConcluida;
+  const professorELinkOk =
+    temProfessor && temLink && !matriculaConcluida && !recurringTrulyStarted;
 
-  // REGRA 1: AZUL (MATRÍCULA EM PROCESSO). VENCE DE TODAS AS OUTRAS CORES
-  // enquanto step>0 e ainda nao eh aluno matriculado. A fase de cadastro de
-  // matricula eh o status corrente do funil e deve sobrescrever cores antigas
-  // como verde (aula experimental concluida).
-  if (matriculaEmProcesso) {
+  // REGRA 1: AZUL (MATRÍCULA EM PROCESSO OU JÁ CONCLUÍDA / ALUNO RECORRENTE).
+  // VENCE DE TODAS as outras cores. Se passou pelo cadastro inicial OU já está
+  // matriculado, AVATAR SEMPRE É AZUL (nunca vira verde/amarelo/laranja de
+  // volta, mesmo que a aula experimental tivesse sido concluída antes).
+  if (azulPorCadastroIniciadoOuConcluido) {
     if (isSelected || size === "big") {
       return `${sizeBase} !bg-[#2563eb] !text-white ring-[3px] ring-[#1d4ed8] shadow-[0_2px_6px_rgba(37,99,235,0.42)] transition-none hover:!bg-[#2563eb] hover:!ring-[#1d4ed8]`;
     }
     return `${sizeBase} !bg-[#2563eb] !text-white transition-none hover:!bg-[#2563eb]`;
   }
 
-  // REGRA 2: VERDE (prof + link + NÃO matrícula em processo)
+  // REGRA 2: VERDE (prof + link + NÃO em recorrente NÃO matriculado)
   if (professorELinkOk) {
     if (isSelected || size === "big") {
       return `${sizeBase} !bg-[#16a34a] !text-white ring-[3px] ring-[#15803d] shadow-[0_2px_6px_rgba(22,163,74,0.42)] transition-none hover:!bg-[#16a34a] hover:!ring-[#15803d]`;
