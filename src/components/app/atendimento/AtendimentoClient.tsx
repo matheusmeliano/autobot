@@ -6673,7 +6673,7 @@ export function AtendimentoClient() {
                         }
                         return (
                           <div className="w-full">
-                            <div className="flex items-start justify-between gap-4">
+                            <div className="flex flex-col items-stretch gap-4 sm:flex-row sm:items-start sm:justify-between">
                               <div className="flex items-start gap-3">
                                 <div className="mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-[var(--app-border)] bg-[var(--app-solid-surface-2)] text-[var(--app-text-70)]">
                                   <FileText className="h-5 w-5" strokeWidth={2.25} />
@@ -6692,7 +6692,7 @@ export function AtendimentoClient() {
                                   href={pdfUrlRaw}
                                   target="_blank"
                                   rel="noreferrer noopener"
-                                  className="inline-flex min-h-[44px] items-center justify-center gap-2 rounded-xl border border-[var(--app-border)] bg-[var(--app-solid-surface-2)] px-5 text-[13px] font-semibold text-[var(--app-text-85)] transition hover:bg-[var(--app-hover)]"
+                                  className="inline-flex min-h-[44px] w-full items-center justify-center gap-2 rounded-xl border border-[var(--app-border)] bg-[var(--app-solid-surface-2)] px-5 text-[13px] font-semibold text-[var(--app-text-85)] transition hover:bg-[var(--app-hover)] sm:w-auto"
                                 >
                                   <ExternalLink className="h-4 w-4 shrink-0" />
                                   Baixar PDF
@@ -8211,7 +8211,7 @@ export function AtendimentoClient() {
                       }
                       return (
                         <div className="w-full">
-                          <div className="flex items-start justify-between gap-4">
+                          <div className="flex flex-col items-stretch gap-4 sm:flex-row sm:items-start sm:justify-between">
                             <div className="flex items-start gap-3">
                               <div className="mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-[var(--app-border)] bg-[var(--app-solid-surface-2)] text-[var(--app-text-70)]">
                                 <FileText className="h-5 w-5" strokeWidth={2.25} />
@@ -8230,7 +8230,7 @@ export function AtendimentoClient() {
                                 href={pdfUrlRaw}
                                 target="_blank"
                                 rel="noreferrer noopener"
-                                className="inline-flex min-h-[44px] items-center justify-center gap-2 rounded-xl border border-[var(--app-border)] bg-[var(--app-solid-surface-2)] px-5 text-[13px] font-semibold text-[var(--app-text-85)] transition hover:bg-[var(--app-hover)]"
+                                className="inline-flex min-h-[44px] w-full items-center justify-center gap-2 rounded-xl border border-[var(--app-border)] bg-[var(--app-solid-surface-2)] px-5 text-[13px] font-semibold text-[var(--app-text-85)] transition hover:bg-[var(--app-hover)] sm:w-auto"
                               >
                                 <ExternalLink className="h-4 w-4 shrink-0" />
                                 Baixar PDF
