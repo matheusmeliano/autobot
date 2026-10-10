@@ -5569,16 +5569,8 @@ export function AtendimentoClient() {
                               type="button"
                               onClick={() => void handleConfirmPayment(sl)}
                               disabled={confirmingPayment}
-                              className="inline-flex min-h-[40px] w-full items-center justify-center gap-2 rounded-xl border border-[var(--app-border)] bg-[var(--app-card)] px-4 text-[13px] font-semibold text-[var(--app-text-85)] shadow-none transition hover:bg-[var(--app-hover)] disabled:cursor-not-allowed disabled:opacity-65 sm:w-auto"
+                              className="inline-flex h-7 shrink-0 items-center justify-center rounded-full border border-[#2563eb]/30 bg-[rgba(37,99,235,0.12)] px-3 text-[11px] font-bold uppercase tracking-wide text-[#1d4ed8] shadow-none transition hover:bg-[rgba(37,99,235,0.18)] disabled:cursor-not-allowed disabled:opacity-65"
                             >
-                              {confirmingPayment ? (
-                                <Loader2 className="h-4 w-4 shrink-0 animate-spin" />
-                              ) : (
-                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4 shrink-0">
-                                  <path d="M3 3v18h18" />
-                                  <path d="M7 14l4-4 4 4 5-5" />
-                                </svg>
-                              )}
                               {confirmingPayment ? "Confirmando..." : "Confirmar pagamento"}
                             </button>
                           ) : null}
@@ -7114,16 +7106,8 @@ export function AtendimentoClient() {
                             type="button"
                             onClick={() => void handleConfirmPayment(sl)}
                             disabled={confirmingPayment}
-                            className="inline-flex min-h-[40px] w-full items-center justify-center gap-2 rounded-xl border border-[var(--app-border)] bg-[var(--app-card)] px-4 text-[13px] font-semibold text-[var(--app-text-85)] shadow-none transition hover:bg-[var(--app-hover)] disabled:cursor-not-allowed disabled:opacity-65 sm:w-auto"
+                            className="inline-flex h-7 shrink-0 items-center justify-center rounded-full border border-[#2563eb]/30 bg-[rgba(37,99,235,0.12)] px-3 text-[11px] font-bold uppercase tracking-wide text-[#1d4ed8] shadow-none transition hover:bg-[rgba(37,99,235,0.18)] disabled:cursor-not-allowed disabled:opacity-65"
                           >
-                            {confirmingPayment ? (
-                              <Loader2 className="h-4 w-4 shrink-0 animate-spin" />
-                            ) : (
-                              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4 shrink-0">
-                                <path d="M3 3v18h18" />
-                                <path d="M7 14l4-4 4 4 5-5" />
-                              </svg>
-                            )}
                             {confirmingPayment ? "Confirmando..." : "Confirmar pagamento"}
                           </button>
                         ) : null}
