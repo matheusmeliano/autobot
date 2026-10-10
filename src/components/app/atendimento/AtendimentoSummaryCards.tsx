@@ -1760,12 +1760,16 @@ function BookingDetails({
     const start = (pastRecurringPageSafe - 1) * PAST_RECURRING_PAGE_SIZE;
     return pastRecurringOccurrences.slice(start, start + PAST_RECURRING_PAGE_SIZE);
   }, [pastRecurringOccurrences, pastRecurringPageSafe]);
-  const recurringStatusLabel = String(lead.recurring_class_status ?? "").trim()
-    ? String(lead.recurring_class_status ?? "")
-        .toLowerCase()
-        .replace(/_/g, " ")
-        .replace(/\b\w/g, (c) => c.toUpperCase())
-    : "Agendado";
+  const recurringStatusLabelRaw = String(lead.recurring_class_status ?? "").trim();
+  const recurringStatusLabel = (() => {
+    if (!recurringStatusLabelRaw) return "Agendado";
+    const n = recurringStatusLabelRaw.toLowerCase();
+    if (n === "cadastro_plataforma_pendente") return "Cadastro de matrícula incompleto";
+    return recurringStatusLabelRaw
+      .toLowerCase()
+      .replace(/_/g, " ")
+      .replace(/\b\w/g, (c) => c.toUpperCase());
+  })();
   const canCancel = derivedStatus === "scheduled" && Boolean(bookingId) && !hasRecurringClass && !hideExperimentalInfoCompletely;
   const canEditLessonLink =
     Boolean(bookingId) && bookingStatus !== "cancelled" && !bookingIsNoShow && !experimentalLocked && !hideExperimentalInfoCompletely;
@@ -3173,6 +3177,7 @@ export function AtendimentoSummaryCards({
               patch.future_experimental_class_booking = {
                 id: bkIdOk,
                 status: String(bk.status ?? "scheduled").trim() || "scheduled",
+                source: String(bk.source ?? "saved").trim().toLowerCase() !== "draft" ? String(bk.source ?? "table").trim() || "table" : "saved",
                 lead_date: bkLeadDate || null,
                 lead_time: bkLeadTime || null,
                 professor_date: bkProfessorDate || null,
@@ -3202,6 +3207,7 @@ export function AtendimentoSummaryCards({
               patch.future_experimental_class_booking = {
                 id: "fallback",
                 status: "scheduled",
+                source: "saved",
                 lead_date: String(patch.experimental_class_lead_date ?? "").trim() || null,
                 lead_time: String(patch.experimental_class_lead_time ?? "").trim() || null,
                 professor_date: String(patch.experimental_class_professor_date ?? "").trim() || null,
@@ -3242,23 +3248,40 @@ export function AtendimentoSummaryCards({
                 "experimental_class_professor_start_at",
                 "experimental_class_status",
                 "funnel_stage",
+                "experimental_class_booking_id",
+                "experimental_class_link",
+                "experimental_class_professor_name",
+                "experimental_class_professor_phone",
               ];
               for (const k of keepLocalIfIncomingEmpty) {
                 const incV = String((incoming as any)?.[k] ?? "").trim();
                 const locV = String((prior as any)?.[k] ?? "").trim();
                 if (!incV && locV) (merged as any)[k] = locV;
               }
-              if (
-                !merged.experimental_class_booking &&
-                prior.experimental_class_booking
-              ) {
-                merged.experimental_class_booking = prior.experimental_class_booking;
-              }
-              if (
-                !merged.future_experimental_class_booking &&
-                prior.future_experimental_class_booking
-              ) {
-                merged.future_experimental_class_booking = prior.future_experimental_class_booking;
+              const startAtKey = "professor_start_at";
+              const pickBookingStartMs = (obj: any) => {
+                if (!obj || typeof obj !== "object") return -1;
+                const v =
+                  String((obj as any)?.[startAtKey] ?? (obj as any)?.lead_start_at ?? "").trim();
+                if (!v) return -1;
+                const t = new Date(v).getTime();
+                return Number.isFinite(t) && t > 0 ? t : -1;
+              };
+              const nestedBookingKeys = [
+                "experimental_class_booking",
+                "future_experimental_class_booking",
+                "latest_experimental_class_booking",
+              ] as const;
+              for (const k of nestedBookingKeys) {
+                const incMs = pickBookingStartMs(incoming?.[k]);
+                const locMs = pickBookingStartMs(prior?.[k]);
+                if (locMs > 0 && incMs <= 0) {
+                  (merged as any)[k] = prior[k];
+                  continue;
+                }
+                if (locMs > 0 && incMs > 0 && locMs > incMs) {
+                  (merged as any)[k] = prior[k];
+                }
               }
               if (
                 !String((merged as any).funnel_stage ?? "").trim() &&

@@ -203,19 +203,19 @@ export function DashboardClient({
 
       <div className="mt-0 grid gap-4 min-[1201px]:mt-8 min-[1201px]:grid-cols-3">
         <Card
-          title="Total a receber (mês)"
+          title="Total a receber"
           value={brl(visibleStats.receivableMonthTotal, fmt)}
           subtitle=""
           icon={<Wallet className="h-5 w-5" />}
         />
         <Card
-          title="Já recebidos (mês)"
+          title="Já recebidos"
           value={brl(visibleStats.receivableMonthPaid, fmt)}
           subtitle=""
           icon={<Wallet className="h-5 w-5" />}
         />
         <Card
-          title="Falta receber (mês)"
+          title="Falta receber"
           value={brl(visibleStats.receivableMonthRemaining, fmt)}
           subtitle=""
           icon={<Wallet className="h-5 w-5" />}

@@ -182,9 +182,9 @@ export async function GET() {
         if (!existing) {
           bookingsByLeadId.set(leadId, candidate);
         } else {
-          const curStr = String(existing?.updated_at || existing?.created_at || "");
-          const newStr = String((booking as any).updated_at || (booking as any).created_at || "");
-          if (newStr > curStr) bookingsByLeadId.set(leadId, candidate);
+          const startMs = parseStartAtMs(candidate.professor_start_at || candidate.lead_start_at);
+          const curStartMs = parseStartAtMs(existing.professor_start_at || existing.lead_start_at);
+          if (startMs > curStartMs) bookingsByLeadId.set(leadId, candidate);
         }
         const startMs = parseStartAtMs(candidate.professor_start_at || candidate.lead_start_at);
         const currentLatest = latestBookingByLeadId.get(leadId);
@@ -346,13 +346,53 @@ export async function GET() {
     }
 
     // Build composite lead (igual /leads/route.ts: monta latest_experimental_class_booking / future / experimental_class_booking)
+    let latestLiveByLeadIdStartAt = new Map<string, { ms: number; booking: any }>();
+    for (const [, b] of bookingsById.entries()) {
+      const leadId = String((b as any)?.lead_id ?? "").trim();
+      if (!leadId) continue;
+      const status = String((b as any)?.status ?? "").trim().toLowerCase();
+      if (status === "cancelled") continue;
+      if (!["scheduled", "booked", "attended", "no_show", "completed"].includes(status)) continue;
+      const ms = parseStartAtMs((b as any).professor_start_at || (b as any).lead_start_at);
+      if (ms <= 0) continue;
+      const cur = latestLiveByLeadIdStartAt.get(leadId);
+      if (!cur || ms > cur.ms) latestLiveByLeadIdStartAt.set(leadId, { ms, booking: b });
+    }
+
     const processedLeads = rows.map((row) => {
       const leadId = String(row.id ?? "");
       const preferredBookingId = String((row as any)?.experimental_class_booking_id ?? "").trim();
       const preferredBooking =
         (preferredBookingId ? bookingsById.get(preferredBookingId) ?? null : null) as any;
-      const existingBookingRaw =
-        preferredBooking ?? bookingsByLeadId.get(leadId) ?? bookingsByLeadIdIncludingCancelled.get(leadId) ?? null;
+      const preferredValid =
+        preferredBooking &&
+        String((preferredBooking as any)?.status ?? "").trim().toLowerCase() !== "cancelled";
+      const liveByStart = latestLiveByLeadIdStartAt.get(leadId);
+      let existingBookingRaw: any = null;
+      if (liveByStart) {
+        const prefMs = preferredValid
+          ? parseStartAtMs(
+              (preferredBooking as any)?.professor_start_at ||
+                (preferredBooking as any)?.lead_start_at,
+            )
+          : -1;
+        if (prefMs > 0 && liveByStart.ms >= prefMs) {
+          existingBookingRaw = liveByStart.booking;
+        } else if (preferredValid) {
+          existingBookingRaw = preferredBooking;
+        } else {
+          existingBookingRaw =
+            liveByStart.booking ??
+            bookingsByLeadId.get(leadId) ??
+            bookingsByLeadIdIncludingCancelled.get(leadId) ??
+            null;
+        }
+      } else {
+        existingBookingRaw =
+          preferredValid
+            ? preferredBooking
+            : bookingsByLeadId.get(leadId) ?? bookingsByLeadIdIncludingCancelled.get(leadId) ?? null;
+      }
       const isCancelledLead = cancelledLeadBookingIds.has(leadId) || cancelledByHistoryLeadIds.has(leadId);
       const cancelledAt = cancelledAtByLeadId.get(leadId) ?? null;
       const cancelledProfSnap = cancelledProfessorSnapshotByLeadId.get(leadId) ?? null;

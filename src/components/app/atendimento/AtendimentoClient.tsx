@@ -5,7 +5,12 @@ import { AlertCircle, AlertTriangle, BarChart3, Bot, Calendar as CalendarIcon, C
 import { useRouter, useSearchParams } from "next/navigation";
 import { ATENDIMENTO_PROFESSOR_TIME_ZONE, STAGE_LABELS, STATUS_LABELS } from "@/lib/atendimento/constants";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
-import { resolveTimeZoneFromCityInput, zonedDateTimeToUtcIso } from "@/lib/timezone";
+import {
+  inferTimeZoneFromPhoneCountryCode,
+  resolveStudentTimezone,
+  resolveTimeZoneFromCityInput,
+  zonedDateTimeToUtcIso,
+} from "@/lib/timezone";
 import type { AtendimentoLeadListItem, AtendimentoSummary } from "@/lib/atendimento/types";
 import { modalToast } from "@/lib/modalToast";
 import { formatAtendimentoDate, formatAtendimentoDateTime, leadMatchesSearchQuery } from "@/lib/atendimento/utils";
@@ -373,44 +378,269 @@ function applyPhoneMask(input: string): string {
   return `+${country} ${groups.join("-")}`;
 }
 
+function buildRecurringNextOccurrenceNiceLabel(
+  lead: AtendimentoLeadListItem
+): { weekdayWithDate: string; time: string } | null {
+  // Helpers (idênticos aos de buildExperimentalMetaForList)
+  const addDaysLocal = (localDate: string, days: number): string => {
+    const [y, m, d] = localDate.split("-").map(Number);
+    const dt = new Date(Date.UTC(y, m - 1, d, 12, 0, 0));
+    dt.setUTCDate(dt.getUTCDate() + days);
+    const yy = dt.getUTCFullYear();
+    const mm = String(dt.getUTCMonth() + 1).padStart(2, "0");
+    const dd = String(dt.getUTCDate()).padStart(2, "0");
+    return `${yy}-${mm}-${dd}`;
+  };
+  const todayLocalInTz = (tz: string): string => {
+    const parts = new Intl.DateTimeFormat("en-CA", { timeZone: tz, year: "numeric", month: "2-digit", day: "2-digit" }).formatToParts(new Date());
+    const map: Record<string, string> = {};
+    parts.forEach((p: any) => { map[p.type] = p.value; });
+    return `${map.year || ""}-${map.month || ""}-${map.day || ""}`;
+  };
+  const weekdayShortInTz = (localDate: string, tz: string): string => {
+    const [y, m, d] = localDate.split("-").map(Number);
+    const dt = new Date(Date.UTC(y, m - 1, d, 12, 0, 0));
+    return new Intl.DateTimeFormat("en-US", { timeZone: tz, weekday: "short" }).format(dt).toLowerCase().slice(0, 3);
+  };
+  const normalizeWeekday = (w: unknown): string => {
+    const s = String(w ?? "").trim().toLowerCase().slice(0, 3);
+    if (!s) return "";
+    if (["mon", "seg", "segunda"].some((x) => s.startsWith(x) || x.startsWith(s))) return "mon";
+    if (["tue", "ter", "terca"].some((x) => s.startsWith(x) || x.startsWith(s))) return "tue";
+    if (["wed", "qua", "quarta"].some((x) => s.startsWith(x) || x.startsWith(s))) return "wed";
+    if (["thu", "qui", "quinta"].some((x) => s.startsWith(x) || x.startsWith(s))) return "thu";
+    if (["fri", "sex", "sexta"].some((x) => s.startsWith(x) || x.startsWith(s))) return "fri";
+    if (["sat", "sab", "sabado"].some((x) => s.startsWith(x) || x.startsWith(s))) return "sat";
+    if (["sun", "dom", "domingo"].some((x) => s.startsWith(x) || x.startsWith(s))) return "sun";
+    return s;
+  };
+  const computeNextWeekdayFromToday = (targetWdRaw: string, tz: string): string | null => {
+    const target = normalizeWeekday(targetWdRaw);
+    if (!["mon", "tue", "wed", "thu", "fri", "sat", "sun"].includes(target)) return null;
+    const startLocal = todayLocalInTz(tz);
+    for (let i = 0; i <= 14; i++) {
+      const candidate = addDaysLocal(startLocal, i);
+      if (weekdayShortInTz(candidate, tz) === target) return candidate;
+    }
+    return null;
+  };
+
+  // Campos da recorrência
+  const wdRaw = String((lead as any)?.recurring_class_weekday ?? "").trim();
+  const wdLabelRaw = String((lead as any)?.recurring_class_weekday_label ?? "").trim();
+  const tmRaw = String((lead as any)?.recurring_class_lead_time ?? (lead as any)?.recurring_class_professor_time ?? "").trim();
+  const tz = deriveLeadEffectiveTimeZone(lead);
+
+  const wdOk = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"].includes(normalizeWeekday(wdRaw) || normalizeWeekday(wdLabelRaw));
+  if (!wdOk) return null;
+
+  const nextLocal = computeNextWeekdayFromToday(wdRaw || wdLabelRaw, tz);
+  if (!nextLocal) return null;
+
+  const [yy, mm, dd] = nextLocal.split("-");
+  const shortDm = `${dd}/${mm}`;
+
+  // Monta "Quarta-feira (07/10)" a partir do label salvo, ou fallback:
+  const cleanWdLabel = (() => {
+    // Se existe label salvo em pt-BR, remove qualquer data antiga em parênteses (ex.: "(30/09)")
+    const s = (wdLabelRaw || "").trim();
+    if (s) {
+      const withoutOldDate = s.replace(/\s*\(\s*\d{1,2}\s*[\/\-]\s*\d{1,2}\s*\)\s*$/g, "").trim();
+      if (withoutOldDate) return withoutOldDate;
+      return s;
+    }
+    // Fallback via weekdayShortInTz → pt-BR longo
+    const wdShort = weekdayShortInTz(nextLocal, tz);
+    const toPTLong: Record<string, string> = {
+      mon: "Segunda-feira", tue: "Terça-feira", wed: "Quarta-feira", thu: "Quinta-feira",
+      fri: "Sexta-feira", sat: "Sábado", sun: "Domingo",
+    };
+    return toPTLong[wdShort] || "";
+  })();
+  const wdWithDate = cleanWdLabel ? `${cleanWdLabel} (${shortDm})` : "";
+
+  const cleanTime = (() => {
+    const t = tmRaw.trim();
+    if (!t) return "";
+    if (/h$/i.test(t)) return t;
+    return `${t.replace(/h$/i, "")}h`;
+  })();
+
+  return { weekdayWithDate: wdWithDate, time: cleanTime };
+}
+
 function buildExperimentalMetaForList(lead: AtendimentoLeadListItem): { label: string; tone: "success" | "warning" | "default" } {
+  // ============================================================
+  // GATE: DECISÃO PRINCIPAL RECORRENTE vs EXPERIMENTAL
+  // (Deve bater 100% com a decisão do card da Visão Geral no
+  // buildRecurringMetaForVisaoGeral)
+  // ============================================================
+  const gStepRaw = Number((lead as any)?.recurring_registration_step ?? NaN);
+  const gHasStep = Number.isFinite(gStepRaw) && gStepRaw >= 1;
+  const gHasPass = Boolean((lead as any)?.recurring_registration_password) || Boolean(String((lead as any)?.signup_password_raw_temp ?? "").trim());
+  const gPs = String((lead as any)?.payment_status ?? "").trim().toLowerCase();
+  const gPayConfirmedAtRaw = String((lead as any)?.payment_confirmed_at ?? "").trim();
+  const gSt = String(lead.status ?? "").trim().toLowerCase();
+  const gPayConfirmedGlobal =
+    gPs === "confirmado" || gPs === "matriculado" || gPs === "pago" ||
+    gSt === "matriculado" || gSt === "matricula_confirmada" ||
+    Boolean(gPayConfirmedAtRaw && gPayConfirmedAtRaw !== "null");
+  const gRecurringTrulyStarted = gHasStep || gHasPass || gPayConfirmedGlobal;
+  const gRecurringWeekdayRaw = String((lead as any)?.recurring_class_weekday ?? (lead as any)?.recurring_class_weekday_label ?? "").trim();
+  const gRecurringWeekdayOk = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"].includes(String(gRecurringWeekdayRaw.toLowerCase().slice(0, 3)) === "seg" ? "mon"
+    : String(gRecurringWeekdayRaw.toLowerCase().slice(0, 3)) === "ter" ? "tue"
+    : String(gRecurringWeekdayRaw.toLowerCase().slice(0, 3)) === "qua" ? "wed"
+    : String(gRecurringWeekdayRaw.toLowerCase().slice(0, 3)) === "qui" ? "thu"
+    : String(gRecurringWeekdayRaw.toLowerCase().slice(0, 3)) === "sex" ? "fri"
+    : String(gRecurringWeekdayRaw.toLowerCase().slice(0, 3)) === "sab" ? "sat"
+    : String(gRecurringWeekdayRaw.toLowerCase().slice(0, 3)) === "dom" ? "sun"
+    : String(gRecurringWeekdayRaw.toLowerCase().trim()));
+  const gRecurringLeadTimeRaw = String((lead as any)?.recurring_class_lead_time ?? (lead as any)?.recurring_class_professor_time ?? "").trim();
+  const gRecurringTimeOk = Boolean(gRecurringLeadTimeRaw);
+
+  // Helpers locais (recorrente / experimental compartilham)
+  const addDaysLocal = (localDate: string, days: number): string => {
+    const [y, m, d] = localDate.split("-").map(Number);
+    const dt = new Date(Date.UTC(y, m - 1, d, 12, 0, 0));
+    dt.setUTCDate(dt.getUTCDate() + days);
+    const yy = dt.getUTCFullYear();
+    const mm = String(dt.getUTCMonth() + 1).padStart(2, "0");
+    const dd = String(dt.getUTCDate()).padStart(2, "0");
+    return `${yy}-${mm}-${dd}`;
+  };
+  const todayLocalInTz = (tz: string): string => {
+    const parts = new Intl.DateTimeFormat("en-CA", { timeZone: tz, year: "numeric", month: "2-digit", day: "2-digit" }).formatToParts(new Date());
+    const map: Record<string, string> = {};
+    parts.forEach((p: any) => { map[p.type] = p.value; });
+    return `${map.year || ""}-${map.month || ""}-${map.day || ""}`;
+  };
+  const weekdayShortInTz = (localDate: string, tz: string): string => {
+    const [y, m, d] = localDate.split("-").map(Number);
+    const dt = new Date(Date.UTC(y, m - 1, d, 12, 0, 0));
+    return new Intl.DateTimeFormat("en-US", { timeZone: tz, weekday: "short" }).format(dt).toLowerCase().slice(0, 3);
+  };
+  const normalizeWeekday = (w: unknown): string => {
+    const s = String(w ?? "").trim().toLowerCase().slice(0, 3);
+    if (!s) return "";
+    if (["mon", "seg", "segunda"].some((x) => s.startsWith(x) || x.startsWith(s))) return "mon";
+    if (["tue", "ter", "terca"].some((x) => s.startsWith(x) || x.startsWith(s))) return "tue";
+    if (["wed", "qua", "quarta"].some((x) => s.startsWith(x) || x.startsWith(s))) return "wed";
+    if (["thu", "qui", "quinta"].some((x) => s.startsWith(x) || x.startsWith(s))) return "thu";
+    if (["fri", "sex", "sexta"].some((x) => s.startsWith(x) || x.startsWith(s))) return "fri";
+    if (["sat", "sab", "sabado"].some((x) => s.startsWith(x) || x.startsWith(s))) return "sat";
+    if (["sun", "dom", "domingo"].some((x) => s.startsWith(x) || x.startsWith(s))) return "sun";
+    return s;
+  };
+  const computeNextWeekdayFromToday = (targetWdRaw: string, tz: string, anchorDate?: string): string | null => {
+    const target = normalizeWeekday(targetWdRaw);
+    if (!["mon", "tue", "wed", "thu", "fri", "sat", "sun"].includes(target)) return null;
+    const startLocal = anchorDate && /^\d{4}-\d{2}-\d{2}$/.test(anchorDate) ? anchorDate : todayLocalInTz(tz);
+    for (let i = 0; i <= 14; i++) {
+      const candidate = addDaysLocal(startLocal, i);
+      if (weekdayShortInTz(candidate, tz) === target) return candidate;
+    }
+    return null;
+  };
+  const isLocalDatePast = (localDate: string, tz: string): boolean => {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(localDate)) return false;
+    return localDate < todayLocalInTz(tz);
+  };
+
+  const leadEffectiveTz = deriveLeadEffectiveTimeZone(lead);
+  const formatDateNice = (local: string, hmRaw: string): string => {
+    const dmy = formatAtendimentoDate(local);
+    const hm = String(hmRaw).replace(/h/gi, "").trim();
+    return `Aula em: ${dmy}, ${hm}h`;
+  };
+
+  // ============================================================
+  // CASO RECORRENTE (prioridade máxima para bater Visão Geral)
+  // Se o aluno entrou no fluxo recorrente e tem dia/hora OK,
+  // SEMPRE exibe a recorrência calculada a partir de hoje,
+  // IGUAL ao card azul da Visão Geral.
+  // ============================================================
+  if (gRecurringTrulyStarted && gRecurringWeekdayOk && gRecurringTimeOk) {
+    const nextLocal = computeNextWeekdayFromToday(gRecurringWeekdayRaw, leadEffectiveTz);
+    if (nextLocal) {
+      return { label: formatDateNice(nextLocal, gRecurringLeadTimeRaw), tone: "success" };
+    }
+  }
+
+  // ============================================================
+  // CASO EXPERIMENTAL (se não for recorrente)
+  // 1ª PRIORIDADE: flat fields (atualizados no Reagendar, sempre)
+  // 2ª: bookingObj (experimental_class_booking)
+  // 3ª: future_experimental_class_booking
+  //
+  // Cascata de dados PROFESSOR primeiro, converte para TZ do aluno;
+  // se falhar, cascata ALUNO direto.
+  // ============================================================
   const booking = lead.experimental_class_booking;
   const bookingStatus = String(booking?.status ?? "").trim().toLowerCase();
   const bookingHasId = Boolean(String(booking?.id ?? "").trim());
-  const bookingIsNotDraft = bookingHasId && String(booking?.source ?? "draft").trim().toLowerCase() !== "draft";
+  const bookingSourceRaw = String(booking?.source ?? "").trim().toLowerCase();
+  const bookingIsNotDraft = bookingHasId && bookingSourceRaw !== "draft";
   const latestCancelledAt = String((lead as any)?.latest_experimental_class_cancelled_at ?? "").trim();
   const hasLatestCancelledMarker = Boolean(latestCancelledAt && latestCancelledAt !== "null");
   const futureExp = (lead as any)?.future_experimental_class_booking ?? null;
   const futureExpStatus = String(futureExp?.status ?? "").trim().toLowerCase();
   const hasFutureExp = Boolean(futureExp && futureExpStatus !== "cancelled");
 
-  const bookingProfDate = (booking && bookingHasId && bookingIsNotDraft && bookingStatus !== "cancelled")
-    ? String((booking as any)?.professor_date ?? "").slice(0, 10).trim()
-    : "";
-  const bookingProfTime = (booking && bookingHasId && bookingIsNotDraft && bookingStatus !== "cancelled")
-    ? String((booking as any)?.professor_time ?? "").trim()
-    : "";
-  const futureBookingProfDate = hasFutureExp
-    ? String((futureExp as any)?.professor_date ?? "").slice(0, 10).trim()
-    : "";
-  const futureBookingProfTime = hasFutureExp
-    ? String((futureExp as any)?.professor_time ?? "").trim()
-    : "";
+  // Flat fields (1ª prioridade, sempre atualizados após reagendamento)
   const leadFlatProfDate = hasLatestCancelledMarker
     ? ""
     : String((lead as any)?.experimental_class_professor_date ?? "").slice(0, 10).trim();
   const leadFlatProfTime = hasLatestCancelledMarker
     ? ""
     : String((lead as any)?.experimental_class_professor_time ?? "").trim();
+  const leadFlatLeadDate = hasLatestCancelledMarker
+    ? ""
+    : String((lead as any)?.experimental_class_lead_date ?? "").trim();
+  const leadFlatLeadTime = hasLatestCancelledMarker
+    ? ""
+    : String((lead as any)?.experimental_class_lead_time ?? "").trim();
 
-  const bestProfDate = bookingProfDate || futureBookingProfDate || leadFlatProfDate;
-  const bestProfTime = bookingProfTime || futureBookingProfTime || leadFlatProfTime;
+  // BookingObj (2ª prioridade, reserva existente atual)
+  const bookingObj = booking ?? null;
+  const bookingProfDate = (bookingObj && bookingHasId && bookingIsNotDraft && bookingStatus !== "cancelled")
+    ? String((bookingObj as any)?.professor_date ?? "").slice(0, 10).trim()
+    : "";
+  const bookingProfTime = (bookingObj && bookingHasId && bookingIsNotDraft && bookingStatus !== "cancelled")
+    ? String((bookingObj as any)?.professor_time ?? "").trim()
+    : "";
+  const bookingLeadDate = (bookingObj && bookingHasId && bookingIsNotDraft && bookingStatus !== "cancelled")
+    ? String((bookingObj as any)?.lead_date ?? "").trim()
+    : "";
+  const bookingLeadTime = (bookingObj && bookingHasId && bookingIsNotDraft && bookingStatus !== "cancelled")
+    ? String((bookingObj as any)?.lead_time ?? "").trim()
+    : "";
 
+  // Future booking (3ª prioridade, reserva nova ainda não confirmada)
+  const futureBookingProfDate = hasFutureExp
+    ? String((futureExp as any)?.professor_date ?? "").slice(0, 10).trim()
+    : "";
+  const futureBookingProfTime = hasFutureExp
+    ? String((futureExp as any)?.professor_time ?? "").trim()
+    : "";
+  const futureBookingLeadDate = hasFutureExp
+    ? String((futureExp as any)?.lead_date ?? "").trim()
+    : "";
+  const futureBookingLeadTime = hasFutureExp
+    ? String((futureExp as any)?.lead_time ?? "").trim()
+    : "";
+
+  // Cascata PROFESSOR (1ª prioridade flat fields)
+  const bestProfDate = leadFlatProfDate || bookingProfDate || futureBookingProfDate;
+  const bestProfTime = leadFlatProfTime || bookingProfTime || futureBookingProfTime;
+  // Cascata ALUNO (1ª prioridade flat fields)
+  const bestLeadDate = leadFlatLeadDate || bookingLeadDate || futureBookingLeadDate;
+  const bestLeadTime = leadFlatLeadTime || bookingLeadTime || futureBookingLeadTime;
+
+  // Tenta converter PROFESSOR → ALUNO (melhor precisão)
   let dateRawOk = "";
   let timeRawOk = "";
   if (bestProfDate && bestProfTime) {
     try {
-      const leadEffectiveTz = deriveLeadEffectiveTimeZone(lead);
       const utcIso = zonedDateTimeToUtcIso({
         date: bestProfDate,
         time: bestProfTime,
@@ -425,48 +655,33 @@ function buildExperimentalMetaForList(lead: AtendimentoLeadListItem): { label: s
       timeRawOk = "";
     }
   }
+  // Se a conversão TZ falhar, usa cascata ALUNO direto (flat fields primeiro)
   if (!dateRawOk || !timeRawOk) {
-    const leadFlatDate = hasLatestCancelledMarker
-      ? ""
-      : String((lead as any)?.experimental_class_lead_date ?? "").trim();
-    const leadFlatTime = hasLatestCancelledMarker
-      ? ""
-      : String((lead as any)?.experimental_class_lead_time ?? "").trim();
-    const futureBookingLeadDate = hasFutureExp
-      ? String((futureExp as any)?.lead_date ?? "").trim()
-      : "";
-    const futureBookingLeadTime = hasFutureExp
-      ? String((futureExp as any)?.lead_time ?? "").trim()
-      : "";
-    const bookingLeadDate = (booking && bookingHasId && bookingIsNotDraft && bookingStatus !== "cancelled")
-      ? String((booking as any)?.lead_date ?? "").trim()
-      : "";
-    const bookingLeadTime = (booking && bookingHasId && bookingIsNotDraft && bookingStatus !== "cancelled")
-      ? String((booking as any)?.lead_time ?? "").trim()
-      : "";
-    dateRawOk = leadFlatDate || futureBookingLeadDate || bookingLeadDate;
-    timeRawOk = leadFlatTime || futureBookingLeadTime || bookingLeadTime;
+    dateRawOk = bestLeadDate;
+    timeRawOk = bestLeadTime;
   }
+
+  // Experimental: se tem data OK, exibe. Se passou e NÃO for recorrente, só exibe a data
+  // como fallback (não avança recorrência — esse caminho é só experimental puro).
   if (dateRawOk && timeRawOk) {
-    const dmy = formatAtendimentoDate(dateRawOk);
-    const hm = String(timeRawOk).replace(/h/gi, "").trim();
-    return { label: `Aula em: ${dmy}, ${hm}h`, tone: "success" };
+    const timeForLabel = timeRawOk;
+    return { label: formatDateNice(dateRawOk, timeForLabel), tone: "success" };
   }
-  const recurringWeekdayOk = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"].includes(String(lead.recurring_class_weekday ?? "").trim().toLowerCase());
-  const recurringTimeOk = Boolean(String(lead.recurring_class_professor_time ?? "").trim()) || Boolean(String(lead.recurring_class_lead_time ?? "").trim());
-  const regStepRaw = Number((lead as any)?.recurring_registration_step ?? NaN);
+
+  // Avisos básicos (não recorrente)
   const stateRaw = String((lead as any)?.state ?? "").trim();
   const cityRaw = String((lead as any)?.city ?? "").trim();
   if (!stateRaw && !cityRaw) return { label: "Falta estado e cidade", tone: "warning" };
   if (stateRaw && !cityRaw) return { label: "Falta cidade", tone: "warning" };
   if (!stateRaw && cityRaw) return { label: "Falta estado", tone: "warning" };
-  if (!recurringWeekdayOk && !recurringTimeOk && !hasFutureExp && !dateRawOk && !timeRawOk) {
+  const recurringTimeRawAlt = String((lead as any)?.recurring_class_professor_time ?? (lead as any)?.recurring_class_lead_time ?? "").trim();
+  if (!gRecurringWeekdayOk && !Boolean(recurringTimeRawAlt) && !hasFutureExp && !dateRawOk && !timeRawOk) {
     return { label: "Falta dia e horário", tone: "warning" };
   }
-  if (!recurringWeekdayOk && !recurringTimeOk && !hasFutureExp && dateRawOk && !timeRawOk) {
+  if (!gRecurringWeekdayOk && !Boolean(recurringTimeRawAlt) && !hasFutureExp && dateRawOk && !timeRawOk) {
     return { label: "Falta horário", tone: "warning" };
   }
-  if (!recurringWeekdayOk && !recurringTimeOk && !hasFutureExp && !dateRawOk && timeRawOk) {
+  if (!gRecurringWeekdayOk && !Boolean(recurringTimeRawAlt) && !hasFutureExp && !dateRawOk && timeRawOk) {
     return { label: "Falta dia", tone: "warning" };
   }
   return { label: "Novo registro", tone: "default" };
@@ -516,7 +731,7 @@ function buildRecurringMetaForVisaoGeral(lead: AtendimentoLeadListItem): { title
     ps === "matriculado" ||
     ps === "pago" ||
     st === "matriculado" ||
-    st === "aluno" ||
+    st === "matricula_confirmada" ||
     Boolean(payConfirmedAtRaw && payConfirmedAtRaw !== "null");
 
   // GATE ESTRITO. Só entra na view nova de recorrente se:
@@ -541,7 +756,7 @@ function buildRecurringMetaForVisaoGeral(lead: AtendimentoLeadListItem): { title
       return { title: "Falta estado e cidade", body: "Clique em Editar no card Informações para preencher.", tone: "warning" };
     }
     if (stateRaw && !cityRaw) {
-      return { title: "Falta cidade", body: "Clique em Editar no card Informações para preencher a cidade.", tone: "warning" };
+      return { title: "Falta cidade", body: "Clique em Editar no card Informações para preencher.", tone: "warning" };
     }
     if (!stateRaw && cityRaw) {
       return { title: "Falta estado", body: "Clique em Editar no card Informações para preencher o estado.", tone: "warning" };
@@ -602,7 +817,7 @@ function buildRecurringMetaForVisaoGeral(lead: AtendimentoLeadListItem): { title
     if (!recurringWeekdayOk && recurringTimeOk) {
       return { title: "Falta dia da semana recorrente", body: "Horário definido, mas dia da semana ainda não foi escolhido no link de matrícula.", tone: "info" };
     }
-    return { title: "Falta Dia e Horário Recorrentes", body: "O aluno ainda não definiu dia da semana e horário das aulas recorrentes no link de matrícula.", tone: "info" };
+    return { title: "Falta Dia e Horário Recorrentes", body: "Aulas recorrentes ainda não definidas.", tone: "info" };
   }
 
   // ===== PASSO 2: CONTRATO =====
@@ -2831,13 +3046,65 @@ export function AtendimentoClient() {
     if (!selectedLead || editLocationSaving) return;
     try {
       setEditLocationSaving(true);
+      const city = String(editLocationCity ?? "").trim() || null;
+      const state = String(editLocationState ?? "").trim() || null;
+      const phone = String((selectedLead as any)?.phone ?? "").trim() || null;
+      const browserTz =
+        typeof window !== "undefined" && typeof Intl !== "undefined"
+          ? Intl.DateTimeFormat().resolvedOptions().timeZone || null
+          : null;
+
+      let resolvedTimeZone: string | null = null;
+      let resolvedCountry: string | null = null;
+
+      if (city || state) {
+        const direct = city
+          ? resolveTimeZoneFromCityInput({
+              city,
+              state: state ?? undefined,
+              phone: phone ?? undefined,
+              allowPhoneCountryFallback: true,
+            })
+          : null;
+        if (direct?.timeZone) {
+          resolvedTimeZone = direct.timeZone;
+          resolvedCountry =
+            direct.country === "BR" ? "Brasil" : direct.country === "US" ? "Estados Unidos" : null;
+        } else {
+          const studentTz = resolveStudentTimezone({
+            city,
+            state,
+            phone,
+            browserTimeZone: browserTz,
+          });
+          if (studentTz) resolvedTimeZone = studentTz;
+        }
+      }
+
+      if (!resolvedTimeZone) {
+        const phoneFb = inferTimeZoneFromPhoneCountryCode(phone);
+        if (phoneFb?.timeZone) {
+          resolvedTimeZone = phoneFb.timeZone;
+          resolvedCountry =
+            phoneFb.country === "BR" ? "Brasil" : phoneFb.country === "US" ? "Estados Unidos" : null;
+        }
+      }
+
+      if (!resolvedTimeZone && browserTz) {
+        resolvedTimeZone = browserTz;
+      }
+
+      const body: { city: string | null; state: string | null; timezone?: string | null; country?: string | null } = {
+        city,
+        state,
+      };
+      if (resolvedTimeZone) body.timezone = resolvedTimeZone;
+      if (resolvedCountry) body.country = resolvedCountry;
+
       const response = await fetch(`/api/atendimento/leads/${selectedLead.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          city: String(editLocationCity ?? "").trim() || null,
-          state: String(editLocationState ?? "").trim() || null,
-        }),
+        body: JSON.stringify(body),
       });
       const payload = (await response.json().catch(() => null)) as { ok?: boolean; lead?: AtendimentoLeadListItem; error?: string } | null;
       if (!response.ok || !payload?.ok) {
@@ -3193,6 +3460,7 @@ export function AtendimentoClient() {
               patch.future_experimental_class_booking = {
                 id: bkIdOk,
                 status: String(bk.status ?? "scheduled").trim() || "scheduled",
+                source: String(bk.source ?? "saved").trim().toLowerCase() !== "draft" ? String(bk.source ?? "table").trim() || "table" : "saved",
                 lead_date: bkLeadDate || null,
                 lead_time: bkLeadTime || null,
                 professor_date: bkProfessorDate || null,
@@ -3222,6 +3490,7 @@ export function AtendimentoClient() {
               patch.future_experimental_class_booking = {
                 id: "fallback",
                 status: "scheduled",
+                source: "saved",
                 lead_date: String(patch.experimental_class_lead_date ?? "").trim() || null,
                 lead_time: String(patch.experimental_class_lead_time ?? "").trim() || null,
                 professor_date: String(patch.experimental_class_professor_date ?? "").trim() || null,
@@ -3272,23 +3541,30 @@ export function AtendimentoClient() {
                 const locV = String((prior as any)?.[k] ?? "").trim();
                 if (!incV && locV) (merged as any)[k] = locV;
               }
-              if (
-                !merged.experimental_class_booking &&
-                prior.experimental_class_booking
-              ) {
-                merged.experimental_class_booking = prior.experimental_class_booking;
-              }
-              if (
-                !merged.future_experimental_class_booking &&
-                prior.future_experimental_class_booking
-              ) {
-                merged.future_experimental_class_booking = prior.future_experimental_class_booking;
-              }
-              if (
-                !merged.latest_experimental_class_booking &&
-                prior.latest_experimental_class_booking
-              ) {
-                merged.latest_experimental_class_booking = prior.latest_experimental_class_booking;
+              const startAtKey = "professor_start_at";
+              const pickBookingStartMs = (obj: any) => {
+                if (!obj || typeof obj !== "object") return -1;
+                const v =
+                  String((obj as any)?.[startAtKey] ?? (obj as any)?.lead_start_at ?? "").trim();
+                if (!v) return -1;
+                const t = new Date(v).getTime();
+                return Number.isFinite(t) && t > 0 ? t : -1;
+              };
+              const nestedBookingKeys = [
+                "experimental_class_booking",
+                "future_experimental_class_booking",
+                "latest_experimental_class_booking",
+              ] as const;
+              for (const k of nestedBookingKeys) {
+                const incMs = pickBookingStartMs(incoming?.[k]);
+                const locMs = pickBookingStartMs(prior?.[k]);
+                if (locMs > 0 && incMs <= 0) {
+                  (merged as any)[k] = prior[k];
+                  continue;
+                }
+                if (locMs > 0 && incMs > 0 && locMs > incMs) {
+                  (merged as any)[k] = prior[k];
+                }
               }
               if (
                 !merged.latest_past_class_meta &&
@@ -4532,7 +4808,7 @@ export function AtendimentoClient() {
               aria-label="Atualizar lista"
               className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-[var(--app-border)] bg-[var(--app-solid-surface)] text-[var(--app-text-75)] hover:bg-[var(--app-hover)] disabled:cursor-not-allowed disabled:opacity-60 shadow-none"
             >
-              <RefreshCw className={`h-5 w-5 ${refreshing ? "animate-spin" : ""}`} strokeWidth={2.25} />
+              <RefreshCw className={`h-5 w-5 ${refreshing ? "animate-spin" : ""}`} strokeWidth={1.75} />
             </button>
             {/* DATA DE CADASTRO no header (acesso direto, nao precisa abrir filtros) - botão pequeno redondo IGUAL OS OUTROS ali (Refresh, SlidersHorizontal etc) */}
             <div className="">
@@ -4633,7 +4909,7 @@ export function AtendimentoClient() {
               aria-label="Adicionar registro"
               className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-[var(--app-border)] bg-[var(--app-solid-surface)] text-[var(--app-text-85)] hover:bg-[var(--app-hover)] disabled:cursor-not-allowed disabled:opacity-60 shadow-none"
             >
-              <Plus className="h-5 w-5" strokeWidth={2.25} />
+              <Plus className="h-5 w-5" strokeWidth={1.75} />
             </button>
             <button
               type="button"
@@ -4642,7 +4918,7 @@ export function AtendimentoClient() {
               title="Legenda das cores dos avatares"
               className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] text-[var(--app-text-75)] hover:bg-[var(--app-hover)] shadow-none"
             >
-              <Palette className="h-5 w-5" strokeWidth={2.25} />
+              <Palette className="h-5 w-5" strokeWidth={1.75} />
             </button>
             <div className="relative shrink-0">
               <button
@@ -4658,7 +4934,7 @@ export function AtendimentoClient() {
                     : "border-emerald-500/35 bg-emerald-500/15 text-emerald-700 hover:bg-emerald-500/20",
                 ].join(" ")}
               >
-                <Bot className="h-5 w-5" strokeWidth={2.25} />
+                <Bot className="h-5 w-5" strokeWidth={1.75} />
               </button>
             </div>
           </div>
@@ -4927,7 +5203,7 @@ export function AtendimentoClient() {
                           const enrollment = String((sl as any)?.enrollment_number ?? "").trim();
                           if (!enrollment) return null;
                           return (
-                            <div className="mt-1 inline-flex w-max max-w-full items-center gap-1.5 rounded-full border border-[#2563eb]/30 bg-[rgba(37,99,235,0.08)] px-3 py-1 text-[12px] font-bold text-[#1e3a8a] sm:text-[13px]">
+                            <div className="mt-3 inline-flex w-max max-w-full items-center gap-1.5 rounded-full border border-[#2563eb]/30 bg-[rgba(37,99,235,0.08)] px-3 py-1 text-[12px] font-bold text-[#1e3a8a] sm:text-[13px]">
                               <FileText className="h-3.5 w-3.5 shrink-0" strokeWidth={2.25} />
                               Matrícula nº {enrollment}
                             </div>
@@ -5352,7 +5628,15 @@ export function AtendimentoClient() {
                             const wd = String(lead?.recurring_class_weekday_label ?? lead?.recurring_class_weekday ?? "").trim();
                             const tm = String(lead?.recurring_class_lead_time ?? lead?.recurring_class_professor_time ?? "").trim();
                             const st = String(lead?.recurring_class_status ?? "").trim();
+                            const rcsLabelFn = (raw: string) => {
+                              const n = raw.toLowerCase().trim();
+                              if (n === "cadastro_plataforma_pendente") return "Cadastro de matrícula incompleto";
+                              return raw;
+                            };
                             const hasAny = Boolean(wd || tm || st);
+                            const nextOcc = (() => {
+                              try { return buildRecurringNextOccurrenceNiceLabel(selectedLead); } catch { return null; }
+                            })();
                             if (isConcluded) {
                               return (
                                 <div className="mt-4 flex items-start gap-3 rounded-xl border border-[#2563eb]/35 bg-[rgba(37,99,235,0.12)] px-4 py-3">
@@ -5363,15 +5647,17 @@ export function AtendimentoClient() {
                                     <div className="font-semibold text-[#1e3a8a] truncate">
                                       {(() => {
                                         const parts: string[] = [];
-                                        if (wd) parts.push(`Dia: ${wd}`);
-                                        if (tm) parts.push(`às ${tm}`);
-                                        if (parts.length === 0 && st) parts.push(`Status: ${st}`);
+                                        if (nextOcc?.weekdayWithDate) parts.push(`${nextOcc.weekdayWithDate}`);
+                                        else if (wd) parts.push(`${wd}`);
+                                        if (nextOcc?.time) parts.push(`às ${nextOcc.time.replace(/h$/i, "")}`);
+                                        else if (tm) parts.push(`às ${tm}`);
+                                        if (parts.length === 0 && st) parts.push(`${rcsLabelFn(st)}`);
                                         if (parts.length === 0) return "Aulas recorrentes ativas.";
-                                        return `${parts.join(" ")} (semanal)`;
+                                        return `${parts.join(" ")}`;
                                       })()}
                                     </div>
                                     <div className="mt-0.5 text-[13px] text-[#1d4ed8]/80">
-                                      Matrícula confirmada. Aulas recorrentes semanais para este aluno.
+                                      Aulas recorrentes semanais para este aluno.
                                     </div>
                                   </div>
                                 </div>
@@ -5387,15 +5673,17 @@ export function AtendimentoClient() {
                                     <div className="font-semibold text-[#1e3a8a] truncate">
                                       {(() => {
                                         const parts: string[] = [];
-                                        if (wd) parts.push(`Dia: ${wd}`);
-                                        if (tm) parts.push(`às ${tm}`);
-                                        if (parts.length === 0 && st) parts.push(`Status: ${st}`);
+                                        if (nextOcc?.weekdayWithDate) parts.push(`${nextOcc.weekdayWithDate}`);
+                                        else if (wd) parts.push(`${wd}`);
+                                        if (nextOcc?.time) parts.push(`às ${nextOcc.time.replace(/h$/i, "")}`);
+                                        else if (tm) parts.push(`às ${tm}`);
+                                        if (parts.length === 0 && st) parts.push(`${rcsLabelFn(st)}`);
                                         if (parts.length === 0) return "Aula recorrente cadastrada.";
                                         return parts.join(" ");
                                       })()}
                                     </div>
                                     <div className="mt-0.5 text-[13px] text-[#1d4ed8]/80">
-                                      Aluno definiu dia e horário das aulas recorrentes no link de matrícula.
+                                      Aguarde a definição das aulas recorrentes.
                                     </div>
                                   </div>
                                 </div>
@@ -5601,7 +5889,7 @@ export function AtendimentoClient() {
                             if (!wdNice && !t) return "Horário recorrente ainda não definido pelo aluno no link de matrícula.";
                             if (wdNice && !t) return `${wdNice} — horário ainda não definido.`;
                             if (!wdNice && t) return `Horário: ${t} — dia da semana ainda não definido.`;
-                            return `${wdNice} às ${t}h (recorrente semanal).`;
+                            return `${wdNice} às ${t}h`;
                           })();
                           return (
                             <div className="relative overflow-hidden rounded-2xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] p-5 shadow-none">
@@ -5732,7 +6020,7 @@ export function AtendimentoClient() {
                                       Aguardando dia e horário recorrente
                                     </div>
                                     <div className="mt-0.5 text-[13px] text-[#1d4ed8]/80">
-                                      Quando o aluno concluir a etapa de dia e horário no link de matrícula, os dados aparecem aqui.
+                                      Após o aluno definir o dia e o horário, os dados aparecerão aqui.
                                     </div>
                                   </div>
                                 </div>
@@ -6264,6 +6552,25 @@ export function AtendimentoClient() {
                               return "border-[var(--app-border)] bg-[var(--app-solid-surface-2)] text-[var(--app-text-70)]";
                           }
                         };
+                        const hasRealContractContent =
+                          signedAtRaw || pdfUrlRaw || csRaw === "assinado";
+                        if (!hasRealContractContent) {
+                          return (
+                            <div className="w-full">
+                              <div className="flex items-center gap-2">
+                                <FileText className="h-5 w-5 text-[var(--app-text-70)]" strokeWidth={2.25} />
+                                <div className="text-[15px] font-bold text-[var(--app-text-85)]">
+                                  Contrato de matrícula
+                                </div>
+                              </div>
+                              <div className="mt-4 rounded-xl border border-[var(--app-border)] bg-[var(--app-solid-surface-2)] px-4 py-3 text-center">
+                                <div className="text-[13px] font-semibold text-[var(--app-text-60)]">
+                                  O contrato ainda não está disponível para esse registro.
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        }
                         return (
                           <div className="w-full">
                             <div className="flex items-start justify-between gap-4">
@@ -6280,13 +6587,16 @@ export function AtendimentoClient() {
                                   </div>
                                 </div>
                               </div>
-                              {statusBadge ? (
-                                <div className={[
-                                  "inline-flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1 text-[11px] font-bold uppercase tracking-[0.12em]",
-                                  wrapperCls(statusBadge.tone),
-                                ].join(" ")}>
-                                  {statusBadge.label}
-                                </div>
+                              {pdfUrlRaw ? (
+                                <a
+                                  href={pdfUrlRaw}
+                                  target="_blank"
+                                  rel="noreferrer noopener"
+                                  className="inline-flex min-h-[44px] items-center justify-center gap-2 rounded-xl border border-[var(--app-border)] bg-[var(--app-solid-surface-2)] px-5 text-[13px] font-semibold text-[var(--app-text-85)] transition hover:bg-[var(--app-hover)]"
+                                >
+                                  <ExternalLink className="h-4 w-4 shrink-0" />
+                                  Baixar PDF
+                                </a>
                               ) : null}
                             </div>
 
@@ -6308,58 +6618,6 @@ export function AtendimentoClient() {
                                 </div>
                               </div>
                             </div>
-
-                            <div className="mt-5 flex flex-col items-stretch justify-start gap-3 sm:flex-row">
-                              <a
-                                href={pdfUrlRaw || "#"}
-                                target="_blank"
-                                rel="noreferrer noopener"
-                                onClick={(e) => { if (!pdfUrlRaw) e.preventDefault(); }}
-                                className={[
-                                  "inline-flex min-h-[44px] items-center justify-center gap-2 rounded-xl border px-5 text-[13px] font-semibold transition",
-                                  pdfUrlRaw
-                                    ? "border-[#2563eb]/35 bg-[#2563eb] !text-white hover:bg-[#1d4ed8]"
-                                    : "border-[var(--app-border)] bg-[var(--app-solid-surface-2)] text-[var(--app-text-55)] cursor-not-allowed",
-                                ].join(" ")}
-                              >
-                                <ExternalLink className="h-4 w-4 shrink-0" />
-                                {pdfUrlRaw ? "Abrir contrato em PDF" : "PDF indisponível no momento"}
-                              </a>
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  if (!pdfUrlRaw) return;
-                                  const a = document.createElement("a");
-                                  a.href = pdfUrlRaw;
-                                  a.download = "contrato-matricula.pdf";
-                                  a.rel = "noreferrer noopener";
-                                  document.body.appendChild(a);
-                                  a.click();
-                                  document.body.removeChild(a);
-                                }}
-                                disabled={!pdfUrlRaw}
-                                className={[
-                                  "inline-flex min-h-[44px] items-center justify-center gap-2 rounded-xl border px-5 text-[13px] font-semibold transition",
-                                  pdfUrlRaw
-                                    ? "border-[var(--app-border)] bg-[var(--app-solid-surface-2)] text-[var(--app-text-85)] hover:bg-[var(--app-hover)]"
-                                    : "border-[var(--app-border)] bg-[var(--app-solid-surface-2)] text-[var(--app-text-55)] cursor-not-allowed disabled:opacity-60",
-                                ].join(" ")}
-                              >
-                                <Save className="h-4 w-4 shrink-0" />
-                                Baixar PDF
-                              </button>
-                            </div>
-
-                            {!hasContract ? (
-                              <div className="mt-5 rounded-xl border border-[var(--app-border)] bg-[var(--app-solid-surface-2)] px-4 py-3">
-                                <div className="text-[13px] font-semibold text-[var(--app-text-70)]">
-                                  Nenhum contrato encontrado para este registro.
-                                </div>
-                                <div className="mt-0.5 text-[12px] text-[var(--app-text-60)]">
-                                  Quando o aluno avançar no link de matrícula e aceitar o contrato, os dados serão exibidos aqui.
-                                </div>
-                              </div>
-                            ) : null}
                           </div>
                         );
                       })()}
@@ -6926,7 +7184,15 @@ export function AtendimentoClient() {
                           const wd = String(lead?.recurring_class_weekday_label ?? lead?.recurring_class_weekday ?? "").trim();
                           const tm = String(lead?.recurring_class_lead_time ?? lead?.recurring_class_professor_time ?? "").trim();
                           const st = String(lead?.recurring_class_status ?? "").trim();
+                          const rcsLabelFn = (raw: string) => {
+                            const n = raw.toLowerCase().trim();
+                            if (n === "cadastro_plataforma_pendente") return "Cadastro de matrícula incompleto";
+                            return raw;
+                          };
                           const hasAny = Boolean(wd || tm || st);
+                          const nextOcc = (() => {
+                            try { return buildRecurringNextOccurrenceNiceLabel(selectedLead); } catch { return null; }
+                          })();
                           if (isConcluded) {
                             return (
                               <div className="mt-4 flex items-start gap-3 rounded-xl border border-[#2563eb]/35 bg-[rgba(37,99,235,0.12)] px-4 py-3">
@@ -6937,9 +7203,11 @@ export function AtendimentoClient() {
                                   <div className="font-semibold text-[#1e3a8a] truncate">
                                     {(() => {
                                       const parts: string[] = [];
-                                      if (wd) parts.push(`Dia: ${wd}`);
-                                      if (tm) parts.push(`às ${tm}`);
-                                      if (parts.length === 0 && st) parts.push(`Status: ${st}`);
+                                      if (nextOcc?.weekdayWithDate) parts.push(`${nextOcc.weekdayWithDate}`);
+                                      else if (wd) parts.push(`${wd}`);
+                                      if (nextOcc?.time) parts.push(`às ${nextOcc.time.replace(/h$/i, "")}`);
+                                      else if (tm) parts.push(`às ${tm}`);
+                                      if (parts.length === 0 && st) parts.push(`${rcsLabelFn(st)}`);
                                       if (parts.length === 0) return "Aulas recorrentes ativas.";
                                       return `${parts.join(" ")} (semanal)`;
                                     })()}
@@ -6961,15 +7229,17 @@ export function AtendimentoClient() {
                                   <div className="font-semibold text-[#1e3a8a] truncate">
                                     {(() => {
                                       const parts: string[] = [];
-                                      if (wd) parts.push(`Dia: ${wd}`);
-                                      if (tm) parts.push(`às ${tm}`);
-                                      if (parts.length === 0 && st) parts.push(`Status: ${st}`);
+                                      if (nextOcc?.weekdayWithDate) parts.push(`${nextOcc.weekdayWithDate}`);
+                                      else if (wd) parts.push(`${wd}`);
+                                      if (nextOcc?.time) parts.push(`às ${nextOcc.time.replace(/h$/i, "")}`);
+                                      else if (tm) parts.push(`às ${tm}`);
+                                      if (parts.length === 0 && st) parts.push(`${rcsLabelFn(st)}`);
                                       if (parts.length === 0) return "Aula recorrente cadastrada.";
                                       return parts.join(" ");
                                     })()}
                                   </div>
                                   <div className="mt-0.5 text-[13px] text-[#1d4ed8]/80">
-                                    Aluno definiu dia e horário das aulas recorrentes no link de matrícula.
+                                    Aguarde a definição das aulas recorrentes.
                                   </div>
                                 </div>
                               </div>
@@ -7279,7 +7549,7 @@ export function AtendimentoClient() {
                                     Aguardando dia e horário recorrente
                                   </div>
                                   <div className="mt-0.5 text-[13px] text-[#1d4ed8]/80">
-                                    Quando o aluno concluir a etapa de dia e horário no link de matrícula, os dados aparecem aqui.
+                                    Após o aluno definir o dia e o horário, os dados aparecerão aqui.
                                   </div>
                                 </div>
                               </div>
@@ -7844,6 +8114,25 @@ export function AtendimentoClient() {
                             return "border-[var(--app-border)] bg-[var(--app-solid-surface-2)] text-[var(--app-text-70)]";
                         }
                       };
+                      const hasRealContractContent =
+                        signedAtRaw || pdfUrlRaw || csRaw === "assinado";
+                      if (!hasRealContractContent) {
+                        return (
+                          <div className="w-full">
+                            <div className="flex items-center gap-2">
+                              <FileText className="h-5 w-5 text-[var(--app-text-70)]" strokeWidth={2.25} />
+                              <div className="text-[15px] font-bold text-[var(--app-text-85)]">
+                                Contrato de matrícula
+                              </div>
+                            </div>
+                            <div className="mt-4 rounded-xl border border-[var(--app-border)] bg-[var(--app-solid-surface-2)] px-4 py-3 text-center">
+                              <div className="text-[13px] font-semibold text-[var(--app-text-60)]">
+                                O contrato ainda não está disponível para esse registro.
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      }
                       return (
                         <div className="w-full">
                           <div className="flex items-start justify-between gap-4">
@@ -7860,13 +8149,16 @@ export function AtendimentoClient() {
                                 </div>
                               </div>
                             </div>
-                            {statusBadge ? (
-                              <div className={[
-                                "inline-flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1 text-[11px] font-bold uppercase tracking-[0.12em]",
-                                wrapperCls(statusBadge.tone),
-                              ].join(" ")}>
-                                {statusBadge.label}
-                              </div>
+                            {pdfUrlRaw ? (
+                              <a
+                                href={pdfUrlRaw}
+                                target="_blank"
+                                rel="noreferrer noopener"
+                                className="inline-flex min-h-[44px] items-center justify-center gap-2 rounded-xl border border-[var(--app-border)] bg-[var(--app-solid-surface-2)] px-5 text-[13px] font-semibold text-[var(--app-text-85)] transition hover:bg-[var(--app-hover)]"
+                              >
+                                <ExternalLink className="h-4 w-4 shrink-0" />
+                                Baixar PDF
+                              </a>
                             ) : null}
                           </div>
 
@@ -7888,58 +8180,6 @@ export function AtendimentoClient() {
                               </div>
                             </div>
                           </div>
-
-                          <div className="mt-5 flex items-stretch justify-start gap-3">
-                            <a
-                              href={pdfUrlRaw || "#"}
-                              target="_blank"
-                              rel="noreferrer noopener"
-                              onClick={(e) => { if (!pdfUrlRaw) e.preventDefault(); }}
-                              className={[
-                                "inline-flex min-h-[44px] items-center justify-center gap-2 rounded-xl border px-5 text-[13px] font-semibold transition",
-                                pdfUrlRaw
-                                  ? "border-[#2563eb]/35 bg-[#2563eb] !text-white hover:bg-[#1d4ed8]"
-                                  : "border-[var(--app-border)] bg-[var(--app-solid-surface-2)] text-[var(--app-text-55)] cursor-not-allowed",
-                              ].join(" ")}
-                            >
-                              <ExternalLink className="h-4 w-4 shrink-0" />
-                              {pdfUrlRaw ? "Abrir contrato em PDF" : "PDF indisponível no momento"}
-                            </a>
-                            <button
-                              type="button"
-                              onClick={() => {
-                                if (!pdfUrlRaw) return;
-                                const a = document.createElement("a");
-                                a.href = pdfUrlRaw;
-                                a.download = "contrato-matricula.pdf";
-                                a.rel = "noreferrer noopener";
-                                document.body.appendChild(a);
-                                a.click();
-                                document.body.removeChild(a);
-                              }}
-                              disabled={!pdfUrlRaw}
-                              className={[
-                                "inline-flex min-h-[44px] items-center justify-center gap-2 rounded-xl border px-5 text-[13px] font-semibold transition",
-                                pdfUrlRaw
-                                  ? "border-[var(--app-border)] bg-[var(--app-solid-surface-2)] text-[var(--app-text-85)] hover:bg-[var(--app-hover)]"
-                                  : "border-[var(--app-border)] bg-[var(--app-solid-surface-2)] text-[var(--app-text-55)] cursor-not-allowed disabled:opacity-60",
-                              ].join(" ")}
-                            >
-                              <Save className="h-4 w-4 shrink-0" />
-                              Baixar PDF
-                            </button>
-                          </div>
-
-                          {!hasContract ? (
-                            <div className="mt-5 rounded-xl border border-[var(--app-border)] bg-[var(--app-solid-surface-2)] px-4 py-3">
-                              <div className="text-[13px] font-semibold text-[var(--app-text-70)]">
-                                Nenhum contrato encontrado para este registro.
-                              </div>
-                              <div className="mt-0.5 text-[12px] text-[var(--app-text-60)]">
-                                Quando o aluno avançar no link de matrícula e aceitar o contrato, os dados serão exibidos aqui.
-                              </div>
-                            </div>
-                          ) : null}
                         </div>
                       );
                     })()}
@@ -8287,20 +8527,25 @@ export function AtendimentoClient() {
               }
 
               const bookingObj =
-                (lead as any)?.future_experimental_class_booking ??
                 (lead as any)?.experimental_class_booking ??
+                (lead as any)?.future_experimental_class_booking ??
                 null;
               const bookingStatus = String((bookingObj as any)?.status ?? "").trim().toLowerCase();
               const bookingHasId = Boolean(String((bookingObj as any)?.id ?? "").trim());
-              const bookingIsNotDraft =
-                bookingHasId &&
-                String((bookingObj as any)?.source ?? "draft").trim().toLowerCase() !== "draft";
+              const bookingSourceRaw = String((bookingObj as any)?.source ?? "").trim().toLowerCase();
+              const bookingIsNotDraft = bookingHasId && bookingSourceRaw !== "draft";
               const latestCancelledAt = String(
                 (lead as any)?.latest_experimental_class_cancelled_at ?? "",
               ).trim();
               const hasLatestCancelledMarker =
                 Boolean(latestCancelledAt) && latestCancelledAt !== "null";
 
+              const leadFlatProfDate = hasLatestCancelledMarker
+                ? ""
+                : String((lead as any)?.experimental_class_professor_date ?? "").slice(0, 10).trim();
+              const leadFlatProfTime = hasLatestCancelledMarker
+                ? ""
+                : String((lead as any)?.experimental_class_professor_time ?? "").trim();
               const bookingProfDate =
                 bookingObj && bookingHasId && bookingIsNotDraft && bookingStatus !== "cancelled"
                   ? String((bookingObj as any)?.professor_date ?? "").slice(0, 10).trim()
@@ -8331,29 +8576,45 @@ export function AtendimentoClient() {
                         "",
                     ).trim()
                   : "";
-              const leadFlatProfDate = hasLatestCancelledMarker
-                ? ""
-                : String((lead as any)?.experimental_class_professor_date ?? "").slice(0, 10).trim();
-              const leadFlatProfTime = hasLatestCancelledMarker
-                ? ""
-                : String((lead as any)?.experimental_class_professor_time ?? "").trim();
-              const bestProfDate = bookingProfDate || futureBookingProfDate || leadFlatProfDate;
-              const bestProfTime = bookingProfTime || futureBookingProfTime || leadFlatProfTime;
+              const bestProfDate = leadFlatProfDate || bookingProfDate || futureBookingProfDate;
+              const bestProfTime = leadFlatProfTime || bookingProfTime || futureBookingProfTime;
 
-              const fallbackLeadDateRaw = hasLatestCancelledMarker
+              const leadFlatLeadDate = hasLatestCancelledMarker
                 ? ""
-                : String(
-                    (lead as any)?.experimental_class_lead_date ??
-                      (bookingObj as any)?.lead_date ??
-                      "",
-                  ).trim();
-              const fallbackLeadTimeRaw = hasLatestCancelledMarker
+                : String((lead as any)?.experimental_class_lead_date ?? "").trim();
+              const leadFlatLeadTime = hasLatestCancelledMarker
                 ? ""
-                : String(
-                    (lead as any)?.experimental_class_lead_time ??
-                      (bookingObj as any)?.lead_time ??
-                      "",
-                  ).trim();
+                : String((lead as any)?.experimental_class_lead_time ?? "").trim();
+              const bookingLeadDate =
+                bookingObj && bookingHasId && bookingIsNotDraft && bookingStatus !== "cancelled"
+                  ? String((bookingObj as any)?.lead_date ?? "").trim()
+                  : "";
+              const bookingLeadTime =
+                bookingObj && bookingHasId && bookingIsNotDraft && bookingStatus !== "cancelled"
+                  ? String((bookingObj as any)?.lead_time ?? "").trim()
+                  : "";
+              const futureBookingLeadDate =
+                (lead as any)?.future_experimental_class_booking &&
+                String(
+                  ((lead as any).future_experimental_class_booking as any)?.status ?? "",
+                ).trim().toLowerCase() !== "cancelled"
+                  ? String(
+                      ((lead as any).future_experimental_class_booking as any)?.lead_date ??
+                        "",
+                    ).trim()
+                  : "";
+              const futureBookingLeadTime =
+                (lead as any)?.future_experimental_class_booking &&
+                String(
+                  ((lead as any).future_experimental_class_booking as any)?.status ?? "",
+                ).trim().toLowerCase() !== "cancelled"
+                  ? String(
+                      ((lead as any).future_experimental_class_booking as any)?.lead_time ??
+                        "",
+                    ).trim()
+                  : "";
+              const bestLeadDate = leadFlatLeadDate || bookingLeadDate || futureBookingLeadDate;
+              const bestLeadTime = leadFlatLeadTime || bookingLeadTime || futureBookingLeadTime;
 
               let leadDateRaw = "";
               let leadTimeRaw = "";
@@ -8375,20 +8636,12 @@ export function AtendimentoClient() {
                 }
               }
               if (!leadDateRaw || !leadTimeRaw) {
-                leadDateRaw = fallbackLeadDateRaw;
-                leadTimeRaw = fallbackLeadTimeRaw;
+                leadDateRaw = bestLeadDate;
+                leadTimeRaw = bestLeadTime;
               }
 
-              const profDateRaw = String(
-                (lead as any)?.experimental_class_professor_date ??
-                  (bookingObj as any)?.professor_date ??
-                  "",
-              ).trim();
-              const profTimeRaw = String(
-                (lead as any)?.experimental_class_professor_time ??
-                  (bookingObj as any)?.professor_time ??
-                  "",
-              ).trim();
+              const profDateRaw = bestProfDate;
+              const profTimeRaw = bestProfTime;
               const formatTime = (raw: string) => {
                 if (!raw) return "—";
                 const clean = raw.replace(/h/gi, "").trim();

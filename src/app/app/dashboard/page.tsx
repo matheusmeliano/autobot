@@ -5,16 +5,17 @@ import { buildAgendaRows } from "@/lib/agendaRows";
 import { deriveAgendarVisualStatus } from "@/lib/agendarStatus";
 import { getOpenMonthlyInstallments } from "@/lib/chargeAccumulation";
 import {
+  applyCurrentMonthDebtorStatuses,
   deriveReferenceMonthDebtorStatus,
   deriveReferenceMonthDebtorChargeProgress,
 } from "@/lib/debtorChargeStatus";
 import { BRAZIL_TIMEZONES, type BrazilTimeZone } from "@/lib/timezone";
+import { refreshOneWhatsAppInstanceStatusLive } from "@/lib/atendimento/server";
 import {
-  areBrazilianPhonesEquivalent,
-  loadHiddenWhatsAppPhoneBlocklist,
-  normalizePhoneDigitsOnly,
-} from "@/lib/painelHiddenPhones";
-import { getZapiInstanceMeta, refreshOneWhatsAppInstanceStatusLive } from "@/lib/atendimento/server";
+  listAllClientesDebtors,
+  listAllClientesScheduleRuns,
+  listAllClientesSchedules,
+} from "@/lib/clientesData";
 
 async function dashboardRefreshWhatsAppStatusLive(
   supabase: any,
@@ -139,10 +140,9 @@ export default async function DashboardPage() {
     templatesRes,
     whatsappRes,
     profileRes,
-    scheduleRunsRes,
     debtorsRes,
     schedulesRes,
-    hiddenBlocklistRaw,
+    scheduleRunsRes,
   ] = await Promise.all([
     supabase
       .from("message_templates")
@@ -156,60 +156,13 @@ export default async function DashboardPage() {
       .limit(1)
       .maybeSingle(),
     supabase.from("profiles").select("nome, timezone").eq("user_id", userId).maybeSingle(),
-    supabase
-      .from("schedule_runs")
-      .select("schedule_id, scheduled_for")
-      .eq("status", "executado")
-      .order("scheduled_for", { ascending: false })
-      .limit(2000),
-    supabase
-      .from("debtors")
-      .select(
-        "id, nome, telefone, observacoes, valor, status, retry_time, accumulate_open_monthly_charges, debtor_charges(id, amount, due_day, recurrence_month, recurrence_year, created_at)",
-      )
-      .eq("user_id", userId)
-      .limit(1000),
-    supabase
-      .from("schedules")
-      .select(
-        "id, debtor_id, charge_id, template_id, template_pending_id, template_overdue_id, data_envio, charge_due_at, status, recurrence, recurrence_until, recurrence_day, recurrence_time, schedule_timezone, last_sent_at, payment_received_at, created_at, closed_at, charge:debtor_charges!schedules_charge_id_fkey(due_day, recurrence_month, recurrence_year), pending_template:message_templates!schedules_template_pending_id_fkey(nome), overdue_template:message_templates!schedules_template_overdue_id_fkey(nome)",
-      )
-      .eq("user_id", userId)
-      .limit(2000),
-    loadHiddenWhatsAppPhoneBlocklist(),
+    listAllClientesDebtors(supabase),
+    listAllClientesSchedules(supabase),
+    listAllClientesScheduleRuns(supabase),
   ]);
   const liveWhatsappStatus = await dashboardRefreshWhatsAppStatusLive(supabase, whatsappRes.data);
-
-  const hiddenBlocklist = (hiddenBlocklistRaw ?? new Set<string>()) as Set<string>;
-  const debtorTelefoneById = new Map<string, string>();
-  for (const d of (debtorsRes.data ?? []) as any[]) {
-    const id = String(d?.id ?? "");
-    if (!id) continue;
-    debtorTelefoneById.set(id, String(d?.telefone ?? ""));
-  }
-
-  function debtorPhoneIsBlocked(phoneRaw: any): boolean {
-    const phone = normalizePhoneDigitsOnly(String(phoneRaw ?? ""));
-    if (!phone) return false;
-    for (const blocked of hiddenBlocklist) {
-      if (!blocked) continue;
-      if (areBrazilianPhonesEquivalent(phone, blocked)) return true;
-    }
-    return false;
-  }
-
-  const debtorsFiltered = ((debtorsRes.data ?? []) as any[]).filter(
-    (d) => !debtorPhoneIsBlocked(String(d?.telefone ?? "")),
-  );
-  const schedulesFiltered = ((schedulesRes.data ?? []) as any[]).filter((s) => {
-    const debtorId = String((s as any)?.debtor_id ?? "");
-    if (!debtorId) return true;
-    const phone = debtorTelefoneById.get(debtorId) ?? "";
-    if (!debtorPhoneIsBlocked(phone)) return true;
-    return false;
-  });
-
-  const schedules = schedulesFiltered as any[];
+  const debtorsFiltered = (debtorsRes.data ?? []) as any[];
+  const schedules = (schedulesRes.data ?? []) as any[];
   const latestExecutedRunBySchedule = new Map<string, string>();
   for (const run of scheduleRunsRes.data ?? []) {
     const scheduleId = String((run as any)?.schedule_id ?? "");
@@ -222,6 +175,21 @@ export default async function DashboardPage() {
     last_executed_scheduled_for:
       latestExecutedRunBySchedule.get(String((s as any).id ?? "")) ?? null,
   }));
+  const debtorsWithStatus = applyCurrentMonthDebtorStatuses({
+    debtors: (debtorsFiltered as any[]).map((row) => ({
+      ...row,
+      status: row.status ?? "ativo",
+      charges: ((row as any)?.debtor_charges ?? []).map((c: any) => ({
+        ...c,
+        amount: typeof c?.amount === "number" ? c.amount : Number(c?.amount),
+        due_day: typeof c?.due_day === "number" ? c.due_day : Number(c?.due_day),
+        recurrence_month: typeof c?.recurrence_month === "number" ? c.recurrence_month : Number(c?.recurrence_month),
+        recurrence_year: typeof c?.recurrence_year === "number" ? c.recurrence_year : Number(c?.recurrence_year),
+      })),
+    })),
+    schedules: schedulesWithLatestRun as any[],
+    nowUtcIso: now.toISOString(),
+  });
   const tzRaw = (profileRes as any)?.data?.timezone;
   const timeZone = BRAZIL_TIMEZONES.includes(tzRaw) ? (tzRaw as BrazilTimeZone) : null;
   const effectiveTimeZone: BrazilTimeZone = timeZone ?? "America/Sao_Paulo";
@@ -250,7 +218,6 @@ export default async function DashboardPage() {
 
   let receivableMonthTotal = 0;
   let receivableMonthPaid = 0;
-
   const schedulesByDebtor = new Map<string, any[]>();
   for (const schedule of schedulesWithLatestRun) {
     const debtorId = String(schedule?.debtor_id ?? "");
@@ -262,7 +229,7 @@ export default async function DashboardPage() {
 
   const nowUtcIso = now.toISOString();
 
-  for (const debtor of debtorsFiltered as any[]) {
+  for (const debtor of debtorsWithStatus as any[]) {
     const debtorId = String(debtor?.id ?? "");
     if (!debtorId) continue;
     const baseAmountRaw = debtor?.valor;

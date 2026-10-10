@@ -12,7 +12,7 @@ const DEBTORS_SELECT =
   "id, nome, telefone, valor, vencimento, pix_key, observacoes, status, accumulate_open_monthly_charges, skip_weekends_on_first_charge, retry_weekdays, retry_time, retry_max_attempts, retry_interval_days, retry_auto_close_days, created_at, debtor_charges(id, amount, due_day, recurrence_month, recurrence_year, created_at)";
 
 const SCHEDULES_SELECT =
-  "id, debtor_id, charge_id, status, recurrence, data_envio, charge_due_at, first_sent_at, last_sent_at, payment_received_at, schedule_timezone, closed_at";
+  "id, debtor_id, charge_id, template_id, template_pending_id, template_overdue_id, status, recurrence, recurrence_until, recurrence_day, recurrence_time, data_envio, charge_due_at, first_sent_at, last_sent_at, payment_received_at, schedule_timezone, created_at, closed_at, charge:debtor_charges!schedules_charge_id_fkey(due_day, recurrence_month, recurrence_year), pending_template:message_templates!schedules_template_pending_id_fkey(nome), overdue_template:message_templates!schedules_template_overdue_id_fkey(nome)";
 
 type ClientesQueryResult<T> = {
   data: T[] | null;

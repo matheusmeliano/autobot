@@ -203,8 +203,14 @@ export async function GET(req: Request) {
         continue;
       }
       if (!["scheduled", "booked", "attended", "no_show", "completed"].includes(status)) continue;
-      if (bookingsByLeadId.has(leadId)) continue;
-      bookingsByLeadId.set(leadId, candidate);
+      const candidateMs = parseStartAtMs((booking as any).professor_start_at || (booking as any).lead_start_at);
+      const current = bookingsByLeadId.get(leadId);
+      const currentMs = current
+        ? parseStartAtMs(current.professor_start_at || current.lead_start_at)
+        : -1;
+      if (!current || candidateMs > currentMs) {
+        bookingsByLeadId.set(leadId, candidate);
+      }
     }
     for (const booking of bookings ?? []) {
       const id = String((booking as any)?.id ?? "");

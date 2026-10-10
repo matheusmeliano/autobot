@@ -3,6 +3,11 @@ import { requireAtendimentoUser, maybeNotifyRegisteredAttendantAboutExperimental
 import { isAtendimentoOnlyAccessScope, normalizeAccessScope } from "@/lib/auth/access";
 import { ATENDIMENTO_PROFESSOR_TIME_ZONE } from "@/lib/atendimento/constants";
 import { calculatePastRecurringOccurrences } from "@/lib/atendimento/experimentalClass";
+import {
+  inferTimeZoneFromPhoneCountryCode,
+  resolveTimeZoneFromCityInput,
+  resolveTimeZoneFromStateInput,
+} from "@/lib/timezone";
 import { z } from "zod";
 
 function isExperimentalClassBookingsTableUnavailable(error: unknown) {
@@ -164,6 +169,14 @@ export async function GET(request: Request, context: { params: Promise<{ leadId:
     let latestPastExpBooking: any = null;
     let isCancelledFromTable = false;
 
+    let futureBestCandidate: any = null;
+    let futureBestMs = -1;
+    let futureEarliestCandidate: any = null;
+    let futureEarliestMs = -1;
+    let latestPastBestMs = -1;
+    let latestLiveByStartAt: any = null;
+    let latestLiveByStartAtMs = -1;
+
     for (const b of bookings ?? []) {
       const id = String((b as any)?.id ?? "");
       const status = String((b as any)?.status ?? "").trim().toLowerCase();
@@ -191,40 +204,23 @@ export async function GET(request: Request, context: { params: Promise<{ leadId:
       }
       if (!["scheduled", "booked", "attended", "no_show", "completed"].includes(status)) continue;
       if (!existingBookingRaw) existingBookingRaw = candidate;
-    }
-
-    const preferredBookingId = String((lead as any)?.experimental_class_booking_id ?? "").trim();
-    if (preferredBookingId) {
-      preferredBooking = bookingsById.get(preferredBookingId) ?? null;
-    }
-    existingBookingRaw = preferredBooking ?? existingBookingRaw ?? existingIncludingCancelled ?? null;
-
-    for (const b of bookings ?? []) {
-      const status = String((b as any)?.status ?? "").trim().toLowerCase();
-      if (status === "cancelled") continue;
-      if (!["scheduled", "booked", "attended", "no_show", "completed"].includes(status)) continue;
       const cMs = parseStartAtMs((b as any).professor_start_at || (b as any).lead_start_at);
+      if (cMs > 0 && cMs > latestLiveByStartAtMs) {
+        latestLiveByStartAtMs = cMs;
+        latestLiveByStartAt = candidate;
+      }
       if (cMs >= nowMs) {
-        const curFutureMs = futureExpBooking
-          ? parseStartAtMs(futureExpBooking.professor_start_at || futureExpBooking.lead_start_at)
-          : 0;
-        if (curFutureMs <= 0 || (cMs > 0 && cMs < curFutureMs)) {
-          futureExpBooking = {
-            ...(b as any),
-            lesson_link: String((b as any)?.lesson_link ?? "").trim() || null,
-            student_start_notification_sent_at: String((b as any)?.student_start_notification_sent_at ?? "").trim() || null,
-            attendant_start_notification_sent_at: String((b as any)?.attendant_start_notification_sent_at ?? "").trim() || null,
-            attendance_status: String((b as any)?.attendance_status ?? "").trim() || null,
-            attendance_checked_at: null,
-            professor_timezone: String((b as any)?.professor_timezone ?? "").trim() || ATENDIMENTO_PROFESSOR_TIME_ZONE,
-            source: "table",
-          };
+        if (futureEarliestMs <= 0 || (cMs > 0 && cMs < futureEarliestMs)) {
+          futureEarliestMs = cMs;
+          futureEarliestCandidate = candidate;
+        }
+        if (cMs > futureBestMs) {
+          futureBestMs = cMs;
+          futureBestCandidate = candidate;
         }
       } else if (cMs > 0 && cMs < nowMs) {
-        const curPastMs = latestPastExpBooking
-          ? parseStartAtMs(latestPastExpBooking.professor_start_at || latestPastExpBooking.lead_start_at)
-          : 0;
-        if (cMs > curPastMs) {
+        if (cMs > latestPastBestMs) {
+          latestPastBestMs = cMs;
           latestPastExpBooking = {
             ...(b as any),
             lesson_link: String((b as any)?.lesson_link ?? "").trim() || null,
@@ -238,6 +234,43 @@ export async function GET(request: Request, context: { params: Promise<{ leadId:
         }
       }
     }
+
+    const preferredBookingId = String((lead as any)?.experimental_class_booking_id ?? "").trim();
+    if (preferredBookingId) {
+      preferredBooking = bookingsById.get(preferredBookingId) ?? null;
+    }
+    {
+      const preferredValid =
+        preferredBooking &&
+        String((preferredBooking as any)?.status ?? "").trim().toLowerCase() !== "cancelled";
+      if (latestLiveByStartAt) {
+        const prefStartMs = preferredValid
+          ? parseStartAtMs(
+              (preferredBooking as any)?.professor_start_at ||
+                (preferredBooking as any)?.lead_start_at,
+            )
+          : -1;
+        if (
+          latestLiveByStartAtMs > 0 &&
+          prefStartMs > 0 &&
+          latestLiveByStartAtMs >= prefStartMs
+        ) {
+          existingBookingRaw = latestLiveByStartAt;
+        } else if (preferredValid) {
+          existingBookingRaw = preferredBooking;
+        } else {
+          existingBookingRaw =
+            latestLiveByStartAt ?? existingBookingRaw ?? existingIncludingCancelled ?? null;
+        }
+      } else {
+        existingBookingRaw =
+          preferredValid
+            ? preferredBooking
+            : existingBookingRaw ?? existingIncludingCancelled ?? null;
+      }
+    }
+
+    futureExpBooking = futureEarliestCandidate ?? futureBestCandidate ?? null;
 
     let cancelledAt: string | null = null;
     let cancelledProfSnap: {
@@ -1396,6 +1429,76 @@ export async function PATCH(request: Request, context: { params: Promise<{ leadI
   if (safeExpProfessorPhone !== undefined) updateData.experimental_class_professor_phone = safeExpProfessorPhone;
   if (safeExpBookingId !== undefined) updateData.experimental_class_booking_id = safeExpBookingId;
   if (safeInternalNotes !== undefined) updateData.internal_notes = safeInternalNotes;
+
+  const cityOrStateTouched = safeCity !== undefined || safeState !== undefined;
+  const timeZoneMissingFromRequest = safeTimezone === undefined;
+  const countryMissingFromRequest = safeCountry === undefined;
+
+  if (cityOrStateTouched && (timeZoneMissingFromRequest || countryMissingFromRequest)) {
+    let existingPhone: string | null = null;
+    try {
+      const existingForFallback = await admin
+        .from("atendimento_leads")
+        .select("id, phone, timezone, country")
+        .eq("id", leadId)
+        .maybeSingle();
+      if (existingForFallback?.data) {
+        existingPhone = String((existingForFallback.data as any).phone ?? "").trim() || null;
+      }
+    } catch (_fb) {}
+
+    const effectiveCity = safeCity !== undefined
+      ? safeCity
+      : null;
+    const effectiveState = safeState !== undefined
+      ? safeState
+      : null;
+
+    let resolvedTz: string | null = null;
+    let resolvedCountry: string | null = null;
+
+    if (effectiveCity) {
+      const cityRes = resolveTimeZoneFromCityInput({
+        city: effectiveCity ?? "",
+        state: effectiveState ?? undefined,
+        phone: existingPhone ?? undefined,
+        allowPhoneCountryFallback: true,
+      });
+      if (cityRes?.timeZone) {
+        resolvedTz = cityRes.timeZone;
+        resolvedCountry =
+          cityRes.country === "BR" ? "Brasil" : cityRes.country === "US" ? "Estados Unidos" : null;
+      }
+    }
+
+    if (!resolvedTz && effectiveState) {
+      const stateRes = resolveTimeZoneFromStateInput({
+        state: effectiveState ?? "",
+        phone: existingPhone ?? undefined,
+      });
+      if (stateRes?.timeZone) {
+        resolvedTz = stateRes.timeZone;
+        resolvedCountry =
+          stateRes.country === "BR" ? "Brasil" : stateRes.country === "US" ? "Estados Unidos" : null;
+      }
+    }
+
+    if (!resolvedTz) {
+      const phoneFb = inferTimeZoneFromPhoneCountryCode(existingPhone);
+      if (phoneFb?.timeZone) {
+        resolvedTz = phoneFb.timeZone;
+        resolvedCountry =
+          phoneFb.country === "BR" ? "Brasil" : phoneFb.country === "US" ? "Estados Unidos" : null;
+      }
+    }
+
+    if (timeZoneMissingFromRequest && resolvedTz) {
+      updateData.timezone = resolvedTz;
+    }
+    if (countryMissingFromRequest && resolvedCountry) {
+      updateData.country = resolvedCountry;
+    }
+  }
 
   if (Object.keys(updateData).length === 0) {
     return Response.json({ ok: true, lead: null });

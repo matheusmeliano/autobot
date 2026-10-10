@@ -2,7 +2,12 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { botReplyForLead, extractLeadDataFromMessage, filterCapturedDataForLead, getNextMissingField, initialBotMessages } from "./bot.ts";
 import { buildExperimentalClassDatePromptMessages, EXPERIMENTAL_CLASS_DATE_PROMPT_MESSAGE } from "./constants.ts";
-import { resolveTimeZoneFromCityInput, resolveTimeZoneFromStateInput } from "../timezone.ts";
+import {
+  __DEBUG_EXTENDED_COUNT,
+  containsLocalityStructuralType,
+  resolveTimeZoneFromCityInput,
+  resolveTimeZoneFromStateInput,
+} from "../timezone.ts";
 
 test("extractLeadDataFromMessage captura apenas nome, captura de telefone e proibida para evitar contatos importados", () => {
   const data = extractLeadDataFromMessage(
@@ -297,4 +302,146 @@ test("resolveTimeZoneFromCityInput falha sem fallback quando a cidade nao for re
   });
 
   assert.equal(resolution, null);
+});
+
+test("[extended] mapa de localidades extendidas carregou com sucesso (BASE + EXTENDED)", () => {
+  assert.ok(Number.isFinite(__DEBUG_EXTENDED_COUNT));
+  assert.ok(__DEBUG_EXTENDED_COUNT > 200, `Esperado regras > 200, obtido ${__DEBUG_EXTENDED_COUNT}`);
+});
+
+test("[extended] containsLocalityStructuralType detecta prefixos estruturais PT/EN/ES", () => {
+  assert.equal(containsLocalityStructuralType("Vila Maria Alta"), true);
+  assert.equal(containsLocalityStructuralType("vilarejo de paz"), true);
+  assert.equal(containsLocalityStructuralType("Edison Township NJ"), true);
+  assert.equal(containsLocalityStructuralType("The Villages Florida"), true);
+  assert.equal(containsLocalityStructuralType("Colonia Socorro TX"), true);
+  assert.equal(containsLocalityStructuralType("Distrito Federal"), true);
+  assert.equal(containsLocalityStructuralType("Gated Community West Palm Beach"), true);
+  assert.equal(containsLocalityStructuralType("Comunidade Planejada Sorocaba SP"), true);
+  assert.equal(containsLocalityStructuralType("Cidade-distrito de Teste"), true);
+  assert.equal(containsLocalityStructuralType("Town of Truckee CA"), true);
+  assert.equal(containsLocalityStructuralType("Orlando Florida"), false, "Cidade normal nao deve disparar structural");
+  assert.equal(containsLocalityStructuralType("São Paulo"), false);
+});
+
+test("[extended] resolveTimeZoneFromCityInput reconhece Vila SP com estado (city_match ou extended)", () => {
+  const resolution = resolveTimeZoneFromCityInput({
+    state: "São Paulo",
+    city: "Vila Maria Alta, SP",
+    phone: "+55 11 99999-9999",
+    allowPhoneCountryFallback: false,
+  });
+
+  assert.ok(resolution, "Resolução nao pode ser null para Vila SP");
+  assert.equal(resolution?.timeZone, "America/Sao_Paulo");
+  assert.equal(resolution?.country, "BR");
+  assert.ok(
+    resolution?.source === "city_match" || resolution?.source === "extended_locality_match",
+    `source inesperado: ${resolution?.source}`,
+  );
+});
+
+test("[extended] resolveTimeZoneFromCityInput reconhece Edison Township NJ", () => {
+  const resolution = resolveTimeZoneFromCityInput({
+    state: "NJ",
+    city: "Edison Township",
+    phone: "+1 732 555 9988",
+    allowPhoneCountryFallback: false,
+  });
+
+  assert.ok(resolution, "Edison Township NJ deve ser reconhecido");
+  assert.equal(resolution?.timeZone, "America/New_York");
+  assert.equal(resolution?.country, "US");
+  assert.ok(
+    resolution?.source === "city_match" || resolution?.source === "extended_locality_match",
+  );
+});
+
+test("[extended] resolveTimeZoneFromCityInput reconhece The Villages FL", () => {
+  const resolution = resolveTimeZoneFromCityInput({
+    state: "FL",
+    city: "The Villages",
+    phone: "+1 352 555 9988",
+    allowPhoneCountryFallback: false,
+  });
+
+  assert.ok(resolution, "The Villages FL deve ser reconhecido");
+  assert.equal(resolution?.timeZone, "America/New_York");
+  assert.equal(resolution?.country, "US");
+});
+
+test("[extended] resolveTimeZoneFromCityInput reconhece colonia Socorro/El Paso TX (fronteira)", () => {
+  const resolution = resolveTimeZoneFromCityInput({
+    state: "TX",
+    city: "Colonia Socorro El Paso Texas",
+    phone: "+1 915 555 9988",
+    allowPhoneCountryFallback: false,
+  });
+
+  assert.ok(resolution, "Colonia Socorro TX deve ser reconhecida");
+  assert.ok(
+    resolution.timeZone === "America/Denver" || resolution.timeZone === "America/Chicago",
+    `Timezone deve ser America/Denver (El Paso area MT) ou America/Chicago; obtido ${resolution.timeZone}`,
+  );
+  assert.equal(resolution?.country, "US");
+});
+
+test("[extended] resolveTimeZoneFromCityInput aceita nomes longos com numeros (tipo estrutural ativa graca 13 tokens)", () => {
+  const longName = "Colonia 4 de Março Socorro El Paso TX County";
+  const tokens = longName.split(/\s+/).filter(Boolean).length;
+  assert.ok(tokens > 8, `Nome precisa ter >8 tokens para ativar o teste, obtido ${tokens}`);
+  const resolution = resolveTimeZoneFromCityInput({
+    state: "Texas",
+    city: longName,
+    phone: "+1 915 555 0000",
+    allowPhoneCountryFallback: true,
+  });
+
+  assert.ok(
+    resolution !== null,
+    `Colonia longa com numeros deve ser aceita quando estrutural ativado. Tokens=${tokens}`,
+  );
+  assert.equal(resolution?.country, "US");
+});
+
+test("[extended] resolveTimeZoneFromCityInput reconhece cidade-distrito / DF com state_match ou melhor", () => {
+  const resolution = resolveTimeZoneFromCityInput({
+    state: "DF",
+    city: "Plano Piloto Distrito Federal",
+    phone: "+55 61 99999-9999",
+    allowPhoneCountryFallback: true,
+  });
+
+  assert.ok(resolution, "DF deve resolver");
+  assert.equal(resolution?.country, "BR");
+  assert.equal(resolution?.timeZone, "America/Sao_Paulo");
+});
+
+test("[extended] resolveTimeZoneFromCityInput Westfield NJ town/CDP resolve America/New_York", () => {
+  const resolution = resolveTimeZoneFromCityInput({
+    state: "New Jersey",
+    city: "Westfield NJ town",
+    phone: "+1 908 555 1234",
+    allowPhoneCountryFallback: false,
+  });
+
+  assert.ok(resolution, "Westfield NJ town deve ser reconhecido");
+  assert.equal(resolution?.country, "US");
+  assert.equal(resolution?.timeZone, "America/New_York");
+});
+
+test("[extended] resolveTimeZoneFromCityInput não quebra cidades normais existentes (Orlando, Primavera do Leste)", () => {
+  const orlando = resolveTimeZoneFromCityInput({
+    state: "FL", city: "Orlando", phone: "+1 321 555 0000", allowPhoneCountryFallback: false,
+  });
+  assert.equal(orlando?.city, "orlando");
+  assert.equal(orlando?.timeZone, "America/New_York");
+  assert.equal(orlando?.source, "city_match");
+
+  const primavera = resolveTimeZoneFromCityInput({
+    state: "MT", city: "Primavera do Leste", phone: "+55 65 99999-0000", allowPhoneCountryFallback: false,
+  });
+  assert.equal(primavera?.city, "primavera do leste");
+  assert.equal(primavera?.timeZone, "America/Cuiaba");
+  assert.equal(primavera?.country, "BR");
 });

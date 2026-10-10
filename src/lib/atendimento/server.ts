@@ -1646,31 +1646,36 @@ export async function sendExperimentalClassStartNotifications(now = new Date()) 
     }
 
     const CRON_GRACE_MS = 2 * 60 * 1000;
+    const CRON_LATE_RECOVERY_MS = 4 * 60 * 60 * 1000;
     const attendantFireMs =
       professorStartAtMs - EXPERIMENTAL_CLASS_ATTENDANT_START_REMINDER_MINUTES * 60_000;
     const attendantWindowEndMs = attendantFireMs + CRON_GRACE_MS;
+    const attendantLateWindowEndMs = attendantFireMs + CRON_LATE_RECOVERY_MS;
     const studentFireMs = leadStartAtMs;
     const studentWindowEndMs = studentFireMs + CRON_GRACE_MS;
+    const studentLateWindowEndMs = studentFireMs + CRON_LATE_RECOVERY_MS;
     const attendantDue =
       !cachedAttendantSent &&
       nowMs >= attendantFireMs &&
-      nowMs <= attendantWindowEndMs;
+      nowMs <= attendantLateWindowEndMs;
     const registeredAttendantDue =
       !cachedRegisteredAttendantSent &&
       nowMs >= attendantFireMs &&
-      nowMs <= attendantWindowEndMs;
+      nowMs <= attendantLateWindowEndMs;
     const studentDue =
       !cachedStudentSent &&
       nowMs >= studentFireMs &&
-      nowMs <= studentWindowEndMs;
+      nowMs <= studentLateWindowEndMs;
     if (process.env.NODE_ENV !== "production" || attendantDue || registeredAttendantDue || studentDue) {
       const profDate = new Date(professorStartAtMs);
       const studDate = new Date(studentFireMs);
       const fireProf = new Date(attendantFireMs);
       const fireWinEnd = new Date(attendantWindowEndMs);
+      const fireWinLateEnd = new Date(attendantLateWindowEndMs);
       const studentWinEnd = new Date(studentWindowEndMs);
+      const studentWinLateEnd = new Date(studentLateWindowEndMs);
       console.log(
-        `[cron-exp-bookings] booking=${bookingId} lead=${leadId} now=${new Date(nowMs).toISOString()} profStart=${profDate.toISOString()} leadFire(student)=${studDate.toISOString()} profFire(H-5)=${fireProf.toISOString()} profWin=[${fireProf.toISOString()}~${fireWinEnd.toISOString()}] studentWin=[${studDate.toISOString()}~${studentWinEnd.toISOString()}] attendantDue=${String(attendantDue)} regAttDue=${String(registeredAttendantDue)} studentDue=${String(studentDue)} cachedSent(att/reg/stud)=${String(cachedAttendantSent)}/${String(cachedRegisteredAttendantSent)}/${String(cachedStudentSent)} source=${String((booking as any).source ?? "unknown")}`,
+        `[cron-exp-bookings] booking=${bookingId} lead=${leadId} now=${new Date(nowMs).toISOString()} profStart=${profDate.toISOString()} leadFire(student)=${studDate.toISOString()} profFire(H-5)=${fireProf.toISOString()} profWin=[${fireProf.toISOString()}~${fireWinEnd.toISOString()}|lateUntil=${fireWinLateEnd.toISOString()}] studentWin=[${studDate.toISOString()}~${studentWinEnd.toISOString()}|lateUntil=${studentWinLateEnd.toISOString()}] attendantDue=${String(attendantDue)} regAttDue=${String(registeredAttendantDue)} studentDue=${String(studentDue)} cachedSent(att/reg/stud)=${String(cachedAttendantSent)}/${String(cachedRegisteredAttendantSent)}/${String(cachedStudentSent)} source=${String((booking as any).source ?? "unknown")}`,
       );
     }
 
@@ -2055,23 +2060,39 @@ export async function sendRecurringClassStartNotifications(now = new Date()) {
     const cachedRegisteredAttendantSent = registeredAttendantOccurrenceAlreadySent;
 
     const RECURRING_CRON_GRACE_MS = 2 * 60 * 1000;
+    const RECURRING_CRON_LATE_RECOVERY_MS = 4 * 60 * 60 * 1000;
     const attendantFireMs =
       professorStartAtMsFinal - RECURRING_CLASS_ATTENDANT_START_REMINDER_MINUTES * 60_000;
     const attendantWindowEndMs = attendantFireMs + RECURRING_CRON_GRACE_MS;
+    const attendantLateWindowEndMs = attendantFireMs + RECURRING_CRON_LATE_RECOVERY_MS;
     const studentFireMs = leadStartAtMsFinal;
     const studentWindowEndMs = studentFireMs + RECURRING_CRON_GRACE_MS;
+    const studentLateWindowEndMs = studentFireMs + RECURRING_CRON_LATE_RECOVERY_MS;
     const attendantDue =
       !cachedAttendantSent &&
       nowMs >= attendantFireMs &&
-      nowMs <= attendantWindowEndMs;
+      nowMs <= attendantLateWindowEndMs;
     const registeredAttendantDue =
       !cachedRegisteredAttendantSent &&
       nowMs >= attendantFireMs &&
-      nowMs <= attendantWindowEndMs;
+      nowMs <= attendantLateWindowEndMs;
     const studentDue =
       !cachedStudentSent &&
       nowMs >= studentFireMs &&
-      nowMs <= studentWindowEndMs;
+      nowMs <= studentLateWindowEndMs;
+
+    if (process.env.NODE_ENV !== "production" || attendantDue || registeredAttendantDue || studentDue) {
+      const profDate = new Date(professorStartAtMsFinal);
+      const studDate = new Date(studentFireMs);
+      const fireProf = new Date(attendantFireMs);
+      const fireWinEnd = new Date(attendantWindowEndMs);
+      const fireWinLateEnd = new Date(attendantLateWindowEndMs);
+      const studentWinEnd = new Date(studentWindowEndMs);
+      const studentWinLateEnd = new Date(studentLateWindowEndMs);
+      console.log(
+        `[cron-recurring-class] lead=${leadId} now=${new Date(nowMs).toISOString()} profStart=${profDate.toISOString()} leadFire(student)=${studDate.toISOString()} profFire(H-5)=${fireProf.toISOString()} profWin=[${fireProf.toISOString()}~${fireWinEnd.toISOString()}|lateUntil=${fireWinLateEnd.toISOString()}] studentWin=[${studDate.toISOString()}~${studentWinEnd.toISOString()}|lateUntil=${studentWinLateEnd.toISOString()}] attendantDue=${String(attendantDue)} regAttDue=${String(registeredAttendantDue)} studentDue=${String(studentDue)} cachedSent(att/reg/stud)=${String(cachedAttendantSent)}/${String(cachedRegisteredAttendantSent)}/${String(cachedStudentSent)} weekday=${weekdayRaw} profTime=${professorTimeHHMM}`,
+      );
+    }
 
     const weekdayLabel =
       (RECURRING_WEEKDAY_LABELS_PT_BR as Record<string, string>)[weekdayRaw] ??
@@ -3945,7 +3966,6 @@ export function isLeadRecurringRegistrationConcluded(lead: unknown): boolean {
     funnelRaw === "matricula_confirmada"
   );
 }
-
 export async function ensureStudentAuthUserCreatedForLead(params: {
   admin: ReturnType<typeof createSupabaseAdminClient>;
   leadId: string;
@@ -4254,7 +4274,6 @@ export async function confirmLeadRecurringPayment(params: {
     String((lead as any).status ?? "").trim() === "matricula_confirmada" ||
     String((lead as any).funnel_stage ?? "").trim() === "matriculado" ||
     String((lead as any).funnel_stage ?? "").trim() === "matricula_confirmada";
-
   const now = new Date().toISOString();
   const patch: any = {
     payment_status: "confirmado",

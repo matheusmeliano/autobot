@@ -66,6 +66,7 @@ import {
   detectLenientYesNo,
 } from "@/lib/atendimento/server";
 import {
+  containsLocalityStructuralType,
   inferBrazilianLocationFromDdd,
   inferTimeZoneFromPhoneCountryCode,
   resolveTimeZoneFromCityInput,
@@ -657,24 +658,35 @@ const MAX_LOCATION_WHATSAPP_ATTEMPTS = 3;
 const MAX_SCHEDULE_WHATSAPP_ATTEMPTS = 3;
 
 function isValidCityInput(raw: string): { valid: boolean; reason?: string } {
-  const value = String(raw ?? "")
+  const hasStructural = containsLocalityStructuralType(raw ?? "");
+  const valueClean = String(raw ?? "")
     .toLowerCase()
     .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .replace(/[^a-z\s]/g, " ")
-    .replace(/\s+/g, " ")
-    .trim();
+    .replace(/[\u0300-\u036f]/g, "");
+  const value = hasStructural
+    ? valueClean
+        .replace(/[^a-z0-9\s]/g, " ")
+        .replace(/\s+/g, " ")
+        .trim()
+    : valueClean
+        .replace(/[^a-z\s]/g, " ")
+        .replace(/\s+/g, " ")
+        .trim();
   if (!value) return { valid: false, reason: "empty" };
   if (value.length < 3) return { valid: false, reason: "too_short" };
   if (/^[a-z]+$/.test(value) && value.length >= 10) {
     const vowels = (value.match(/[aeiou]/g) ?? []).length;
     const consonants = (value.match(/[bcdfghjklmnpqrstvwxyz]/g) ?? []).length;
     const total = vowels + consonants;
-    if (total >= 10 && vowels / total < 0.2) return { valid: false, reason: "low_vowels" };
+    if (!hasStructural && total >= 10 && vowels / total < 0.2) return { valid: false, reason: "low_vowels" };
+    if (hasStructural && total >= 14 && vowels / total < 0.12) return { valid: false, reason: "low_vowels" };
     const unique = new Set(value.split("")).size;
-    if (unique / value.length < 0.55) return { valid: false, reason: "low_unique" };
+    const minUniqueRatio = hasStructural ? 0.4 : 0.55;
+    if (unique / value.length < minUniqueRatio) return { valid: false, reason: "low_unique" };
   }
-  if (!/[aeiou]/.test(value)) return { valid: false, reason: "no_vowels" };
+  const stripped = value.replace(/[^a-z]/g, "");
+  if (!stripped) return { valid: false, reason: "no_letters" };
+  if (!/[aeiou]/.test(stripped)) return { valid: false, reason: "no_vowels" };
   return { valid: true };
 }
 
@@ -683,7 +695,11 @@ function cityResolutionIsReliable(
   params?: { stateSoFarCountry?: "BR" | "US" | null },
 ): resolution is NonNullable<ReturnType<typeof resolveTimeZoneFromCityInput>> {
   if (!resolution) return false;
-  if (resolution.source !== "city_match" && resolution.source !== "state_match") return false;
+  if (
+    resolution.source !== "city_match" &&
+    resolution.source !== "state_match" &&
+    resolution.source !== "extended_locality_match"
+  ) return false;
   if (!String(resolution.city ?? "").trim()) return false;
   const city = String(resolution.city ?? "").trim().toLowerCase();
   const state = String(resolution.state ?? "").trim().toLowerCase();
@@ -5296,7 +5312,8 @@ export async function POST(req: Request) {
             : null;
           const stateSoFarCountry = stateSoFarCountryRaw?.country ?? null;
           const inputCheck = isValidCityInput(inboundContent);
-          const rawResolved = inputCheck.valid
+          const hasStructuralType = containsLocalityStructuralType(inboundContent);
+          let rawResolved = inputCheck.valid
             ? resolveTimeZoneFromCityInput({
                 city: inboundContent,
                 state: stateSoFar || null,
@@ -5304,6 +5321,14 @@ export async function POST(req: Request) {
                 allowPhoneCountryFallback: false,
               })
             : null;
+          if (!rawResolved && hasStructuralType && inputCheck.valid) {
+            rawResolved = resolveTimeZoneFromCityInput({
+              city: inboundContent,
+              state: stateSoFar || null,
+              phone: normalizedPhoneOnly,
+              allowPhoneCountryFallback: true,
+            });
+          }
           const resolved = cityResolutionIsReliable(rawResolved, { stateSoFarCountry }) ? rawResolved : null;
           const resolvedCityValue = String(resolved?.city ?? "").trim();
           if (resolved && !resolvedCityValue) {

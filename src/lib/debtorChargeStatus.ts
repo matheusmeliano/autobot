@@ -188,17 +188,17 @@ function isSchedulePaidForReferenceMonth(params: {
   scheduleTimeZone: string;
 }) {
   const timeZone = String(params.row.schedule_timezone ?? "").trim() || params.scheduleTimeZone;
-  if (isPaidSchedule(params.row, timeZone)) {
-    const paymentLocalDate =
-      scheduleLocalDate(params.row.payment_received_at ?? null, timeZone) ??
-      scheduleLocalDate(params.row.closed_at ?? null, timeZone);
-    if (paymentLocalDate?.slice(0, 7) === params.referenceYearMonth) return true;
+  if (!isPaidSchedule(params.row, timeZone)) return false;
 
-    const scheduleReferenceDate = scheduleReferenceLocalDate(params.row, timeZone);
-    if (scheduleReferenceDate?.slice(0, 7) === params.referenceYearMonth) return true;
-  }
+  const paymentLocalDate =
+    scheduleLocalDate(params.row.payment_received_at ?? null, timeZone) ??
+    scheduleLocalDate(params.row.closed_at ?? null, timeZone);
+  if (paymentLocalDate?.slice(0, 7) === params.referenceYearMonth) return true;
 
-  return rolledForwardReferenceYearMonth(params.row, timeZone) === params.referenceYearMonth;
+  const scheduleReferenceDate = scheduleReferenceLocalDate(params.row, timeZone);
+  if (scheduleReferenceDate?.slice(0, 7) === params.referenceYearMonth) return true;
+
+  return false;
 }
 
 function getMatchingSchedulesForCharge(params: {

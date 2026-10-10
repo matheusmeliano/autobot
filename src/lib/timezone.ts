@@ -19,7 +19,7 @@ export type CityTimeZoneResolution = {
   timeZone: string;
   teacherTimeZone: string;
   country: "BR" | "US" | null;
-  source: "city_match" | "state_match" | "phone_country_fallback";
+  source: "city_match" | "state_match" | "phone_country_fallback" | "extended_locality_match";
 };
 
 export type StateTimeZoneResolution = {
@@ -99,7 +99,10 @@ export const BRAZIL_TIMEZONES = [
 
 export type BrazilTimeZone = (typeof BRAZIL_TIMEZONES)[number];
 
-const CITY_TIME_ZONE_RULES: CityTimeZoneRule[] = [
+// ================================================================
+// STEP 0 — BASE (imutável). CITY_TIME_ZONE_RULES original, sem mod.
+// ================================================================
+const BASE_CITY_TIME_ZONE_RULES: CityTimeZoneRule[] = [
   {
     timeZone: "America/Chicago",
     country: "US",
@@ -2018,6 +2021,636 @@ const CITY_TIME_ZONE_RULES: CityTimeZoneRule[] = [
   },
 ];
 
+// ================================================================
+// STEP 1.1 — LOCALITY_TYPES_TO_INCLUDE (tipos habitados)
+// PT-BR, EN, ES (colonias México). Usado em parsing/lookup.
+// ================================================================
+const LOCALITY_TYPES_TO_INCLUDE: string[] = [
+  // PT-BR
+  "vila", "vilarejo", "distrito", "cidade distrito", "cidade-distrito",
+  "municipio", "condominio", "condominio fechado", "comunidade planejada",
+  "comunidade fechada", "loteamento", "bairro", "residencial", "nucleo habitacional",
+  "colonia", "colonias", "aldeia", "povoado", "povoado rural", "aglomerado",
+  // EN
+  "village", "villages", "town", "towns", "township", "townships",
+  "census designated place", "cdp",
+  "planned community", "planned unit development", "pud",
+  "gated community", "gated", "neighborhood",
+  "hamlet", "settlement",
+  // ES
+  "colonia", "colonias", "comunidad", "comunidades", "comunidad cerrada",
+  "fraccionamiento", "ejido", "pueblo", "cabecera municipal",
+];
+
+// ================================================================
+// STEP 1.2 — EXTENDED_LOCALITIES_BY_STATE_KEY
+// Localidades habitadas não-municipais. Chave = stateKeyword (normalizado).
+// Conteúdo = arrays de keywords para append nas regras correspondentes.
+// ================================================================
+const EXTENDED_LOCALITIES_BY_STATE_KEY: Record<string, string[]> = {
+  // ================================================================
+  // BR — SÃO PAULO (SP) — TZ America/Sao_Paulo
+  // ================================================================
+  "sao paulo": [
+    // SP - Distritos e vilas de capital + interior
+    "vila maria", "vila maria alta", "vila guilherme", "vila formosa",
+    "vila prudente", "vila matilde", "vila das mercês", "vila cordeiro",
+    "vila romana", "vila ema", "vila clementino", "vila sônia", "vila andrade",
+    "vila carrão", "vila alpina", "vila bandeirante", "vila butantã",
+    "vila madalena", "vila leopoldina", "vila pompeia", "vila da penha",
+    "vila operaria", "vila dos remédios", "vila da saude", "vila do ipiranga",
+    "vila domingos luiz", "vila galvão bueno", "vila inhaguacutu",
+    "vila jabaquara", "vila jacuí", "vila leonel", "vila mariana",
+    "vila mazzei", "vila medeiros", "vila melo", "vila mirna", "vila monforte",
+    "vila monteiro", "vila moreira", "vila nastari", "vila nova davis",
+    "vila nova esperança", "vila nova savina", "vila olímpia", "vila palmares",
+    "vila pereira", "vila petra", "vila pinheiro", "vila pompeia", "vila porto",
+    "vila prudente", "vila rebaixada", "vila regina", "vila riacho grande",
+    "vila rodrigues", "vila romana", "vila ruela", "vila sabaúna",
+    "vila sagrado coração de jesus", "vila salles", "vila santo antonio",
+    "vila são benedito", "vila são cristovão", "vila são francisco de paula",
+    "vila são joão", "vila são jorge", "vila são josé", "vila são paulo",
+    "vila silva", "vila silveira", "vila silvestre", "vila simoes",
+    "vila sotero", "vila sul americana", "vila teixeira", "vila tavares",
+    "vila teodoro", "vila tolosa", "vila tupi", "vila uberaba",
+    "vila ibirapuera", "vila ipiranga", "vila isabel", "vila jaguaré",
+    "vila joaquim inácio", "vila lara", "vila libanesa", "vila luis",
+    "vila luiza", "vila maciel", "vila madalena", "vila maria baixa",
+    "vila mariana", "vila matilde", "vila maua", "vila medeiros",
+    "vila melo viosa", "vila menk", "vila miragaia", "vila monte alegre",
+    "vila monteiro", "vila morais", "vila morumbi", "vila nascimento",
+    "vila natalina", "vila noêmia", "vila nova cachoeirinha", "vila nova conceição",
+    "vila nova curuça", "vila nova esperança", "vila nova porto feliz",
+    "vila nova são joaquim", "vila novais", "vila odilon", "vila olhos dagua",
+    "vila palma", "vila palmeiras", "vila paraíso", "vila paulista",
+    "vila penha", "vila pereira barreto", "vila petra", "vila piracicabana",
+    "vila popular", "vila porto rico", "vila porto seguro", "vila progresso",
+    "vila prudente", "vila pulmão", "vila quitaúna", "vila raposo",
+    "vila regente", "vila regina", "vila ribeira", "vila rica",
+    "vila rio branco", "vila rocha", "vila romagnolo", "vila romana",
+    "vila rosário", "vila rust", "vila sabará", "vila sabaúna",
+    "vila sacadura cabral", "vila santa etelvina", "vila santa fé",
+    "vila santa isabel", "vila santa leopoldina", "vila santa lucia",
+    "vila santa maria", "vila santa marina", "vila santa tereza",
+    "vila santo andré", "vila santo amaro", "vila santo antonio",
+    "vila são bernardo", "vila são bento", "vila são cajazeira",
+    "vila são carlos", "vila são cosme", "vila são cristovão",
+    "vila são domingos", "vila são fernando", "vila são gabriel",
+    "vila são gonçalo", "vila são joaquim", "vila são joão batista",
+    "vila são joão", "vila são jorge", "vila são josé do rio preto",
+    "vila são judas", "vila são leopoldo", "vila são lucas",
+    "vila são luis", "vila são marcos", "vila são martinho",
+    "vila são mateus", "vila são paulo", "vila são pedro",
+    "vila são rafael", "vila são roque", "vila são sebastião",
+    "vila são silvestre", "vila são simão", "vila são teodoro",
+    "vila são thomé", "vila são valentin", "vila são vicente",
+    "vila saudade", "vila silvestre", "vila simaria", "vila simões filho",
+    "vila sofia", "vila sotero", "vila sul", "vila taboão",
+    "vila tavares", "vila tijuca", "vila toledo bagno",
+    "vila trindade", "vila uberabinha", "vila unido", "vila ursulina",
+    "vila valqueire", "vila vasconcelos", "vila velha", "vila vermelha",
+    "vila vicentina", "vila virgilio", "vila vizinho", "vila xavier",
+    "vila zuza",
+    // SP - Cidades distritos / condomínios / loteamentos do interior
+    "alphaville", "alumínio", "vila rio preto", "vila mirim",
+    "vila borges", "condominio villa lobos", "loteamento são gerardo",
+    "vila do salto", "vila castelo", "vila formosa",
+  ],
+  "sp": [
+    "vila maria alta sp", "vila ipiranga sp", "alphaville sp",
+    "the villages sp", "ville saint paul sp",
+  ],
+  // ================================================================
+  // BR — RIO DE JANEIRO (RJ) — TZ America/Sao_Paulo
+  // ================================================================
+  "rio de janeiro": [
+    "vila isabel", "vila kennedy", "vila militar", "vila neiva",
+    "vila nova", "vila pavão", "vila pinheiro", "vila roberta",
+    "vila rosário", "vila são joão", "vila são jorge",
+    "vila são josé", "vila silva", "vila tiradentes", "vila valqueire",
+    "vila da penha", "vila sereia", "cidade de deus",
+    "vidigal", "rocinha", "complexo do alemão", "manguinhos",
+    "marechal rondon",
+  ],
+  "rj": [
+    "vila isabel rj", "cidade de deus rj", "vidigal rj",
+  ],
+  // ================================================================
+  // BR — MINAS GERAIS (MG) — TZ America/Sao_Paulo
+  // ================================================================
+  "minas gerais": [
+    "vila do ipiranga", "vila maria", "vila são jorge",
+    "vila pinheiro", "vila cruzeiro", "vila bela vista",
+    "santa terezinha mg", "vila madalena mg",
+    "vila são paulo mg", "cidade jardim mg",
+    "loteamento são francisco mg", "vilarejo das flores",
+  ],
+  "mg": [
+    "vila do ipiranga mg", "santa terezinha mg", "cidade jardim mg",
+  ],
+  // ================================================================
+  // BR — MATO GROSSO (MT) — Cuiabá TZ America/Cuiaba
+  // ================================================================
+  "mato grosso": [
+    "vila operaria cuiabá", "vila bela vista cuiabá",
+    "vila do parque cuiabá", "vila recreio cuiabá",
+    "vilarejo de varzea grande", "plano piloto cuiaba",
+    "vila iredhe bingre", "vila aymores", "vila barão do cerrado",
+    "vila boa esperança cuiabá", "vila central cuiabá",
+    "vila cunha e costa cuiabá", "vila eugenie cuiabá",
+    "vila estrada do varadouro cuiabá", "vila guadalupe cuiabá",
+    "vila mariana cuiabá", "vila operária varzea grande",
+    "vila rosarinho cuiabá", "vila sacramento cuiabá",
+    "vila san martin cuiabá", "vila são bento cuiabá",
+    "vila são camilo cuiabá", "vila são joão cuiabá",
+    "vila são lázaro cuiabá", "vila são luís cuiabá",
+    "vila são mateus cuiabá", "vila são paulo cuiabá",
+    "vila sernambetiba cuiabá", "vila tabajara cuiabá",
+    "vila terra nova cuiabá", "vila tiradentes cuiabá",
+    "vila verdes mares cuiabá",
+    "primavera do leste mt vila centenario",
+    "colonia ribeira mt", "aldeia xavante mt",
+  ],
+  "mt": [
+    "vila operaria mt", "vila bela vista mt", "plano piloto cuiaba mt",
+    "aldeia xavante mt", "colonia ribeira mt",
+  ],
+  // ================================================================
+  // US — NEW JERSEY — America/New_York
+  // ================================================================
+  "new jersey": [
+    "edison township", "woodbridge township", "bridgeton township",
+    "mount olive township", "hopewell township",
+    "montgomery township", "washington township nj",
+    "gloucester township", "deptford township",
+    "berkeley heights", "westfield nj town", "westfield nj",
+    "south orange village", "maplewood township",
+    "livingston township", "paramus nj", "ridgewood village",
+    "tenafly nj", "millburn township", "short hills nj",
+    "wyckoff township", "old bridge township",
+    "sayreville", "perth amboy nj villages",
+    "the settlement at whittingham nj",
+    "gated community monroe nj",
+    "township of little ferry",
+    "toms river township", "lakewood township",
+    "lincroft nj", "middletown township",
+    "plainsboro township", "princeton junction nj",
+  ],
+  "nj": [
+    "edison township nj", "westfield nj", "paramus nj",
+    "toms river township nj", "short hills nj",
+  ],
+  // ================================================================
+  // US — FLORIDA — America/New_York (East) / America/Chicago (West Panhandle)
+  // ================================================================
+  "florida": [
+    "the villages fl", "the villages florida",
+    "weston fl gated", "parkland fl gated",
+    "boca raton villages", "delray beach villages",
+    "miami lakes fl", "pembroke pines fl",
+    "boynton beach fl gated",
+    "parkland mizner country club",
+    "town of surfside fl",
+    "village of pinecrest fl",
+    "key biscayne fl village",
+    "bay harbor islands fl villages",
+    "bal harbour fl village",
+    "town of golden beach fl",
+    "village of tequesta fl",
+    "town of hypoluxo fl",
+    "town of mangonia park fl",
+    "town of loxahatchee groves fl",
+    "town of wellington fl",
+    "town of palm beach shores fl",
+    "town of south palm beach fl",
+    "town of lake worth beach fl",
+    "planned community windermere fl",
+    "gated community fl windermere",
+    "colonia florida city fl",
+    "colonias broward county fl",
+    "lakewood ranch fl planned community",
+    "esplanade on palmer ranch fl",
+    "the forests fl wellington fl",
+    "crown colony fl bonita springs",
+    "naples reserve fl gated community",
+    "grey oaks fl naples",
+    "pelican marsh fl naples",
+    "mediterra fl naples",
+    "vistancia fl lehigh acres planned community",
+  ],
+  "fl": [
+    "the villages fl", "miami lakes fl", "pembroke pines fl",
+    "naples reserve fl", "lakewood ranch fl",
+  ],
+  // ================================================================
+  // US — TEXAS — America/Chicago (Central) / America/Denver (West TX, El Paso area)
+  // ================================================================
+  "texas": [
+    "town of plano tx",
+    "town of frisco tx",
+    "town of mckinney tx",
+    "town of prosper tx",
+    "town of prospero tx",
+    "town of allen tx",
+    "town of fairview tx",
+    "town of lucas tx",
+    "town of murphy tx",
+    "town of parker tx",
+    "town of princeton tx",
+    "town of lowry crossing tx",
+    "town of anna tx",
+    "town of melissa tx",
+    "town of van alstyne tx",
+    "town of whitewright tx",
+    "town of pottsboro tx",
+    "town of sherman tx",
+    "town of denison tx",
+    "town of gainesville tx",
+    "town of valley view tx",
+    "town of pilot point tx",
+    "town of krugerville tx",
+    "town of sanger tx",
+    "town of tyler tx",
+    "town of whitehouse tx",
+    "town of bullard tx",
+    "town of lindale tx",
+    "town of mineola tx",
+    "town of canton tx",
+    "town of emory tx",
+    "town of sulphur springs tx",
+    "town of greenville tx",
+    "town of rockwall tx",
+    "town of rowlett tx",
+    "town of wylie tx",
+    "town of coppell tx",
+    "town of flower mound tx",
+    "town of highland village tx",
+    "town of coppell tx",
+    "town of argyle tx",
+    "town of northlake tx",
+    "town of justin tx",
+    "town of haslet tx",
+    "town of westlake tx",
+    "town of trophy club tx",
+    "town of southlake tx",
+    "town of west frisco tx",
+    "town of the colony tx",
+    "town of little elm tx",
+    "town of aubrey tx",
+    "town of krugerville tx",
+    // ---- Texas / New Mexico colonias (HUD list, El Paso CD → America/Denver) ----
+    "socorro colonia tx",
+    "colonia socorro el paso tx",
+    "colonia del valle el paso tx",
+    "colonia buenavista el paso tx",
+    "colonia san elizario el paso tx",
+    "colonia el paso tx",
+    "colonia tornillo tx",
+    "colonia clint tx",
+    "colonia fabens tx",
+    "colonia vinton tx",
+    "colonia canutillo tx",
+    "colonia anthony tx",
+    "colonia chamberino tx",
+    "colonia berino tx",
+    "colonia playas el paso tx",
+    "colonia redford tx",
+    "colonia presidio tx",
+    "colonia marfa tx",
+    "colonia alpine tx",
+    "colonia fort davis tx",
+    // Hudspeth county - colonias
+    "colonia dora tx",
+    "colonia salt flat tx",
+    "colonia allamo tx",
+    "colonia dell city tx",
+    // Maverick - colonias
+    "colonia eagle pass tx",
+    "colonia quisque tx",
+    "colonia el carreton tx",
+    "colonia morales tx",
+    "colonia rosita tx",
+    "colonia normandy tx",
+    "colonia las quintas fronterizas tx",
+    // Webb county
+    "colonia laredo tx",
+    "colonia el cenizo tx",
+    "colonia bruni tx",
+    "colonia agua dulce laredo tx",
+    "colonia las tiendas tx",
+    "colonia hwy 359 laredo tx",
+    // Hidalgo county colonias
+    "colonia mcallen tx",
+    "colonia edinburg tx",
+    "colonia mission tx",
+    "colonia weslaco tx",
+    "colonia mercedes tx",
+    "colonia donna tx",
+    "colonia la feria tx",
+    "colonia harlingen tx",
+    "colonia brownsville tx",
+    "colonia rio grande city tx",
+    "colonia roma tx",
+    // Starr county colonias
+    "colonia rio grande city tx",
+    "colonia garcia tx",
+    "colonia fronton tx",
+    "colonia la puerta tx",
+    "colonia santa cecilia tx",
+    "colonia escobares tx",
+    "colonia salineño tx",
+    "colonia falcon heights tx",
+    "colonia los ebanos tx",
+    "colonia la rosita tx",
+    "colonia faustino tx",
+    // Houston area planned / gated
+    "the woodlands tx",
+    "cinco ranch tx",
+    "katy tx cinco ranch",
+    "sugar land tx greatwood",
+    "riverstone tx sugar land",
+    "telfair tx sugar land",
+    "sienna tx missouri city",
+    "pearland tx shadow creek ranch",
+    "tx gate community austin",
+    "lakeway tx hills",
+    "rollingwood tx",
+    "west lake hills tx",
+    "lake austin tx gated",
+    "spicewood tx",
+    // TX CDP towns (census designated places)
+    "spring tx",
+    "klein tx",
+    "cypress tx",
+    "tomball tx",
+    "the heights tx",
+    "kingwood tx",
+    "houston tx atascocita",
+    "huffman tx",
+    "dayton tx cdp",
+    "baytown tx crosby",
+    "channelview tx",
+    "galena park tx",
+    "jacinto city tx",
+    "south houston tx",
+    "pearland tx",
+    "friendswood tx",
+    "league city tx cdp",
+  ],
+  "tx": [
+    "town of frisco tx", "the woodlands tx", "cinco ranch tx",
+    "colonia socorro tx", "kingwood tx", "pearland tx",
+  ],
+  // ================================================================
+  // US — NEW MEXICO — America/Denver (Mountain Time) — Colonias
+  // ================================================================
+  "new mexico": [
+    "colonia las cruces nm",
+    "colonia dona ana nm",
+    "colonia anthony nm",
+    "colonia berino nm",
+    "colonia chamberino nm",
+    "colonia vado nm",
+    "colonia la mesa nm",
+    "colonia san pablo nm",
+    "colonia hatch nm",
+    "colonia garfield nm",
+    "colonia elephant butte nm",
+    "colonia truth or consequences nm",
+    "colonia deming nm",
+    "colonia lordsburg nm",
+    "colonia grants nm",
+    "colonia gallup nm",
+    "colonia farmington nm",
+    "colonia aztec nm",
+    "colonia bloomfield nm",
+    "colonia kirtland nm",
+    "colonia shiprock nm",
+    // NM towns / townships / CDP
+    "town of taos nm",
+    "town of red river nm",
+    "town of cloudcroft nm",
+    "town of ruidoso nm",
+    "town of alamogordo nm",
+    "town of carlsbad nm",
+    "town of lovington nm",
+    "town of hobbs nm",
+    "town of roswell nm",
+    "town of clovis nm",
+    "town of portales nm",
+    "town of tucumcari nm",
+    "town of santa rosa nm",
+    "town of las vegas nm",
+    "town of raton nm",
+    "town of silver city nm",
+    "town of bayard nm",
+    "town of deming nm",
+  ],
+  "nm": [
+    "colonia las cruces nm", "colonia dona ana nm", "town of taos nm", "town of roswell nm",
+  ],
+  // ================================================================
+  // US — CALIFORNIA — America/Los_Angeles
+  // ================================================================
+  "california": [
+    "town of los altos ca",
+    "town of los altos hills ca",
+    "town of hillsborough ca",
+    "town of atherton ca",
+    "town of woodside ca",
+    "town of portola valley ca",
+    "town of saratoga ca",
+    "town of cupertino ca villages",
+    "village of la jolla ca",
+    "village of corona del mar ca",
+    "village of laguna beach ca",
+    "covenant of rancho santa fe ca",
+    "coto de caza ca gated community",
+    "ladera ranch ca planned community",
+    "gated community irvine ca",
+    "turtle ridge ca irvine",
+    "woodbury ca irvine",
+    "stonegate ca irvine",
+    "quail hill ca irvine",
+    "orlando ca — wait not ca; coto de caza ca",
+    "the colony ca thousand oaks",
+    "north ranch ca westlake village",
+    "lake sherwood ca gated",
+    "hidden hills ca gated",
+    "bell canyon ca gated",
+    "calabasas ca gated community",
+    "malibu ca gated community",
+    "village of rancho santa fe ca",
+    "town of yountville ca",
+    "town of st helena ca",
+    "town of yountville ca napa",
+    "town of sonoma ca",
+    "town of truckee ca",
+    "town of mammoth lakes ca",
+    "town of bishop ca",
+    "town of lone pine ca",
+    "town of joshua tree ca",
+    "town of twentynine palms ca",
+    // CA townships / CDPs
+    "carmel by the sea ca",
+    "pebble beach ca",
+    "monterey ca pacific grove village",
+    "santa barbara ca montecito village",
+    "goleta ca isla vista cdp",
+    "orcutt ca cdp",
+    "lompoc ca vandenberg village",
+    "lucerne valley ca cdp",
+    "yucca valley ca cdp",
+    "apple valley ca cdp",
+    "victorville ca hesperia cdp",
+    "adelanto ca cdp",
+  ],
+  "ca": [
+    "coto de caza ca", "ladera ranch ca", "calabasas ca", "hillsborough ca", "carmel by the sea ca",
+  ],
+  // ================================================================
+  // US — NEW YORK — America/New_York
+  // ================================================================
+  "new york": [
+    "town of east hampton ny",
+    "town of southampton ny",
+    "town of bridgehampton ny",
+    "village of sag harbor ny",
+    "village of east hampton ny",
+    "village of westhampton beach ny",
+    "village of quogue ny",
+    "town of hempstead ny",
+    "town of babylon ny",
+    "town of huntington ny",
+    "town of smithtown ny",
+    "town of islip ny",
+    "town of brookhaven ny",
+    "town of riverhead ny",
+    "town of southold ny",
+    "town of shelton ny",
+    "village of scarsdale ny",
+    "village of bronxville ny",
+    "village of larchmont ny",
+    "village of mamaroneck ny",
+    "village of rye brook ny",
+    "village of pleasantville ny",
+    "village of briarcliff manor ny",
+    "village of ossining ny",
+    "village of sleepy hollow ny",
+    "village of tarrytown ny",
+    "village of irvington ny",
+    "village of dobbs ferry ny",
+    "village of hastings on hudson ny",
+    "gated community long island ny",
+    "old westbury gardens ny gated",
+    "brookville ny gated",
+    "muttontown ny gated",
+    "syosset ny gated",
+    "locust valley ny gated",
+    "mill neck ny",
+    "glenn cove ny village",
+  ],
+  "ny": [
+    "town of southampton ny", "village of scarsdale ny", "village of bronxville ny", "sleepy hollow ny",
+  ],
+};
+
+// ================================================================
+// SET: flattened EXTENDED_KEYWORDS — usado em resolveTimeZoneFromCityInput
+// para decidir source = "extended_locality_match"
+// ================================================================
+const EXTENDED_KEYWORDS_SET: Set<string> = (() => {
+  const s = new Set<string>();
+  for (const key of Object.keys(EXTENDED_LOCALITIES_BY_STATE_KEY)) {
+    for (const kw of EXTENDED_LOCALITIES_BY_STATE_KEY[key] ?? []) {
+      s.add(normalizeLocationText(kw));
+    }
+  }
+  return s;
+})();
+
+// ================================================================
+// STEP 2 — amendCityTimeZoneRulesWithExtendedLocalities(base)
+// Append de keywords sem duplicatas; deep copy para não mutar BASE.
+// ================================================================
+function amendCityTimeZoneRulesWithExtendedLocalities(
+  base: ReadonlyArray<CityTimeZoneRule>,
+): CityTimeZoneRule[] {
+  const result: CityTimeZoneRule[] = base.map((rule) => ({
+    timeZone: rule.timeZone,
+    country: rule.country,
+    keywords: Array.from(new Set([...(rule.keywords ?? [])])),
+    ...(rule.stateKeywords?.length
+      ? { stateKeywords: Array.from(new Set([...(rule.stateKeywords ?? [])])) }
+      : {}),
+  }));
+
+  // Prepara um índice: stateKeyword (normalizado) → indexes em result
+  const stateIndex = new Map<string, number[]>();
+  result.forEach((rule, idx) => {
+    if (!rule.stateKeywords?.length) return;
+    for (const stateKw of rule.stateKeywords) {
+      const n = normalizeLocationText(stateKw);
+      if (!n) continue;
+      if (!stateIndex.has(n)) stateIndex.set(n, []);
+      stateIndex.get(n)!.push(idx);
+    }
+  });
+
+  for (const rawStateKey of Object.keys(EXTENDED_LOCALITIES_BY_STATE_KEY)) {
+    const locs = EXTENDED_LOCALITIES_BY_STATE_KEY[rawStateKey] ?? [];
+    if (!locs.length) continue;
+    const normState = normalizeLocationText(rawStateKey);
+    const idxList = stateIndex.get(normState) ?? [];
+    if (!idxList.length) continue;
+    for (const idx of idxList) {
+      const rule = result[idx];
+      if (!rule) continue;
+      for (const loc of locs) {
+        const nLoc = normalizeLocationText(loc);
+        if (!nLoc) continue;
+        if (!rule.keywords.some((k) => normalizeLocationText(k) === nLoc)) {
+          rule.keywords.push(loc);
+        }
+      }
+      rule.keywords = Array.from(new Set(rule.keywords)).filter(Boolean);
+    }
+  }
+
+  return result;
+}
+
+// ================================================================
+// STEP 2 FINAL — Cidade-time-zone rules FINAL usadas no runtime.
+// ================================================================
+const CITY_TIME_ZONE_RULES: CityTimeZoneRule[] =
+  amendCityTimeZoneRulesWithExtendedLocalities(BASE_CITY_TIME_ZONE_RULES);
+
+// Export snapshot (útil para debug/teste)
+export const __DEBUG_BASE_CITY_TIME_ZONE_RULES_COUNT = BASE_CITY_TIME_ZONE_RULES.length;
+export const __DEBUG_EXTENDED_COUNT = CITY_TIME_ZONE_RULES.length;
+export const __DEBUG_EXTENDED_LOCALITIES_KEYS = Object.keys(EXTENDED_LOCALITIES_BY_STATE_KEY);
+export function __DEBUG_hasExtendedKeyword(raw: string): boolean {
+  return EXTENDED_KEYWORDS_SET.has(normalizeLocationText(raw));
+}
+
+// ================================================================
+// Helpers de LOCALIDADE (uso em parsing e gates de validação)
+// ================================================================
+export function containsLocalityStructuralType(rawText: string): boolean {
+  const n = normalizeLocationText(rawText);
+  if (!n) return false;
+  for (const t of LOCALITY_TYPES_TO_INCLUDE) {
+    const nt = normalizeLocationText(t);
+    if (!nt) continue;
+    if (new RegExp(`(?:^|\\s)${escapeRegExp(nt)}(?:\\s|$)`, "i").test(n)) return true;
+  }
+  return false;
+}
+export function getNormalizedLocalityTypesTokens(): string[] {
+  return LOCALITY_TYPES_TO_INCLUDE.map(normalizeLocationText).filter(Boolean);
+}
+
 function normalizeLocationText(value: string) {
   return String(value ?? "")
     .toLowerCase()
@@ -2099,6 +2732,27 @@ function extractLocationCandidates(raw: string): string[] {
     const parts = normalized.split(separator).map((part) => part.trim()).filter(Boolean);
     for (const part of parts) {
       if (part) candidates.add(part);
+    }
+  }
+
+  const localityTypes = getNormalizedLocalityTypesTokens();
+  const hasStructural = containsLocalityStructuralType(raw);
+  if (hasStructural) {
+    for (const c of Array.from(candidates)) {
+      const tokens = c.split(/\s+/).filter(Boolean);
+      if (tokens.length <= 1) continue;
+      const filteredTokens = tokens.filter((t) => !localityTypes.includes(t));
+      if (filteredTokens.length && filteredTokens.length !== tokens.length) {
+        candidates.add(filteredTokens.join(" "));
+      }
+      if (tokens.length >= 2) {
+        for (let i = 0; i < tokens.length; i++) {
+          if (localityTypes.includes(tokens[i])) {
+            const without = [...tokens.slice(0, i), ...tokens.slice(i + 1)].join(" ").trim();
+            if (without) candidates.add(without);
+          }
+        }
+      }
     }
   }
 
@@ -2390,7 +3044,9 @@ export function resolveTimeZoneFromCityInput(params: {
   if (!rawCity) return null;
 
   const rawCityTokens = rawCity.split(/\s+/).filter(Boolean);
-  if (rawCityTokens.length > 8) return null;
+  const hasStructuralType = containsLocalityStructuralType(rawCity);
+  const maxTokens = hasStructuralType ? 13 : 8;
+  if (rawCityTokens.length > maxTokens) return null;
 
   const cityCandidates = extractLocationCandidates(rawCity);
   const stateCandidates = rawState ? extractLocationCandidates(rawState) : [];
@@ -2454,6 +3110,13 @@ export function resolveTimeZoneFromCityInput(params: {
         : matchedStateLabel
           ? normalizeLocationText(matchedStateLabel)
           : stateCandidates[0] ?? null;
+      const normalizedMatchedLabel = matchedCityLabel ? normalizeLocationText(matchedCityLabel) : "";
+      const isExtendedMatch = normalizedMatchedLabel
+        ? EXTENDED_KEYWORDS_SET.has(normalizedMatchedLabel)
+        : false;
+      const matchSource: "city_match" | "extended_locality_match" = isExtendedMatch
+        ? "extended_locality_match"
+        : "city_match";
       return {
         city: (matchedCityLabel || rawCity).replace(/\s+/g, " ").trim(),
         state: finalState,
@@ -2462,7 +3125,7 @@ export function resolveTimeZoneFromCityInput(params: {
         timeZone: rule.timeZone,
         teacherTimeZone: PROFESSOR_TIME_ZONE,
         country: rule.country,
-        source: "city_match" as const,
+        source: matchSource,
       };
     }
   }
