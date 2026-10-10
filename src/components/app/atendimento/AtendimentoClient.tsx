@@ -5552,16 +5552,36 @@ export function AtendimentoClient() {
 
                       {/* CARD 3: Status */}
                       <div className="overflow-hidden rounded-2xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] p-5 shadow-none">
-                        <div className="flex items-center gap-2">
-                          <div className="h-5 w-5 text-[var(--app-text-70)]">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5">
-                              <path d="M3 3v18h18" />
-                              <path d="M7 14l4-4 4 4 5-5" />
-                            </svg>
+                        <div className="flex flex-wrap items-center justify-between gap-3">
+                          <div className="flex items-center gap-2">
+                            <div className="h-5 w-5 text-[var(--app-text-70)]">
+                              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5">
+                                <path d="M3 3v18h18" />
+                                <path d="M7 14l4-4 4 4 5-5" />
+                              </svg>
+                            </div>
+                            <div className="text-[15px] font-bold text-[var(--app-text-85)]">
+                              Status
+                            </div>
                           </div>
-                          <div className="text-[15px] font-bold text-[var(--app-text-85)]">
-                            Status
-                          </div>
+                          {statusMeta?.title === "Falta confirmar pagamento" ? (
+                            <button
+                              type="button"
+                              onClick={() => void handleConfirmPayment(sl)}
+                              disabled={confirmingPayment}
+                              className="inline-flex min-h-[40px] w-full items-center justify-center gap-2 rounded-xl border border-[var(--app-border)] bg-[var(--app-card)] px-4 text-[13px] font-semibold text-[var(--app-text-85)] shadow-none transition hover:bg-[var(--app-hover)] disabled:cursor-not-allowed disabled:opacity-65 sm:w-auto"
+                            >
+                              {confirmingPayment ? (
+                                <Loader2 className="h-4 w-4 shrink-0 animate-spin" />
+                              ) : (
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4 shrink-0">
+                                  <path d="M3 3v18h18" />
+                                  <path d="M7 14l4-4 4 4 5-5" />
+                                </svg>
+                              )}
+                              {confirmingPayment ? "Confirmando..." : "Confirmar pagamento"}
+                            </button>
+                          ) : null}
                         </div>
                         {(() => {
                           // Como o gate de buildRecurringMetaForVisaoGeral hoje é
@@ -5589,7 +5609,6 @@ export function AtendimentoClient() {
                           // sao AZUIS, como o usuario pediu (consistente com avatar e
                           // badge Recorrente).
                           if (statusMeta.tone === "success" || statusMeta.tone === "info" || statusMeta.tone === "default") {
-                            const showConfirmPaymentButton = statusMeta.title === "Falta confirmar pagamento";
                             return (
                               <>
                                 <div className="mt-4 rounded-xl border border-[#2563eb]/35 bg-[rgba(37,99,235,0.12)] px-4 py-3">
@@ -5600,26 +5619,6 @@ export function AtendimentoClient() {
                                     {statusMeta.body}
                                   </div>
                                 </div>
-                                {showConfirmPaymentButton ? (
-                                  <div className="mt-4">
-                                    <button
-                                      type="button"
-                                      onClick={() => void handleConfirmPayment(sl)}
-                                      disabled={confirmingPayment}
-                                      className="inline-flex min-h-[44px] w-full items-center justify-center gap-2 rounded-xl border border-[#2563eb]/35 bg-[#2563eb] px-5 text-[13px] font-semibold !text-white shadow-none transition hover:bg-[#1d4ed8] disabled:cursor-not-allowed disabled:opacity-65 sm:w-auto"
-                                    >
-                                      {confirmingPayment ? (
-                                        <Loader2 className="h-4 w-4 shrink-0 animate-spin" />
-                                      ) : (
-                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4 shrink-0">
-                                          <path d="M3 3v18h18" />
-                                          <path d="M7 14l4-4 4 4 5-5" />
-                                        </svg>
-                                      )}
-                                      {confirmingPayment ? "Confirmando..." : "Confirmar pagamento"}
-                                    </button>
-                                  </div>
-                                ) : null}
                               </>
                             );
                           }
@@ -7098,16 +7097,36 @@ export function AtendimentoClient() {
 
                     {/* CARD 3: Status */}
                     <div className="overflow-hidden rounded-2xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] p-5 shadow-none">
-                      <div className="flex items-center gap-2">
-                        <div className="h-5 w-5 text-[var(--app-text-70)]">
-                          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5">
-                            <path d="M3 3v18h18" />
-                            <path d="M7 14l4-4 4 4 5-5" />
-                          </svg>
+                      <div className="flex flex-wrap items-center justify-between gap-3">
+                        <div className="flex items-center gap-2">
+                          <div className="h-5 w-5 text-[var(--app-text-70)]">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5">
+                              <path d="M3 3v18h18" />
+                              <path d="M7 14l4-4 4 4 5-5" />
+                            </svg>
+                          </div>
+                          <div className="text-[15px] font-bold text-[var(--app-text-85)]">
+                            Status
+                          </div>
                         </div>
-                        <div className="text-[15px] font-bold text-[var(--app-text-85)]">
-                          Status
-                        </div>
+                        {statusMeta?.title === "Falta confirmar pagamento" ? (
+                          <button
+                            type="button"
+                            onClick={() => void handleConfirmPayment(sl)}
+                            disabled={confirmingPayment}
+                            className="inline-flex min-h-[40px] w-full items-center justify-center gap-2 rounded-xl border border-[var(--app-border)] bg-[var(--app-card)] px-4 text-[13px] font-semibold text-[var(--app-text-85)] shadow-none transition hover:bg-[var(--app-hover)] disabled:cursor-not-allowed disabled:opacity-65 sm:w-auto"
+                          >
+                            {confirmingPayment ? (
+                              <Loader2 className="h-4 w-4 shrink-0 animate-spin" />
+                            ) : (
+                              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4 shrink-0">
+                                <path d="M3 3v18h18" />
+                                <path d="M7 14l4-4 4 4 5-5" />
+                              </svg>
+                            )}
+                            {confirmingPayment ? "Confirmando..." : "Confirmar pagamento"}
+                          </button>
+                        ) : null}
                       </div>
                       {(() => {
                         if (!statusMeta) {
@@ -7123,7 +7142,6 @@ export function AtendimentoClient() {
                           );
                         }
                         if (statusMeta.tone === "success" || statusMeta.tone === "info" || statusMeta.tone === "default") {
-                          const showConfirmPaymentButton = statusMeta.title === "Falta confirmar pagamento";
                           return (
                             <>
                               <div className="mt-4 rounded-xl border border-[#2563eb]/35 bg-[rgba(37,99,235,0.12)] px-4 py-3">
@@ -7134,26 +7152,6 @@ export function AtendimentoClient() {
                                   {statusMeta.body}
                                 </div>
                               </div>
-                              {showConfirmPaymentButton ? (
-                                <div className="mt-4">
-                                  <button
-                                    type="button"
-                                    onClick={() => void handleConfirmPayment(sl)}
-                                    disabled={confirmingPayment}
-                                    className="inline-flex min-h-[44px] w-full items-center justify-center gap-2 rounded-xl border border-[#2563eb]/35 bg-[#2563eb] px-5 text-[13px] font-semibold !text-white shadow-none transition hover:bg-[#1d4ed8] disabled:cursor-not-allowed disabled:opacity-65 sm:w-auto"
-                                  >
-                                    {confirmingPayment ? (
-                                      <Loader2 className="h-4 w-4 shrink-0 animate-spin" />
-                                    ) : (
-                                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4 shrink-0">
-                                        <path d="M3 3v18h18" />
-                                        <path d="M7 14l4-4 4 4 5-5" />
-                                      </svg>
-                                    )}
-                                    {confirmingPayment ? "Confirmando..." : "Confirmar pagamento"}
-                                  </button>
-                                </div>
-                              ) : null}
                             </>
                           );
                         }
