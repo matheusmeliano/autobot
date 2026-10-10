@@ -919,7 +919,7 @@ function buildRecurringMetaForVisaoGeral(lead: AtendimentoLeadListItem): { title
   const payConfirmed = payConfirmedGlobal;
 
   if (!payConfirmed) {
-    return { title: "Falta confirmar pagamento", body: "Contrato aceito. Agora é necessário confirmar o pagamento para a matrícula ser considerada concluída.", tone: "info" };
+    return { title: "Falta confirmar pagamento", body: "Confirme o pagamento para liberar o painel do aluno.", tone: "info" };
   }
 
   // ===== PASSO 4: CONCLUIDA =====
