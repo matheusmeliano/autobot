@@ -190,13 +190,25 @@ function isSchedulePaidForReferenceMonth(params: {
   const timeZone = String(params.row.schedule_timezone ?? "").trim() || params.scheduleTimeZone;
   if (!isPaidSchedule(params.row, timeZone)) return false;
 
+  const normalizedStatus = String(params.row.status ?? "").trim().toLowerCase();
   const paymentLocalDate =
     scheduleLocalDate(params.row.payment_received_at ?? null, timeZone) ??
     scheduleLocalDate(params.row.closed_at ?? null, timeZone);
   if (paymentLocalDate?.slice(0, 7) === params.referenceYearMonth) return true;
 
-  const scheduleReferenceDate = scheduleReferenceLocalDate(params.row, timeZone);
-  if (scheduleReferenceDate?.slice(0, 7) === params.referenceYearMonth) return true;
+  const lastExecutedYearMonth = yearMonthFromIso(params.row.last_executed_scheduled_for ?? null, timeZone);
+  const scheduledCycleYearMonth = yearMonthFromIso(
+    params.row.charge_due_at ?? params.row.data_envio ?? null,
+    timeZone,
+  );
+  if (
+    (normalizedStatus === "agendado" || normalizedStatus === "executado") &&
+    lastExecutedYearMonth === params.referenceYearMonth &&
+    Boolean(scheduledCycleYearMonth) &&
+    scheduledCycleYearMonth !== params.referenceYearMonth
+  ) {
+    return true;
+  }
 
   return false;
 }
