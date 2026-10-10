@@ -3854,48 +3854,6 @@ export async function formalizeAndPersistContract(params: {
   }
 
   try {
-    const firstName = contractData.studentFullName.trim().split(/\s+/)[0] || contractData.studentFullName || "Aluno";
-    await sendAtendimentoWhatsAppText({
-      phone: EXPERIMENTAL_CLASS_REGISTERED_ATTENDANT_NOTIFICATION_PHONE,
-      message: buildRecurringClassPostEnrollmentRegisteredAttendantNotification(
-        firstName,
-        contractData.classWeekdayLabel || "-",
-        contractData.classTimeLabel || "-",
-      ),
-    });
-    await appendHistoryEvent({
-      leadId,
-      conversationId,
-      eventType: "recurring_class_registered_attendant_post_enrollment_notification_sent",
-      title: "Notificação de matrícula recorrente confirmada enviada ao atendente cadastrado",
-      details: {
-        phone: EXPERIMENTAL_CLASS_REGISTERED_ATTENDANT_NOTIFICATION_PHONE,
-        aluno: contractData.studentFullName,
-        dia_aula: contractData.classWeekdayLabel,
-        horario_aula: contractData.classTimeLabel,
-      },
-      actorType: "system",
-    });
-  } catch (error) {
-    try {
-      await appendHistoryEvent({
-        leadId,
-        conversationId,
-        eventType: "recurring_class_registered_attendant_post_enrollment_notification_failed",
-        title: "Falha ao enviar notificação de matrícula recorrente confirmada ao atendente cadastrado",
-        details: {
-          phone: EXPERIMENTAL_CLASS_REGISTERED_ATTENDANT_NOTIFICATION_PHONE,
-          aluno: contractData.studentFullName,
-          dia_aula: contractData.classWeekdayLabel,
-          horario_aula: contractData.classTimeLabel,
-          error: error instanceof Error ? error.message : String(error),
-        },
-        actorType: "system",
-      });
-    } catch (_e) {}
-  }
-
-  try {
     await admin
       .from("atendimento_files")
       .insert({
@@ -4351,6 +4309,59 @@ export async function confirmLeadRecurringPayment(params: {
   const patchRes = await runPatch(patch);
   if (!patchRes.ok && !applied) {
     return { ok: false, error: (patchRes as any).error?.message ?? "Falha ao atualizar lead." };
+  }
+
+  try {
+    const fullName = String((lead as any).full_name ?? "").trim();
+    const firstName = fullName.split(/\s+/)[0] || fullName || "Aluno";
+    const weekdayLabel =
+      String((lead as any).recurring_class_weekday_label ?? (lead as any).recurring_class_weekday ?? "").trim() || "-";
+    const timeLabel =
+      String((lead as any).recurring_class_lead_time ?? (lead as any).recurring_class_professor_time ?? "").trim() || "-";
+    await sendAtendimentoWhatsAppText({
+      phone: EXPERIMENTAL_CLASS_REGISTERED_ATTENDANT_NOTIFICATION_PHONE,
+      message: buildRecurringClassPostEnrollmentRegisteredAttendantNotification(
+        firstName,
+        weekdayLabel,
+        timeLabel,
+      ),
+    });
+    await appendHistoryEvent({
+      leadId,
+      eventType: "recurring_class_registered_attendant_post_enrollment_notification_sent",
+      title: "Notificação de nova matrícula enviada ao atendente cadastrado",
+      details: {
+        phone: EXPERIMENTAL_CLASS_REGISTERED_ATTENDANT_NOTIFICATION_PHONE,
+        aluno: fullName || null,
+        dia_aula: weekdayLabel,
+        horario_aula: timeLabel,
+        triggered_from: "panel_payment_confirmation",
+        confirmed_by: attendantEmail || (actorType === "attendant" ? "Atendente painel" : actorType),
+      },
+      actorType: "system",
+    });
+  } catch (error) {
+    try {
+      const fullName = String((lead as any).full_name ?? "").trim();
+      const weekdayLabel =
+        String((lead as any).recurring_class_weekday_label ?? (lead as any).recurring_class_weekday ?? "").trim() || "-";
+      const timeLabel =
+        String((lead as any).recurring_class_lead_time ?? (lead as any).recurring_class_professor_time ?? "").trim() || "-";
+      await appendHistoryEvent({
+        leadId,
+        eventType: "recurring_class_registered_attendant_post_enrollment_notification_failed",
+        title: "Falha ao enviar notificação de nova matrícula ao atendente cadastrado",
+        details: {
+          phone: EXPERIMENTAL_CLASS_REGISTERED_ATTENDANT_NOTIFICATION_PHONE,
+          aluno: fullName || null,
+          dia_aula: weekdayLabel,
+          horario_aula: timeLabel,
+          triggered_from: "panel_payment_confirmation",
+          error: error instanceof Error ? error.message : String(error),
+        },
+        actorType: "system",
+      });
+    } catch {}
   }
 
   try {
