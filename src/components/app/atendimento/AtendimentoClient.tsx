@@ -378,6 +378,38 @@ function applyPhoneMask(input: string): string {
   return `+${country} ${groups.join("-")}`;
 }
 
+function normalizeRecurringWeekdayToken(raw: unknown): string {
+  const s = String(raw ?? "").trim().toLowerCase().slice(0, 3);
+  if (!s) return "";
+  if (["mon", "seg", "segunda"].some((x) => s.startsWith(x) || x.startsWith(s))) return "mon";
+  if (["tue", "ter", "terca"].some((x) => s.startsWith(x) || x.startsWith(s))) return "tue";
+  if (["wed", "qua", "quarta"].some((x) => s.startsWith(x) || x.startsWith(s))) return "wed";
+  if (["thu", "qui", "quinta"].some((x) => s.startsWith(x) || x.startsWith(s))) return "thu";
+  if (["fri", "sex", "sexta"].some((x) => s.startsWith(x) || x.startsWith(s))) return "fri";
+  if (["sat", "sab", "sabado"].some((x) => s.startsWith(x) || x.startsWith(s))) return "sat";
+  if (["sun", "dom", "domingo"].some((x) => s.startsWith(x) || x.startsWith(s))) return "sun";
+  return s;
+}
+
+function normalizeScheduleTimeForComparison(raw: unknown): string {
+  const trimmed = String(raw ?? "").trim().toLowerCase();
+  if (!trimmed) return "";
+  const match = trimmed.match(/(\d{1,2}):(\d{2})/);
+  if (!match) return "";
+  return `${String(match[1] ?? "").padStart(2, "0")}:${String(match[2] ?? "").padStart(2, "0")}`;
+}
+
+function weekdayShortFromLocalDate(localDate: string, timeZone: string): string {
+  const [y, m, d] = String(localDate ?? "").split("-").map(Number);
+  if (!Number.isFinite(y) || !Number.isFinite(m) || !Number.isFinite(d)) return "";
+  const dt = new Date(Date.UTC(y, (m || 1) - 1, d || 1, 12, 0, 0));
+  try {
+    return new Intl.DateTimeFormat("en-US", { timeZone, weekday: "short" }).format(dt).toLowerCase().slice(0, 3);
+  } catch {
+    return "";
+  }
+}
+
 function buildRecurringNextOccurrenceNiceLabel(
   lead: AtendimentoLeadListItem
 ): { weekdayWithDate: string; time: string } | null {
@@ -402,20 +434,8 @@ function buildRecurringNextOccurrenceNiceLabel(
     const dt = new Date(Date.UTC(y, m - 1, d, 12, 0, 0));
     return new Intl.DateTimeFormat("en-US", { timeZone: tz, weekday: "short" }).format(dt).toLowerCase().slice(0, 3);
   };
-  const normalizeWeekday = (w: unknown): string => {
-    const s = String(w ?? "").trim().toLowerCase().slice(0, 3);
-    if (!s) return "";
-    if (["mon", "seg", "segunda"].some((x) => s.startsWith(x) || x.startsWith(s))) return "mon";
-    if (["tue", "ter", "terca"].some((x) => s.startsWith(x) || x.startsWith(s))) return "tue";
-    if (["wed", "qua", "quarta"].some((x) => s.startsWith(x) || x.startsWith(s))) return "wed";
-    if (["thu", "qui", "quinta"].some((x) => s.startsWith(x) || x.startsWith(s))) return "thu";
-    if (["fri", "sex", "sexta"].some((x) => s.startsWith(x) || x.startsWith(s))) return "fri";
-    if (["sat", "sab", "sabado"].some((x) => s.startsWith(x) || x.startsWith(s))) return "sat";
-    if (["sun", "dom", "domingo"].some((x) => s.startsWith(x) || x.startsWith(s))) return "sun";
-    return s;
-  };
   const computeNextWeekdayFromToday = (targetWdRaw: string, tz: string): string | null => {
-    const target = normalizeWeekday(targetWdRaw);
+    const target = normalizeRecurringWeekdayToken(targetWdRaw);
     if (!["mon", "tue", "wed", "thu", "fri", "sat", "sun"].includes(target)) return null;
     const startLocal = todayLocalInTz(tz);
     for (let i = 0; i <= 14; i++) {
@@ -431,7 +451,7 @@ function buildRecurringNextOccurrenceNiceLabel(
   const tmRaw = String((lead as any)?.recurring_class_lead_time ?? (lead as any)?.recurring_class_professor_time ?? "").trim();
   const tz = deriveLeadEffectiveTimeZone(lead);
 
-  const wdOk = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"].includes(normalizeWeekday(wdRaw) || normalizeWeekday(wdLabelRaw));
+  const wdOk = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"].includes(normalizeRecurringWeekdayToken(wdRaw) || normalizeRecurringWeekdayToken(wdLabelRaw));
   if (!wdOk) return null;
 
   const nextLocal = computeNextWeekdayFromToday(wdRaw || wdLabelRaw, tz);
@@ -500,6 +520,32 @@ function buildRecurringScheduleCardLabel(lead: AtendimentoLeadListItem): string 
   if (wdNice && !t) return `${wdNice} — horário ainda não definido.`;
   if (!wdNice && t) return `Horário: ${t} — dia da semana ainda não definido.`;
   return `${wdNice} às ${t}h`;
+}
+
+function buildRecurringPendingScheduleCardMeta(
+  lead: AtendimentoLeadListItem,
+): { title: string; body: string } | null {
+  const meta = buildRecurringMetaForVisaoGeral(lead);
+  if (!meta) return null;
+  if (meta.title === "Falta horário recorrente") {
+    return {
+      title: "Aguardando horário recorrente",
+      body: meta.body,
+    };
+  }
+  if (meta.title === "Falta dia recorrente" || meta.title === "Falta dia da semana recorrente") {
+    return {
+      title: "Aguardando dia recorrente",
+      body: meta.body,
+    };
+  }
+  if (meta.title === "Falta Dia e Horário Recorrentes" || meta.title === "Falta dia e horário recorrentes") {
+    return {
+      title: "Aguardando dia e horário recorrente",
+      body: meta.body,
+    };
+  }
+  return null;
 }
 
 function buildExperimentalMetaForList(lead: AtendimentoLeadListItem): { label: string; tone: "success" | "warning" | "default" } {
@@ -3209,6 +3255,58 @@ export function AtendimentoClient() {
                 setSelectedExperimentalSlotId(slotId);
               }
             }
+          } else {
+            const recurringWeekday = normalizeRecurringWeekdayToken(
+              (lead as any)?.recurring_class_weekday ?? (lead as any)?.recurring_class_weekday_label,
+            );
+            const recurringProfessorTime = normalizeScheduleTimeForComparison(
+              (lead as any)?.recurring_class_professor_time ?? (lead as any)?.recurring_class_lead_time,
+            );
+            const recurringLeadTime = normalizeScheduleTimeForComparison(
+              (lead as any)?.recurring_class_lead_time ?? (lead as any)?.recurring_class_professor_time,
+            );
+            const matchSlotInDate = (dateKey: string) => {
+              const daySlots = Array.isArray(slotsByDate?.[dateKey]) ? (slotsByDate[dateKey] as any[]) : [];
+              if (!daySlots.length || (!recurringProfessorTime && !recurringLeadTime)) return null as any;
+              return daySlots.find((slot) => {
+                const slotProfessorTime = normalizeScheduleTimeForComparison(slot?.professorTime);
+                const slotLeadTime = normalizeScheduleTimeForComparison(slot?.leadTime ?? slot?.displayLabel);
+                return (
+                  (recurringProfessorTime && slotProfessorTime === recurringProfessorTime) ||
+                  (recurringLeadTime && slotLeadTime === recurringLeadTime)
+                );
+              }) ?? null;
+            };
+
+            let matchedDate = null as any;
+            if (recurringWeekday) {
+              matchedDate =
+                dates.find((date) => {
+                  const dateKey = String(date?.professorDate ?? date?.id ?? "").slice(0, 10);
+                  return dateKey && weekdayShortFromLocalDate(dateKey, ATENDIMENTO_PROFESSOR_TIME_ZONE) === recurringWeekday;
+                }) ?? null;
+            }
+            if (!matchedDate && (recurringProfessorTime || recurringLeadTime)) {
+              for (const date of dates) {
+                const dateKey = String(date?.professorDate ?? date?.id ?? "").slice(0, 10);
+                if (!dateKey) continue;
+                if (matchSlotInDate(dateKey)) {
+                  matchedDate = date;
+                  break;
+                }
+              }
+            }
+            if (matchedDate) {
+              const matchedDateId = String(matchedDate?.id ?? matchedDate?.professorDate ?? "").trim();
+              const matchedDateKey = String(matchedDate?.professorDate ?? matchedDate?.id ?? "").slice(0, 10);
+              if (matchedDateId) {
+                setSelectedExperimentalDateId(matchedDateId);
+              }
+              const matchedSlot = matchSlotInDate(matchedDateKey);
+              if (matchedSlot?.id) {
+                setSelectedExperimentalSlotId(String(matchedSlot.id));
+              }
+            }
           }
         } else {
           const err = json?.error ? String(json.error) : "Falha ao carregar dias disponíveis.";
@@ -5664,6 +5762,7 @@ export function AtendimentoClient() {
                             typeof (lead as any)?.signup_password_raw_temp === "string" &&
                             String((lead as any).signup_password_raw_temp).trim().length >= 4;
                           const cadastroOuConcluido = hasStep || hasRecurringPass || hasLegacyTempPass || isConcluded;
+                          const pendingRecurringScheduleMeta = buildRecurringPendingScheduleCardMeta(selectedLead);
 
                           if (cadastroOuConcluido) {
                             const wd = String(lead?.recurring_class_weekday_label ?? lead?.recurring_class_weekday ?? "").trim();
@@ -5705,6 +5804,23 @@ export function AtendimentoClient() {
                               );
                             }
                             if (hasAny) {
+                              if (pendingRecurringScheduleMeta) {
+                                return (
+                                  <div className="mt-4 flex items-start gap-3 rounded-xl border border-[#2563eb]/35 bg-[rgba(37,99,235,0.12)] px-4 py-3">
+                                    <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[#2563eb]/20 text-[#1d4ed8]">
+                                      <RefreshCw className="h-5 w-5" />
+                                    </div>
+                                    <div className="min-w-0">
+                                      <div className="font-semibold text-[#1e3a8a] truncate">
+                                        {pendingRecurringScheduleMeta.title}
+                                      </div>
+                                      <div className="mt-0.5 text-[13px] text-[#1d4ed8]/80">
+                                        {pendingRecurringScheduleMeta.body}
+                                      </div>
+                                    </div>
+                                  </div>
+                                );
+                              }
                               return (
                                 <div className="mt-4 flex items-start gap-3 rounded-xl border border-[#2563eb]/35 bg-[rgba(37,99,235,0.12)] px-4 py-3">
                                   <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[#2563eb]/20 text-[#1d4ed8]">
@@ -7210,6 +7326,7 @@ export function AtendimentoClient() {
                           typeof (lead as any)?.signup_password_raw_temp === "string" &&
                           String((lead as any).signup_password_raw_temp).trim().length >= 4;
                         const cadastroOuConcluido = hasStep || hasRecurringPass || hasLegacyTempPass || isConcluded;
+                        const pendingRecurringScheduleMeta = buildRecurringPendingScheduleCardMeta(selectedLead);
 
                         if (cadastroOuConcluido) {
                           const wd = String(lead?.recurring_class_weekday_label ?? lead?.recurring_class_weekday ?? "").trim();
@@ -7251,6 +7368,23 @@ export function AtendimentoClient() {
                             );
                           }
                           if (hasAny) {
+                            if (pendingRecurringScheduleMeta) {
+                              return (
+                                <div className="mt-4 flex items-start gap-3 rounded-xl border border-[#2563eb]/35 bg-[rgba(37,99,235,0.12)] px-4 py-3">
+                                  <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[#2563eb]/20 text-[#1d4ed8]">
+                                    <RefreshCw className="h-5 w-5" />
+                                  </div>
+                                  <div className="min-w-0">
+                                    <div className="font-semibold text-[#1e3a8a] truncate">
+                                      {pendingRecurringScheduleMeta.title}
+                                    </div>
+                                    <div className="mt-0.5 text-[13px] text-[#1d4ed8]/80">
+                                      {pendingRecurringScheduleMeta.body}
+                                    </div>
+                                  </div>
+                                </div>
+                              );
+                            }
                             return (
                               <div className="mt-4 flex items-start gap-3 rounded-xl border border-[#2563eb]/35 bg-[rgba(37,99,235,0.12)] px-4 py-3">
                                 <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[#2563eb]/20 text-[#1d4ed8]">
