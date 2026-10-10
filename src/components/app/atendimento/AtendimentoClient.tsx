@@ -6032,10 +6032,18 @@ export function AtendimentoClient() {
                                   </div>
                                   <div className="min-w-0">
                                     <div className="font-semibold text-[#1e3a8a] truncate">
-                                      Aguardando dia e horário recorrente
+                                      {recWdOk && !recTimeOk
+                                        ? "Aguardando horário recorrente"
+                                        : !recWdOk && recTimeOk
+                                          ? "Aguardando dia recorrente"
+                                          : "Aguardando dia e horário recorrente"}
                                     </div>
                                     <div className="mt-0.5 text-[13px] text-[#1d4ed8]/80">
-                                      Após o aluno definir o dia e o horário, os dados aparecerão aqui.
+                                      {recWdOk && !recTimeOk
+                                        ? "Após o aluno definir o horário, os dados aparecerão aqui."
+                                        : !recWdOk && recTimeOk
+                                          ? "Após o aluno definir o dia da semana, os dados aparecerão aqui."
+                                          : "Após o aluno definir o dia e o horário, os dados aparecerão aqui."}
                                     </div>
                                   </div>
                                 </div>
@@ -7543,10 +7551,18 @@ export function AtendimentoClient() {
                                 </div>
                                 <div className="min-w-0">
                                   <div className="font-semibold text-[#1e3a8a] truncate">
-                                    Aguardando dia e horário recorrente
+                                    {recWdOk && !recTimeOk
+                                      ? "Aguardando horário recorrente"
+                                      : !recWdOk && recTimeOk
+                                        ? "Aguardando dia recorrente"
+                                        : "Aguardando dia e horário recorrente"}
                                   </div>
                                   <div className="mt-0.5 text-[13px] text-[#1d4ed8]/80">
-                                    Após o aluno definir o dia e o horário, os dados aparecerão aqui.
+                                    {recWdOk && !recTimeOk
+                                      ? "Após o aluno definir o horário, os dados aparecerão aqui."
+                                      : !recWdOk && recTimeOk
+                                        ? "Após o aluno definir o dia da semana, os dados aparecerão aqui."
+                                        : "Após o aluno definir o dia e o horário, os dados aparecerão aqui."}
                                   </div>
                                 </div>
                               </div>
