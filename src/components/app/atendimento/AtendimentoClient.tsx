@@ -1554,44 +1554,6 @@ export function AtendimentoClient() {
     }
   }
 
-  async function handleCancelRecurring(lead: AtendimentoLeadListItem) {
-    const recProf = recurringAssignedProfessorForLead(lead);
-    if (!recProf) {
-      modalToast.warning("Selecione o professor das aulas recorrentes antes de cancelar.");
-      return;
-    }
-    if (!window.confirm("Deseja realmente fechar o horário recorrente atual deste registro?")) {
-      return;
-    }
-    try {
-      const res = await fetch(`/api/atendimento/leads/${encodeURIComponent(lead.id)}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          recurring_class_weekday: null,
-          recurring_class_weekday_label: null,
-          recurring_class_lead_time: null,
-          recurring_class_professor_time: null,
-          recurring_class_status: "cancelado_horario_atual",
-        } as any),
-      });
-      const payload = (await res.json().catch(() => null)) as { ok?: boolean; error?: string } | null;
-      if (!res.ok || !payload?.ok) {
-        modalToast.error(payload?.error ?? "Falha ao cancelar horário recorrente.");
-        return;
-      }
-      modalToast.success("Horário recorrente cancelado.");
-      const fresh = await fetch(`/api/atendimento/leads/${encodeURIComponent(lead.id)}?skipEvents=1`, { cache: "no-store" })
-        .then(async (r) => (r.ok ? r.json().catch(() => null) : null))
-        .catch(() => null) as { ok?: boolean; lead?: Record<string, unknown> | null } | null;
-      if (fresh?.ok && fresh.lead?.id) {
-        setPanelLeads((cur) => cur.map((l) => (l.id === lead.id ? ({ ...l, ...fresh.lead } as AtendimentoLeadListItem) : l)));
-      }
-    } catch (_) {
-      modalToast.error("Falha ao cancelar horário recorrente.");
-    }
-  }
-
   async function handleConfirmPayment(lead: AtendimentoLeadListItem) {
     if (confirmingPayment) return;
     if (!window.confirm("Confirmar pagamento e concluir a matrícula deste registro?")) return;
@@ -6058,17 +6020,6 @@ export function AtendimentoClient() {
                                       {recSendingNotification ? "Disparando..." : "Disparar"}
                                     </button>
                                   </div>
-                                  <div className="flex w-full sm:w-auto shrink-0">
-                                    <button
-                                      type="button"
-                                      onClick={() => handleOpenExperimentalBooking(sl, "recurring")}
-                                      title={recSchedOk ? "Reagendar aula recorrente." : "Agendar aula recorrente."}
-                                      className="inline-flex h-10 w-full items-center justify-center gap-2 rounded-full border border-[var(--app-border)] bg-[var(--app-solid-surface)] px-4 text-[13px] font-semibold text-[var(--app-text-85)] hover:bg-[var(--app-hover)] disabled:cursor-not-allowed disabled:opacity-55 sm:w-auto"
-                                    >
-                                      <Plus className="h-4 w-4" />
-                                      {recSchedOk ? "Reagendar" : "Agendar"}
-                                    </button>
-                                  </div>
                                   <div className="relative w-full sm:w-auto shrink-0 min-w-0 sm:max-w-[320px]">
                                     <button
                                       type="button"
@@ -6127,26 +6078,6 @@ export function AtendimentoClient() {
                                       </div>
                                     ) : null}
                                   </div>
-                                  <button
-                                    type="button"
-                                    onClick={() => void handleCancelRecurring(sl)}
-                                    disabled={!recSchedOk}
-                                    title={recSchedOk ? "Fechar horário recorrente atual." : "Defina dia e horário antes de poder fechar o horário recorrente atual."}
-                                    className="hidden sm:inline-flex h-10 w-10 shrink-0 items-center justify-center gap-2 rounded-xl border border-red-500/30 bg-red-500/10 text-red-700 transition hover:bg-red-500/15 disabled:cursor-not-allowed disabled:opacity-55"
-                                  >
-                                    <X className="h-4 w-4 shrink-0" />
-                                  </button>
-                                </div>
-                                <div className="flex sm:hidden absolute top-5 right-5 z-10 items-center gap-2">
-                                  <button
-                                    type="button"
-                                    onClick={() => void handleCancelRecurring(sl)}
-                                    disabled={!recSchedOk}
-                                    title={recSchedOk ? "Fechar horário recorrente atual." : "Defina dia e horário antes."}
-                                    className="inline-flex h-10 w-10 shrink-0 items-center justify-center gap-2 rounded-xl border border-red-500/30 bg-red-500/10 text-red-700 transition hover:bg-red-500/15 disabled:cursor-not-allowed disabled:opacity-55"
-                                  >
-                                    <X className="h-4 w-4 shrink-0" />
-                                  </button>
                                 </div>
                               </div>
                               {!recSchedOk ? (
@@ -7595,17 +7526,6 @@ export function AtendimentoClient() {
                                     {recSendingNotification ? "Disparando..." : "Disparar"}
                                   </button>
                                 </div>
-                                <div className="flex w-full sm:w-auto shrink-0">
-                                  <button
-                                    type="button"
-                                    onClick={() => handleOpenExperimentalBooking(sl, "recurring")}
-                                    title={recSchedOk ? "Reagendar aula recorrente." : "Agendar aula recorrente."}
-                                    className="inline-flex h-10 w-full items-center justify-center gap-2 rounded-full border border-[var(--app-border)] bg-[var(--app-solid-surface)] px-4 text-[13px] font-semibold text-[var(--app-text-85)] hover:bg-[var(--app-hover)] disabled:cursor-not-allowed disabled:opacity-55 sm:w-auto"
-                                  >
-                                    <Plus className="h-4 w-4" />
-                                    {recSchedOk ? "Reagendar" : "Agendar"}
-                                  </button>
-                                </div>
                                 <div className="relative w-full sm:w-auto shrink-0 min-w-0 sm:max-w-[320px]">
                                   <button
                                     type="button"
@@ -7664,26 +7584,6 @@ export function AtendimentoClient() {
                                     </div>
                                   ) : null}
                                 </div>
-                                <button
-                                  type="button"
-                                  onClick={() => void handleCancelRecurring(sl)}
-                                  disabled={!recSchedOk}
-                                  title={recSchedOk ? "Fechar horário recorrente atual." : "Defina dia e horário antes de poder fechar o horário recorrente atual."}
-                                  className="hidden sm:inline-flex h-10 w-10 shrink-0 items-center justify-center gap-2 rounded-xl border border-red-500/30 bg-red-500/10 text-red-700 transition hover:bg-red-500/15 disabled:cursor-not-allowed disabled:opacity-55"
-                                >
-                                  <X className="h-4 w-4 shrink-0" />
-                                </button>
-                              </div>
-                              <div className="flex sm:hidden absolute top-5 right-5 z-10 items-center gap-2">
-                                <button
-                                  type="button"
-                                  onClick={() => void handleCancelRecurring(sl)}
-                                  disabled={!recSchedOk}
-                                  title={recSchedOk ? "Fechar horário recorrente atual." : "Defina dia e horário antes."}
-                                  className="inline-flex h-10 w-10 shrink-0 items-center justify-center gap-2 rounded-xl border border-red-500/30 bg-red-500/10 text-red-700 transition hover:bg-red-500/15 disabled:cursor-not-allowed disabled:opacity-55"
-                                >
-                                  <X className="h-4 w-4 shrink-0" />
-                                </button>
                               </div>
                             </div>
                             {!recSchedOk ? (
