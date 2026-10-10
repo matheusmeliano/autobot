@@ -2935,6 +2935,29 @@ export function AtendimentoClient() {
     }
   }
 
+  async function handleCopyEnrollmentNumber(lead: AtendimentoLeadListItem) {
+    const raw = String((lead as any)?.enrollment_number ?? "").trim();
+    if (!raw) return;
+    try {
+      await navigator.clipboard.writeText(raw);
+      modalToast.success("Número de matrícula copiado.");
+    } catch {
+      try {
+        const ta = document.createElement("textarea");
+        ta.value = raw;
+        ta.style.position = "fixed";
+        ta.style.opacity = "0";
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand("copy");
+        document.body.removeChild(ta);
+        modalToast.success("Número de matrícula copiado.");
+      } catch {
+        modalToast.error("Falha ao copiar matrícula.");
+      }
+    }
+  }
+
   async function loadBotExperimentalSetting() {
     try {
       const res = await fetch("/api/atendimento/settings/experimental-class-bot", { cache: "no-store" });
@@ -5306,7 +5329,15 @@ export function AtendimentoClient() {
                           return (
                             <div className="mt-3 inline-flex w-max max-w-full items-center gap-1.5 rounded-full border border-[#2563eb]/30 bg-[rgba(37,99,235,0.08)] px-3 py-1 text-[12px] font-bold text-[#1e3a8a] sm:text-[13px]">
                               <FileText className="h-3.5 w-3.5 shrink-0" strokeWidth={2.25} />
-                              Matrícula nº {enrollment}
+                              <span className="truncate">Matrícula nº {enrollment}</span>
+                              <button
+                                type="button"
+                                onClick={() => void handleCopyEnrollmentNumber(sl)}
+                                className="inline-flex h-5 shrink-0 items-center justify-center rounded-full border border-[#2563eb]/25 bg-white/60 px-2 text-[10px] font-bold uppercase tracking-wide text-[#1d4ed8] transition hover:bg-white/80"
+                                title="Copiar matrícula"
+                              >
+                                Copiar
+                              </button>
                             </div>
                           );
                         })()}
@@ -6842,7 +6873,15 @@ export function AtendimentoClient() {
                         return (
                           <div className="mt-1 inline-flex w-max max-w-full items-center gap-1.5 rounded-full border border-[#2563eb]/30 bg-[rgba(37,99,235,0.08)] px-3 py-1 text-[12px] font-bold text-[#1e3a8a] sm:text-[13px]">
                             <FileText className="h-3.5 w-3.5 shrink-0" strokeWidth={2.25} />
-                            Matrícula nº {enrollment}
+                            <span className="truncate">Matrícula nº {enrollment}</span>
+                            <button
+                              type="button"
+                              onClick={() => void handleCopyEnrollmentNumber(sl)}
+                              className="inline-flex h-5 shrink-0 items-center justify-center rounded-full border border-[#2563eb]/25 bg-white/60 px-2 text-[10px] font-bold uppercase tracking-wide text-[#1d4ed8] transition hover:bg-white/80"
+                              title="Copiar matrícula"
+                            >
+                              Copiar
+                            </button>
                           </div>
                         );
                       })()}
