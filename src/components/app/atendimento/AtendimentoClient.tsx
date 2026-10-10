@@ -845,7 +845,7 @@ function buildRecurringMetaForVisaoGeral(lead: AtendimentoLeadListItem): { title
 
   if (!scheduleOk) {
     if (recurringWeekdayOk && !recurringTimeOk) {
-      return { title: "Falta horário recorrente", body: "Dia da semana definido, mas horário da aula ainda não foi escolhido no link de matrícula.", tone: "info" };
+      return { title: "Falta horário recorrente", body: "Horário da aula ainda não foi escolhido no link de matrícula.", tone: "info" };
     }
     if (!recurringWeekdayOk && recurringTimeOk) {
       return { title: "Falta dia da semana recorrente", body: "Horário definido, mas dia da semana ainda não foi escolhido no link de matrícula.", tone: "info" };
