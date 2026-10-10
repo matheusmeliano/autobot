@@ -469,6 +469,39 @@ function buildRecurringNextOccurrenceNiceLabel(
   return { weekdayWithDate: wdWithDate, time: cleanTime };
 }
 
+function buildRecurringScheduleCardLabel(lead: AtendimentoLeadListItem): string {
+  const nextOccurrence = buildRecurringNextOccurrenceNiceLabel(lead);
+  if (nextOccurrence?.weekdayWithDate && nextOccurrence.time) {
+    return `${nextOccurrence.weekdayWithDate} às ${nextOccurrence.time}`;
+  }
+  if (nextOccurrence?.weekdayWithDate) {
+    return nextOccurrence.weekdayWithDate;
+  }
+
+  const wdRaw = String((lead as any)?.recurring_class_weekday ?? "").trim();
+  const wdLabelRaw = String((lead as any)?.recurring_class_weekday_label ?? "").trim();
+  const wd = (wdLabelRaw || wdRaw).toLowerCase();
+  const toPT: Record<string, string> = {
+    mon: "Segunda-feira", tue: "Terça-feira", wed: "Quarta-feira", thu: "Quinta-feira",
+    fri: "Sexta-feira", sat: "Sábado", sun: "Domingo",
+    segunda: "Segunda-feira", terca: "Terça-feira", "terça": "Terça-feira",
+    quarta: "Quarta-feira", quinta: "Quinta-feira", sexta: "Sexta-feira",
+    sabado: "Sábado", "sábado": "Sábado", domingo: "Domingo",
+    seg: "Segunda-feira", ter: "Terça-feira", qua: "Quarta-feira",
+    qui: "Quinta-feira", sex: "Sexta-feira", sab: "Sábado", dom: "Domingo",
+  };
+  const wdNice = toPT[wd] || wdLabelRaw || wdRaw.toUpperCase();
+  const t = String(
+    (lead as any)?.recurring_class_professor_time ??
+      (lead as any)?.recurring_class_lead_time ??
+      "",
+  ).trim();
+  if (!wdNice && !t) return "Horário recorrente ainda não definido pelo aluno no link de matrícula.";
+  if (wdNice && !t) return `${wdNice} — horário ainda não definido.`;
+  if (!wdNice && t) return `Horário: ${t} — dia da semana ainda não definido.`;
+  return `${wdNice} às ${t}h`;
+}
+
 function buildExperimentalMetaForList(lead: AtendimentoLeadListItem): { label: string; tone: "success" | "warning" | "default" } {
   // ============================================================
   // GATE: DECISÃO PRINCIPAL RECORRENTE vs EXPERIMENTAL
@@ -5872,25 +5905,7 @@ export function AtendimentoClient() {
                             if (recSavingLessonLink) return true;
                             return false;
                           })();
-                          const recHorarioLabel = (() => {
-                            const wdLabelRaw = String((sl as any).recurring_class_weekday_label ?? "").trim();
-                            const wd = (wdLabelRaw || recWdRaw).toLowerCase();
-                            const toPT: Record<string, string> = {
-                              mon: "Segunda-feira", tue: "Terça-feira", wed: "Quarta-feira", thu: "Quinta-feira",
-                              fri: "Sexta-feira", sat: "Sábado", sun: "Domingo",
-                              segunda: "Segunda-feira", terca: "Terça-feira", "terça": "Terça-feira",
-                              quarta: "Quarta-feira", quinta: "Quinta-feira", sexta: "Sexta-feira",
-                              sabado: "Sábado", "sábado": "Sábado", domingo: "Domingo",
-                              seg: "Segunda-feira", ter: "Terça-feira", qua: "Quarta-feira",
-                              qui: "Quinta-feira", sex: "Sexta-feira", sab: "Sábado", dom: "Domingo",
-                            };
-                            const wdNice = toPT[wd] || (wdLabelRaw || (recWdOk ? recWdRaw.toUpperCase() : "") || "");
-                            const t = recProfTimeRaw || recLeadTimeRaw || "";
-                            if (!wdNice && !t) return "Horário recorrente ainda não definido pelo aluno no link de matrícula.";
-                            if (wdNice && !t) return `${wdNice} — horário ainda não definido.`;
-                            if (!wdNice && t) return `Horário: ${t} — dia da semana ainda não definido.`;
-                            return `${wdNice} às ${t}h`;
-                          })();
+                          const recHorarioLabel = buildRecurringScheduleCardLabel(sl);
                           return (
                             <div className="relative overflow-hidden rounded-2xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] p-5 shadow-none">
                               <div className="flex flex-wrap items-start justify-between gap-3">
@@ -7401,25 +7416,7 @@ export function AtendimentoClient() {
                           if (recSavingLessonLink) return true;
                           return false;
                         })();
-                        const recHorarioLabel = (() => {
-                          const wdLabelRaw = String((sl as any).recurring_class_weekday_label ?? "").trim();
-                          const wd = (wdLabelRaw || recWdRaw).toLowerCase();
-                          const toPT: Record<string, string> = {
-                            mon: "Segunda-feira", tue: "Terça-feira", wed: "Quarta-feira", thu: "Quinta-feira",
-                            fri: "Sexta-feira", sat: "Sábado", sun: "Domingo",
-                            segunda: "Segunda-feira", terca: "Terça-feira", "terça": "Terça-feira",
-                            quarta: "Quarta-feira", quinta: "Quinta-feira", sexta: "Sexta-feira",
-                            sabado: "Sábado", "sábado": "Sábado", domingo: "Domingo",
-                            seg: "Segunda-feira", ter: "Terça-feira", qua: "Quarta-feira",
-                            qui: "Quinta-feira", sex: "Sexta-feira", sab: "Sábado", dom: "Domingo",
-                          };
-                          const wdNice = toPT[wd] || (wdLabelRaw || (recWdOk ? recWdRaw.toUpperCase() : "") || "");
-                          const t = recProfTimeRaw || recLeadTimeRaw || "";
-                          if (!wdNice && !t) return "Horário recorrente ainda não definido pelo aluno no link de matrícula.";
-                          if (wdNice && !t) return `${wdNice} — horário ainda não definido.`;
-                          if (!wdNice && t) return `Horário: ${t} — dia da semana ainda não definido.`;
-                          return `${wdNice} às ${t}h (recorrente semanal).`;
-                        })();
+                        const recHorarioLabel = buildRecurringScheduleCardLabel(sl);
                         return (
                           <div className="relative overflow-hidden rounded-2xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] p-5 shadow-none">
                             <div className="flex flex-wrap items-start justify-between gap-3">
