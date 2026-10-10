@@ -1006,6 +1006,7 @@ export function AtendimentoClient() {
 
   const [isEditExperimentalOpen, setIsEditExperimentalOpen] = useState(false);
   const [editingExperimentalLead, setEditingExperimentalLead] = useState<AtendimentoLeadListItem | null>(null);
+  const [experimentalBookingModalContext, setExperimentalBookingModalContext] = useState<"experimental" | "recurring">("experimental");
   const [savingExperimentalLeadId, setSavingExperimentalLeadId] = useState<string | null>(null);
   const [loadingExperimentalAvailability, setLoadingExperimentalAvailability] = useState<boolean>(false);
   const [experimentalAvailability, setExperimentalAvailability] = useState<{
@@ -3156,13 +3157,17 @@ export function AtendimentoClient() {
     }
   }
 
-  function handleOpenExperimentalBooking(lead: AtendimentoLeadListItem) {
+  function handleOpenExperimentalBooking(
+    lead: AtendimentoLeadListItem,
+    context: "experimental" | "recurring" = "experimental",
+  ) {
     const fullNameRaw = String(lead?.full_name ?? "").trim();
     if (!fullNameRaw) {
       modalToast.error("Cadastre o nome do aluno antes de agendar uma aula.");
       return;
     }
     setEditingExperimentalLead(lead);
+    setExperimentalBookingModalContext(context);
     setSelectedExperimentalDateId(null);
     setSelectedExperimentalSlotId(null);
     setExperimentalAvailability(null);
@@ -3189,18 +3194,20 @@ export function AtendimentoClient() {
             slotsByDate,
             lead_timezone,
           });
-          const booking = (lead as any)?.experimental_class_booking as any;
-          const pDate = String(booking?.professor_date ?? "").slice(0, 10);
-          const pTime = String(booking?.professor_time ?? "").trim();
-          if (pDate && pTime) {
-            const slotId = `${pDate}|${pTime}`;
-            const maybeSlots = Array.isArray(slotsByDate?.[pDate]) ? (slotsByDate[pDate] as any[]) : [];
-            const maybeDate = dates.find((d) => String(d?.id ?? d?.professorDate ?? "") === pDate);
-            if (maybeDate) {
-              setSelectedExperimentalDateId(String(maybeDate.id));
-            }
-            if (maybeSlots.length && maybeSlots.some((s) => String(s?.id ?? "") === slotId)) {
-              setSelectedExperimentalSlotId(slotId);
+          if (context === "experimental") {
+            const booking = (lead as any)?.experimental_class_booking as any;
+            const pDate = String(booking?.professor_date ?? "").slice(0, 10);
+            const pTime = String(booking?.professor_time ?? "").trim();
+            if (pDate && pTime) {
+              const slotId = `${pDate}|${pTime}`;
+              const maybeSlots = Array.isArray(slotsByDate?.[pDate]) ? (slotsByDate[pDate] as any[]) : [];
+              const maybeDate = dates.find((d) => String(d?.id ?? d?.professorDate ?? "") === pDate);
+              if (maybeDate) {
+                setSelectedExperimentalDateId(String(maybeDate.id));
+              }
+              if (maybeSlots.length && maybeSlots.some((s) => String(s?.id ?? "") === slotId)) {
+                setSelectedExperimentalSlotId(slotId);
+              }
             }
           }
         } else {
@@ -3218,6 +3225,7 @@ export function AtendimentoClient() {
   function handleCloseExperimentalBooking() {
     setIsEditExperimentalOpen(false);
     setEditingExperimentalLead(null);
+    setExperimentalBookingModalContext("experimental");
     setExperimentalAvailability(null);
     setSelectedExperimentalDateId(null);
     setSelectedExperimentalSlotId(null);
@@ -5937,7 +5945,7 @@ export function AtendimentoClient() {
                                   <div className="flex w-full sm:w-auto shrink-0">
                                     <button
                                       type="button"
-                                      onClick={() => handleOpenExperimentalBooking(sl)}
+                                      onClick={() => handleOpenExperimentalBooking(sl, "recurring")}
                                       title={recSchedOk ? "Reagendar aula recorrente." : "Agendar aula recorrente."}
                                       className="inline-flex h-10 w-full items-center justify-center gap-2 rounded-full border border-[var(--app-border)] bg-[var(--app-solid-surface)] px-4 text-[13px] font-semibold text-[var(--app-text-85)] hover:bg-[var(--app-hover)] disabled:cursor-not-allowed disabled:opacity-55 sm:w-auto"
                                     >
@@ -7456,7 +7464,7 @@ export function AtendimentoClient() {
                                 <div className="flex w-full sm:w-auto shrink-0">
                                   <button
                                     type="button"
-                                    onClick={() => handleOpenExperimentalBooking(sl)}
+                                    onClick={() => handleOpenExperimentalBooking(sl, "recurring")}
                                     title={recSchedOk ? "Reagendar aula recorrente." : "Agendar aula recorrente."}
                                     className="inline-flex h-10 w-full items-center justify-center gap-2 rounded-full border border-[var(--app-border)] bg-[var(--app-solid-surface)] px-4 text-[13px] font-semibold text-[var(--app-text-85)] hover:bg-[var(--app-hover)] disabled:cursor-not-allowed disabled:opacity-55 sm:w-auto"
                                   >
@@ -8275,7 +8283,9 @@ export function AtendimentoClient() {
               </div>
               <div className="min-w-0">
                 <h3 className="truncate text-[18px] font-bold leading-tight text-[var(--app-text-85)]">
-                  {editingExperimentalLead && (editingExperimentalLead as any)?.experimental_class_booking?.status === "scheduled"
+                  {experimentalBookingModalContext === "experimental" &&
+                  editingExperimentalLead &&
+                  (editingExperimentalLead as any)?.experimental_class_booking?.status === "scheduled"
                     ? "Reagendamento de aula"
                     : "Agendamento de aula"}
                 </h3>
