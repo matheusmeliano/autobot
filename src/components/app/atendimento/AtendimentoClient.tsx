@@ -912,7 +912,7 @@ function buildRecurringMetaForVisaoGeral(lead: AtendimentoLeadListItem): { title
     Boolean(contractPdfRaw && contractPdfRaw !== "null");
 
   if (!contractAceito) {
-    return { title: "Falta aceitar contrato", body: "Dia e horário definidos. O aluno agora precisa aceitar os termos do contrato no link de matrícula.", tone: "info" };
+    return { title: "Falta aceitar contrato", body: "O aluno deve aceitar os termos do contrato agora.", tone: "info" };
   }
 
   // ===== PASSO 3: PAGAMENTO =====
