@@ -1609,6 +1609,7 @@ function BookingDetails({
   const [assignProfessorDropdownOpen, setAssignProfessorDropdownOpen] = useState(false);
   const [recurringAssignProfessorDropdownOpen, setRecurringAssignProfessorDropdownOpen] = useState(false);
   const hasRecurringSignalForHideExperimental = activeSection === "agendamentos" && leadHasAnyRecurringProgressSignal(lead);
+  const hasMatriculaOrRecurringStageInitiated = leadHasMatriculaOrRecurringStageInitiated(lead);
   const hideExperimentalInfoCompletely = shouldHideExperimentalInfoCompletely(lead, activeSection);
   const initialSavedRecurringLink = String((lead as any).recurring_class_link ?? "").trim();
   const [recurringLinkDraft, setRecurringLinkDraft] = useState(initialSavedRecurringLink);
@@ -1920,6 +1921,7 @@ function BookingDetails({
         {activeSection === "agendamentos" &&
         onEditExperimental &&
         !hasRecurringClass &&
+        !hasMatriculaOrRecurringStageInitiated &&
         !hideExperimentalInfoCompletely ? (
           <button
             type="button"
@@ -1989,7 +1991,7 @@ function BookingDetails({
       </div>
 
       <div className="mt-4 min-w-0 flex-1 overflow-y-auto pr-1 scrollbar-hide">
-        {activeSection === "agendamentos" && leadHasMatriculaOrRecurringStageInitiated(lead) ? (
+        {activeSection === "agendamentos" && hasMatriculaOrRecurringStageInitiated ? (
           <div className="rounded-2xl border border-[var(--app-border)] bg-[var(--app-card)] p-4">
             <div className="flex flex-wrap items-center gap-2 min-[600px]:justify-between">
               <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--app-text-45)]">
@@ -2151,7 +2153,7 @@ function BookingDetails({
           </div>
         ) : null}
 
-        {activeSection === "agendamentos" && leadHasMatriculaOrRecurringStageInitiated(lead) ? (
+        {activeSection === "agendamentos" && hasMatriculaOrRecurringStageInitiated ? (
           <div className="mt-4 rounded-2xl border border-[var(--app-border)] bg-[var(--app-card)] p-4">
             <div className="flex flex-wrap items-center gap-2 min-[600px]:justify-between">
               <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--app-text-45)]">
