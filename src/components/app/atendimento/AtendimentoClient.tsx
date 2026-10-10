@@ -5938,11 +5938,11 @@ export function AtendimentoClient() {
                                     <button
                                       type="button"
                                       onClick={() => handleOpenExperimentalBooking(sl)}
-                                      title="Reagendar aula recorrente."
+                                      title={recSchedOk ? "Reagendar aula recorrente." : "Agendar aula recorrente."}
                                       className="inline-flex h-10 w-full items-center justify-center gap-2 rounded-full border border-[var(--app-border)] bg-[var(--app-solid-surface)] px-4 text-[13px] font-semibold text-[var(--app-text-85)] hover:bg-[var(--app-hover)] disabled:cursor-not-allowed disabled:opacity-55 sm:w-auto"
                                     >
                                       <Plus className="h-4 w-4" />
-                                      Reagendar
+                                      {recSchedOk ? "Reagendar" : "Agendar"}
                                     </button>
                                   </div>
                                   <div className="relative w-full sm:w-auto shrink-0 min-w-0 sm:max-w-[320px]">
@@ -7449,11 +7449,11 @@ export function AtendimentoClient() {
                                   <button
                                     type="button"
                                     onClick={() => handleOpenExperimentalBooking(sl)}
-                                    title="Reagendar aula recorrente."
+                                    title={recSchedOk ? "Reagendar aula recorrente." : "Agendar aula recorrente."}
                                     className="inline-flex h-10 w-full items-center justify-center gap-2 rounded-full border border-[var(--app-border)] bg-[var(--app-solid-surface)] px-4 text-[13px] font-semibold text-[var(--app-text-85)] hover:bg-[var(--app-hover)] disabled:cursor-not-allowed disabled:opacity-55 sm:w-auto"
                                   >
                                     <Plus className="h-4 w-4" />
-                                    Reagendar
+                                    {recSchedOk ? "Reagendar" : "Agendar"}
                                   </button>
                                 </div>
                                 <div className="relative w-full sm:w-auto shrink-0 min-w-0 sm:max-w-[320px]">
