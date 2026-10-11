@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {
+  calculateDisplayRecurringOccurrence,
   buildExperimentalClassAttendantWhatsAppMessage,
   buildExperimentalClassAttendantStartReminderWhatsAppMessage,
   buildExperimentalClassBookingChatMessages,
@@ -480,4 +481,20 @@ test("findExperimentalClassTimeOption fallback para professorTime quando horario
   const fallback = findExperimentalClassTimeOption("14:00", options);
   assert.equal(fallback?.professorTime, "14:00", "se usuario digitar horario do professor diretamente, ainda deve acertar (fallback retrocompatibilidade)");
   assert.equal(fallback?.leadTime, "11:00");
+});
+
+test("calculateDisplayRecurringOccurrence preserva o horario salvo do aluno ao avancar para a proxima aula", () => {
+  const occurrence = calculateDisplayRecurringOccurrence({
+    weekday: "mon",
+    professorTimeHHMM: "14:00",
+    professorTimeZone: "America/Sao_Paulo",
+    leadTimeZone: "America/New_York",
+    leadTimeHHMM: "11:00",
+    lastNotifiedOccurrenceStartAt: "2026-10-12T17:00:00.000Z",
+    fromDate: new Date("2026-10-13T12:00:00.000Z"),
+  });
+
+  assert.equal(occurrence?.professorDate, "2026-10-19");
+  assert.equal(occurrence?.professorTime, "14:00");
+  assert.equal(occurrence?.leadTime, "11:00");
 });

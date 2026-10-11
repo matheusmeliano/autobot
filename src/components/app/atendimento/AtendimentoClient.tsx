@@ -444,6 +444,7 @@ function buildRecurringNextOccurrenceNiceLabel(
       ) || normalizeScheduleTimeForComparison(tmRaw),
     professorTimeZone: ATENDIMENTO_PROFESSOR_TIME_ZONE,
     leadTimeZone: tz,
+    leadTimeHHMM: normalizeScheduleTimeForComparison(tmRaw),
     lastNotifiedOccurrenceStartAt: String(
       (lead as any)?.recurring_class_last_notified_occurrence_start_at ?? "",
     ).trim(),
@@ -650,6 +651,7 @@ function buildExperimentalMetaForList(lead: AtendimentoLeadListItem): { label: s
         ) || normalizeScheduleTimeForComparison(gRecurringLeadTimeRaw),
       professorTimeZone: ATENDIMENTO_PROFESSOR_TIME_ZONE,
       leadTimeZone: leadEffectiveTz,
+      leadTimeHHMM: normalizeScheduleTimeForComparison(gRecurringLeadTimeRaw),
       lastNotifiedOccurrenceStartAt: String(
         (lead as any)?.recurring_class_last_notified_occurrence_start_at ?? "",
       ).trim(),

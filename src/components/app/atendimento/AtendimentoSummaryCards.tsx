@@ -1762,6 +1762,7 @@ function BookingDetails({
           professorTimeHHMM: recurringTime,
           professorTimeZone: ATENDIMENTO_PROFESSOR_TIME_ZONE,
           leadTimeZone: lead.timezone || null,
+          leadTimeHHMM: recurringLeadTimeRaw || recurringProfessorTime,
           lastNotifiedOccurrenceStartAt: String(
             (lead as any)?.recurring_class_last_notified_occurrence_start_at ?? "",
           ).trim(),
@@ -1780,6 +1781,7 @@ function BookingDetails({
       professorTimeHHMM: recurringTime,
       professorTimeZone: ATENDIMENTO_PROFESSOR_TIME_ZONE,
       leadTimeZone: lead.timezone || null,
+      leadTimeHHMM: recurringLeadTimeRaw || recurringProfessorTime,
       fromDate: String((lead as any).recurring_class_created_at ?? lead.created_at ?? "").trim(),
     });
   }, [

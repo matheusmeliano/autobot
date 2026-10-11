@@ -1406,6 +1406,7 @@ export function calculateNextRecurringOccurrence(params: {
   professorTimeHHMM: string;
   professorTimeZone?: string | null;
   leadTimeZone?: string | null;
+  leadTimeHHMM?: string | null;
   fromDate?: Date;
 }) {
   const wantWeekday = String(params.weekday ?? "").trim().toLowerCase();
@@ -1414,6 +1415,8 @@ export function calculateNextRecurringOccurrence(params: {
   if (!/^\d{2}:\d{2}$/.test(time)) return null;
   const profTz = String(params.professorTimeZone ?? ATENDIMENTO_PROFESSOR_TIME_ZONE ?? "").trim() || ATENDIMENTO_PROFESSOR_TIME_ZONE;
   const leadTz = String(params.leadTimeZone ?? "").trim() || profTz;
+  const leadTimeRaw = String(params.leadTimeHHMM ?? "").trim();
+  const leadTimeHHMM = /^\d{2}:\d{2}$/.test(leadTimeRaw) ? leadTimeRaw : "";
   const now = params.fromDate ?? new Date();
 
   const todayLocal = localDateInTimeZone(now, profTz);
@@ -1452,7 +1455,7 @@ export function calculateNextRecurringOccurrence(params: {
       professorTimeZone: profTz,
       professorStartAt: startUtcIso,
       leadDate: localDateInTimeZone(new Date(startUtcMs), leadTz),
-      leadTime: formatTimeInTimeZone(startUtcIso, leadTz),
+      leadTime: leadTimeHHMM || formatTimeInTimeZone(startUtcIso, leadTz),
       leadStartAt: startUtcIso,
       leadTimeZone: leadTz,
       weekdayLabel:
@@ -1469,6 +1472,7 @@ export function calculateCurrentOrNextRecurringOccurrence(params: {
   professorTimeHHMM: string;
   professorTimeZone?: string | null;
   leadTimeZone?: string | null;
+  leadTimeHHMM?: string | null;
   fromDate?: Date;
 }) {
   const wantWeekday = String(params.weekday ?? "").trim().toLowerCase();
@@ -1477,6 +1481,8 @@ export function calculateCurrentOrNextRecurringOccurrence(params: {
   if (!/^\d{2}:\d{2}$/.test(time)) return null;
   const profTz = String(params.professorTimeZone ?? ATENDIMENTO_PROFESSOR_TIME_ZONE ?? "").trim() || ATENDIMENTO_PROFESSOR_TIME_ZONE;
   const leadTz = String(params.leadTimeZone ?? "").trim() || profTz;
+  const leadTimeRaw = String(params.leadTimeHHMM ?? "").trim();
+  const leadTimeHHMM = /^\d{2}:\d{2}$/.test(leadTimeRaw) ? leadTimeRaw : "";
   const now = params.fromDate ?? new Date();
 
   const todayLocal = localDateInTimeZone(now, profTz);
@@ -1514,7 +1520,7 @@ export function calculateCurrentOrNextRecurringOccurrence(params: {
       professorTimeZone: profTz,
       professorStartAt: startUtcIso,
       leadDate: localDateInTimeZone(new Date(startUtcMs), leadTz),
-      leadTime: formatTimeInTimeZone(startUtcIso, leadTz),
+      leadTime: leadTimeHHMM || formatTimeInTimeZone(startUtcIso, leadTz),
       leadStartAt: startUtcIso,
       leadTimeZone: leadTz,
       weekdayLabel:
@@ -1531,6 +1537,7 @@ export function calculateDisplayRecurringOccurrence(params: {
   professorTimeHHMM: string;
   professorTimeZone?: string | null;
   leadTimeZone?: string | null;
+  leadTimeHHMM?: string | null;
   fromDate?: Date;
   lastNotifiedOccurrenceStartAt?: string | null;
   studentNotificationSentAt?: string | null;
@@ -1618,6 +1625,7 @@ export function calculatePastRecurringOccurrences(params: {
   professorTimeHHMM: string;
   professorTimeZone?: string | null;
   leadTimeZone?: string | null;
+  leadTimeHHMM?: string | null;
   fromDate?: Date | string | null;
   toDate?: Date;
 }) {
@@ -1627,6 +1635,8 @@ export function calculatePastRecurringOccurrences(params: {
   if (!/^\d{2}:\d{2}$/.test(time)) return [];
   const profTz = String(params.professorTimeZone ?? ATENDIMENTO_PROFESSOR_TIME_ZONE ?? "").trim() || ATENDIMENTO_PROFESSOR_TIME_ZONE;
   const leadTz = String(params.leadTimeZone ?? "").trim() || profTz;
+  const leadTimeRaw = String(params.leadTimeHHMM ?? "").trim();
+  const leadTimeHHMM = /^\d{2}:\d{2}$/.test(leadTimeRaw) ? leadTimeRaw : "";
   const to = params.toDate ?? new Date();
 
   let fromMs: number;
@@ -1684,7 +1694,7 @@ export function calculatePastRecurringOccurrences(params: {
           professorTimeZone: profTz,
           professorStartAt: startUtcIso,
           leadDate: localDateInTimeZone(new Date(startUtcMs), leadTz),
-          leadTime: formatTimeInTimeZone(startUtcIso, leadTz),
+          leadTime: leadTimeHHMM || formatTimeInTimeZone(startUtcIso, leadTz),
           leadStartAt: startUtcIso,
           leadTimeZone: leadTz,
           weekdayLabel:
