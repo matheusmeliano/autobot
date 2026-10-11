@@ -2,7 +2,12 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { inferCountry } from "../../../lib/atendimento/experimentalClass";
+import {
+  RECURRING_WEEKDAY_LABELS_PT_BR,
+  calculateDisplayRecurringOccurrence,
+  inferCountry,
+} from "../../../lib/atendimento/experimentalClass";
+import { ATENDIMENTO_PROFESSOR_TIME_ZONE } from "../../../lib/atendimento/constants";
 import { resolveStudentTimezone } from "../../../lib/timezone";
 import { AppModal } from "@/components/app/AppModal";
 import { Info, X, Eye, EyeOff, Copy, Check } from "lucide-react";
@@ -103,6 +108,51 @@ function CopyButton({ value, label }: { value: string; label?: string }) {
       <span>{copied ? "Copiado!" : label ?? "Copiar"}</span>
     </button>
   );
+}
+
+function buildAlunoRecurringScheduleLabel(lead: Record<string, unknown> | null | undefined): string {
+  const weekdayRaw = String(lead?.recurring_class_weekday ?? "").trim().toLowerCase();
+  const leadTimeRaw = String(
+    lead?.recurring_class_lead_time ?? lead?.recurring_class_professor_time ?? "",
+  ).trim();
+  const weekdayLabelFallback = String(lead?.recurring_class_weekday_label ?? "").trim();
+  const validWeekday = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"].includes(weekdayRaw)
+    ? (weekdayRaw as "mon" | "tue" | "wed" | "thu" | "fri" | "sat" | "sun")
+    : null;
+
+  if (validWeekday && /^\d{2}:\d{2}$/.test(leadTimeRaw)) {
+    const displayOccurrence = calculateDisplayRecurringOccurrence({
+      weekday: validWeekday,
+      professorTimeHHMM: leadTimeRaw,
+      professorTimeZone: ATENDIMENTO_PROFESSOR_TIME_ZONE,
+      leadTimeZone: String(lead?.timezone ?? "").trim() || null,
+      studentNotificationSentAt: String(
+        lead?.recurring_class_student_start_notification_sent_at ?? "",
+      ).trim(),
+      attendantNotificationSentAt: String(
+        lead?.recurring_class_attendant_start_notification_sent_at ?? "",
+      ).trim(),
+    });
+
+    const occurrenceDate = String(
+      displayOccurrence?.leadDate ?? displayOccurrence?.professorDate ?? "",
+    ).trim();
+    const occurrenceTime = String(displayOccurrence?.leadTime ?? leadTimeRaw).trim();
+    if (occurrenceDate && occurrenceTime) {
+      const [, month = "", day = ""] = occurrenceDate.match(/^(\d{4})-(\d{2})-(\d{2})$/) ?? [];
+      const weekdayLabel =
+        String(displayOccurrence?.weekdayLabel ?? "").trim() ||
+        (RECURRING_WEEKDAY_LABELS_PT_BR as Record<string, string>)?.[validWeekday] ||
+        weekdayLabelFallback;
+      const dateShort = day && month ? `${day}/${month}` : occurrenceDate;
+      if (weekdayLabel && dateShort) return `${weekdayLabel} (${dateShort}) · ${occurrenceTime}`;
+      if (weekdayLabel) return `${weekdayLabel} · ${occurrenceTime}`;
+      return `${occurrenceDate} · ${occurrenceTime}`;
+    }
+  }
+
+  if (weekdayLabelFallback && leadTimeRaw) return `${weekdayLabelFallback} · ${leadTimeRaw}`;
+  return weekdayLabelFallback || leadTimeRaw || "—";
 }
 
 export default function CadastroRecorrenteBody() {
@@ -1683,8 +1733,7 @@ export default function CadastroRecorrenteBody() {
         if (pdfb) { try { localStorage.setItem("enrollment_number_" + pdfb, gn); } catch (ignore) {} }
       } catch (ignoreFallback) {}
     }
-    const weekdayLabel = String(lead?.recurring_class_weekday_label ?? "").trim();
-    const leadTime = String(lead?.recurring_class_lead_time ?? lead?.recurring_class_professor_time ?? "").trim();
+    const recurringScheduleLabel = buildAlunoRecurringScheduleLabel(lead);
     const professorName = String(lead?.recurring_class_professor_name ?? "").trim() || "Lucas Brum";
     const planName = String(lead?.plan_name ?? "").trim() || "Plano Individual";
     const alunoContractPdfUrl = String(lead?.contract_pdf_url ?? "").trim();
@@ -1873,7 +1922,7 @@ export default function CadastroRecorrenteBody() {
                         Dia e horário
                       </div>
                       <div className="text-indigo-950 font-semibold text-base leading-snug">
-                        {(weekdayLabel && leadTime) ? `${weekdayLabel} · ${leadTime}` : weekdayLabel || leadTime || "—"}
+                        {recurringScheduleLabel}
                       </div>
                     </div>
                     <div>

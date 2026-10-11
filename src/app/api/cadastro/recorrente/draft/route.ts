@@ -158,7 +158,7 @@ export async function GET(req: NextRequest) {
       } else if (/column.*does not exist|PGRST204|42703/i.test(String(selFull.error?.message ?? ""))) {
           const fallback = await admin
             .from("atendimento_leads")
-            .select("id, phone, full_name, cpf, legal_responsible_name, legal_responsible_cpf, contract_pdf_url, contract_signed_at, state, city, country, timezone, recurring_registration_step, signup_password_raw_temp, recurring_registration_password, recurring_class_weekday, recurring_class_weekday_label, recurring_class_professor_time, recurring_class_lead_time, recurring_class_professor_name, plan_name, plan_monthly_value, payment_status, payment_confirmed_at, status, funnel_stage, enrollment_number, student_email, email")
+            .select("id, phone, full_name, cpf, legal_responsible_name, legal_responsible_cpf, contract_pdf_url, contract_signed_at, state, city, country, timezone, recurring_registration_step, signup_password_raw_temp, recurring_registration_password, recurring_class_weekday, recurring_class_weekday_label, recurring_class_professor_time, recurring_class_lead_time, recurring_class_professor_name, plan_name, plan_monthly_value, payment_status, payment_confirmed_at, recurring_class_student_start_notification_sent_at, recurring_class_attendant_start_notification_sent_at, status, funnel_stage, enrollment_number, student_email, email")
             .eq("phone", normalizedPhone)
             .limit(1)
             .maybeSingle();
@@ -172,7 +172,7 @@ export async function GET(req: NextRequest) {
         try {
           const fallback = await admin
             .from("atendimento_leads")
-            .select("id, phone, full_name, cpf, legal_responsible_name, legal_responsible_cpf, contract_pdf_url, contract_signed_at, state, city, country, timezone, recurring_registration_step, signup_password_raw_temp, recurring_registration_password, recurring_class_weekday, recurring_class_weekday_label, recurring_class_professor_time, recurring_class_lead_time, recurring_class_professor_name, plan_name, plan_monthly_value, payment_status, payment_confirmed_at, status, funnel_stage, enrollment_number, student_email, email")
+            .select("id, phone, full_name, cpf, legal_responsible_name, legal_responsible_cpf, contract_pdf_url, contract_signed_at, state, city, country, timezone, recurring_registration_step, signup_password_raw_temp, recurring_registration_password, recurring_class_weekday, recurring_class_weekday_label, recurring_class_professor_time, recurring_class_lead_time, recurring_class_professor_name, plan_name, plan_monthly_value, payment_status, payment_confirmed_at, recurring_class_student_start_notification_sent_at, recurring_class_attendant_start_notification_sent_at, status, funnel_stage, enrollment_number, student_email, email")
             .eq("phone", normalizedPhone)
             .limit(1)
             .maybeSingle();
@@ -304,6 +304,12 @@ export async function GET(req: NextRequest) {
         plan_monthly_value: readStr("plan_monthly_value"),
         payment_status: readStr("payment_status"),
         payment_confirmed_at: readStr("payment_confirmed_at"),
+        recurring_class_student_start_notification_sent_at: readStr(
+          "recurring_class_student_start_notification_sent_at",
+        ),
+        recurring_class_attendant_start_notification_sent_at: readStr(
+          "recurring_class_attendant_start_notification_sent_at",
+        ),
         status: readStr("status"),
         funnel_stage: readStr("funnel_stage"),
         recurring_matricula_concluida_dismissed_at: readStr("recurring_matricula_concluida_dismissed_at"),
@@ -315,6 +321,12 @@ export async function GET(req: NextRequest) {
         recurring_class_weekday_label: readStr("recurring_class_weekday_label"),
         recurring_class_professor_time: readStr("recurring_class_professor_time"),
         recurring_class_lead_time: readStr("recurring_class_lead_time"),
+        recurring_class_student_start_notification_sent_at: readStr(
+          "recurring_class_student_start_notification_sent_at",
+        ),
+        recurring_class_attendant_start_notification_sent_at: readStr(
+          "recurring_class_attendant_start_notification_sent_at",
+        ),
       },
       is_matricula_concluida: isMatriculaConcluida,
     });
