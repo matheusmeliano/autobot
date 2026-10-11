@@ -30,6 +30,51 @@ function isExperimentalClassBookingsLessonLinkColumnUnavailable(error: unknown) 
   );
 }
 
+function shouldSuppressExperimentalDataForLead(row: any): boolean {
+  const statusRaw = String(row?.status ?? "").trim().toLowerCase();
+  const funnelRaw = String(row?.funnel_stage ?? "").trim().toLowerCase();
+  const recurringStatusRaw = String(row?.recurring_class_status ?? "").trim().toLowerCase();
+  const contractStatusRaw = String(row?.contract_status ?? "").trim().toLowerCase();
+  const paymentStatusRaw = String(row?.payment_status ?? "").trim().toLowerCase();
+  const paymentConfirmedAtRaw = String(row?.payment_confirmed_at ?? "").trim();
+  const enrollmentNumberRaw = String(row?.enrollment_number ?? "").trim();
+  const regStepRaw = Number(row?.recurring_registration_step ?? NaN);
+  const regStepOk = Number.isFinite(regStepRaw) && regStepRaw >= 1;
+  const hasRecurringPassword =
+    Boolean(String(row?.recurring_registration_password ?? "").trim()) ||
+    Boolean(String(row?.signup_password_raw_temp ?? "").trim());
+  const matriculaConcluida =
+    paymentStatusRaw === "confirmado" ||
+    Boolean(paymentConfirmedAtRaw && paymentConfirmedAtRaw !== "null") ||
+    Boolean(enrollmentNumberRaw) ||
+    statusRaw === "matriculado" ||
+    statusRaw === "matricula_confirmada" ||
+    funnelRaw === "matriculado" ||
+    funnelRaw === "matricula_confirmada";
+  const recurringStageStarted =
+    statusRaw === "aluno" ||
+    statusRaw === "matriculado" ||
+    statusRaw === "cadastro_recorrente_pendente_plataforma" ||
+    statusRaw === "contrato_coletando_dados" ||
+    statusRaw === "contrato_aguardando_aceite" ||
+    statusRaw === "contrato_assinado" ||
+    statusRaw === "matricula_confirmada" ||
+    funnelRaw === "aluno" ||
+    funnelRaw === "aluno_recorrente_cadastrado" ||
+    funnelRaw === "cadastro_recorrente_pendente_plataforma" ||
+    funnelRaw === "contrato_coletando_dados" ||
+    funnelRaw === "contrato_aguardando_aceite" ||
+    funnelRaw === "contrato_assinado" ||
+    funnelRaw === "matricula_confirmada" ||
+    funnelRaw === "matriculado" ||
+    recurringStatusRaw === "cadastro_plataforma_pendente" ||
+    recurringStatusRaw === "confirmado" ||
+    contractStatusRaw === "coletando_dados" ||
+    contractStatusRaw === "aguardando_aceite" ||
+    contractStatusRaw === "assinado";
+  return regStepOk || hasRecurringPassword || matriculaConcluida || recurringStageStarted;
+}
+
 export async function GET() {
   try {
     const auth = await requireAtendimentoUser();
@@ -540,19 +585,36 @@ export async function GET() {
       const finalFunnel = finalFunnelStage || (useContractHistoryFallback && histContract?.funnel_stage) || null;
       const finalStatus = finalLeadStatus || (useContractHistoryFallback && histContract?.status) || null;
 
+      const suppressExperimental = shouldSuppressExperimentalDataForLead({
+        ...row,
+        status: finalStatus || String((row as any)?.status ?? "") || null,
+        funnel_stage: finalFunnel || String((row as any)?.funnel_stage ?? "") || null,
+        payment_status: finalPaymentStatus,
+        payment_confirmed_at: finalConfirmedAt,
+        contract_status: finalContractStatus || String((row as any)?.contract_status ?? "") || null,
+      });
+
       return {
         ...row,
         status: finalStatus || String((row as any)?.status ?? "") || null,
         funnel_stage: finalFunnel || String((row as any)?.funnel_stage ?? "") || null,
         payment_status: finalPaymentStatus,
+        payment_confirmed_at: finalConfirmedAt,
         contract_status: finalContractStatus || String((row as any)?.contract_status ?? "") || null,
         contract_signed_at: finalContractSignedAt,
         contract_pdf_url: finalContractPdf,
         recurring_class_status: String((row as any)?.recurring_class_status ?? "") || null,
-        future_experimental_class_booking: futureExperimentalBookingByLeadId.get(leadId) ?? null,
-        latest_experimental_class_booking: latestBookingByLeadId.get(leadId) ?? null,
-        experimental_class_booking: bookingWithFallback,
-        experimental_class_booking_id: String((row as any)?.experimental_class_booking_id ?? "") || null,
+        experimental_class_status: suppressExperimental ? null : String((row as any)?.experimental_class_status ?? "") || null,
+        experimental_class_lead_date: suppressExperimental ? null : String((row as any)?.experimental_class_lead_date ?? "") || null,
+        experimental_class_lead_time: suppressExperimental ? null : String((row as any)?.experimental_class_lead_time ?? "") || null,
+        experimental_class_professor_date: suppressExperimental ? null : String((row as any)?.experimental_class_professor_date ?? "") || null,
+        experimental_class_professor_time: suppressExperimental ? null : String((row as any)?.experimental_class_professor_time ?? "") || null,
+        experimental_class_lead_start_at: suppressExperimental ? null : String((row as any)?.experimental_class_lead_start_at ?? "") || null,
+        experimental_class_professor_start_at: suppressExperimental ? null : String((row as any)?.experimental_class_professor_start_at ?? "") || null,
+        future_experimental_class_booking: suppressExperimental ? null : futureExperimentalBookingByLeadId.get(leadId) ?? null,
+        latest_experimental_class_booking: suppressExperimental ? null : latestBookingByLeadId.get(leadId) ?? null,
+        experimental_class_booking: suppressExperimental ? null : bookingWithFallback,
+        experimental_class_booking_id: suppressExperimental ? null : String((row as any)?.experimental_class_booking_id ?? "") || null,
       } as any;
     });
 

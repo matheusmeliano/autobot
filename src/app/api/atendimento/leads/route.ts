@@ -31,6 +31,51 @@ function isExperimentalClassBookingsLessonLinkColumnUnavailable(error: unknown) 
   );
 }
 
+function shouldSuppressExperimentalDataForLead(row: any): boolean {
+  const statusRaw = String(row?.status ?? "").trim().toLowerCase();
+  const funnelRaw = String(row?.funnel_stage ?? "").trim().toLowerCase();
+  const recurringStatusRaw = String(row?.recurring_class_status ?? "").trim().toLowerCase();
+  const contractStatusRaw = String(row?.contract_status ?? "").trim().toLowerCase();
+  const paymentStatusRaw = String(row?.payment_status ?? "").trim().toLowerCase();
+  const paymentConfirmedAtRaw = String(row?.payment_confirmed_at ?? "").trim();
+  const enrollmentNumberRaw = String(row?.enrollment_number ?? "").trim();
+  const regStepRaw = Number(row?.recurring_registration_step ?? NaN);
+  const regStepOk = Number.isFinite(regStepRaw) && regStepRaw >= 1;
+  const hasRecurringPassword =
+    Boolean(String(row?.recurring_registration_password ?? "").trim()) ||
+    Boolean(String(row?.signup_password_raw_temp ?? "").trim());
+  const matriculaConcluida =
+    paymentStatusRaw === "confirmado" ||
+    Boolean(paymentConfirmedAtRaw && paymentConfirmedAtRaw !== "null") ||
+    Boolean(enrollmentNumberRaw) ||
+    statusRaw === "matriculado" ||
+    statusRaw === "matricula_confirmada" ||
+    funnelRaw === "matriculado" ||
+    funnelRaw === "matricula_confirmada";
+  const recurringStageStarted =
+    statusRaw === "aluno" ||
+    statusRaw === "matriculado" ||
+    statusRaw === "cadastro_recorrente_pendente_plataforma" ||
+    statusRaw === "contrato_coletando_dados" ||
+    statusRaw === "contrato_aguardando_aceite" ||
+    statusRaw === "contrato_assinado" ||
+    statusRaw === "matricula_confirmada" ||
+    funnelRaw === "aluno" ||
+    funnelRaw === "aluno_recorrente_cadastrado" ||
+    funnelRaw === "cadastro_recorrente_pendente_plataforma" ||
+    funnelRaw === "contrato_coletando_dados" ||
+    funnelRaw === "contrato_aguardando_aceite" ||
+    funnelRaw === "contrato_assinado" ||
+    funnelRaw === "matricula_confirmada" ||
+    funnelRaw === "matriculado" ||
+    recurringStatusRaw === "cadastro_plataforma_pendente" ||
+    recurringStatusRaw === "confirmado" ||
+    contractStatusRaw === "coletando_dados" ||
+    contractStatusRaw === "aguardando_aceite" ||
+    contractStatusRaw === "assinado";
+  return regStepOk || hasRecurringPassword || matriculaConcluida || recurringStageStarted;
+}
+
 function datePlusNDaysIso(n: number): string {
   const d = new Date();
   d.setDate(d.getDate() + n);
@@ -1144,6 +1189,19 @@ function sectionTimestampMs(row: any, sectionName: "interessados" | "alunos" | "
       const finalFunnel = finalFunnelStage || finalContractFunnel || null;
       const finalStatus = finalLeadStatus || finalContractLeadStatus || null;
 
+      const suppressExperimental = shouldSuppressExperimentalDataForLead({
+        ...row,
+        payment_status: finalPaymentStatus,
+        payment_confirmed_at: finalConfirmedAt,
+        contract_status: finalContractStatus || String((row as any)?.contract_status ?? "") || null,
+        funnel_stage: finalFunnel || String((row as any)?.funnel_stage ?? "") || null,
+        status: finalStatus || String((row as any)?.status ?? "") || null,
+        enrollment_number:
+          String((row as any)?.enrollment_number ?? "").trim() ||
+          enrollmentNumberByHistory.get(leadId) ||
+          null,
+      });
+
       return {
         ...row,
         payment_status: finalPaymentStatus,
@@ -1158,19 +1216,20 @@ function sectionTimestampMs(row: any, sectionName: "interessados" | "alunos" | "
           String((row as any)?.enrollment_number ?? "").trim() ||
           enrollmentNumberByHistory.get(leadId) ||
           null,
-        experimental_class_professor_date: mergedProfessorDate || null,
-        experimental_class_lead_date: mergedLeadDate || null,
-        experimental_class_professor_time: mergedProfessorTime || null,
-        experimental_class_lead_time: mergedLeadTime || null,
-        experimental_class_professor_start_at: mergedProfessorStartAt || null,
-        experimental_class_lead_start_at: mergedLeadStartAt || null,
-        experimental_class_professor_name: mergedExperimentalProfName || null,
-        experimental_class_professor_phone: mergedExperimentalProfPhone || null,
+        experimental_class_professor_date: suppressExperimental ? null : mergedProfessorDate || null,
+        experimental_class_lead_date: suppressExperimental ? null : mergedLeadDate || null,
+        experimental_class_professor_time: suppressExperimental ? null : mergedProfessorTime || null,
+        experimental_class_lead_time: suppressExperimental ? null : mergedLeadTime || null,
+        experimental_class_professor_start_at: suppressExperimental ? null : mergedProfessorStartAt || null,
+        experimental_class_lead_start_at: suppressExperimental ? null : mergedLeadStartAt || null,
+        experimental_class_professor_name: suppressExperimental ? null : mergedExperimentalProfName || null,
+        experimental_class_professor_phone: suppressExperimental ? null : mergedExperimentalProfPhone || null,
         recurring_class_professor_name: mergedRecurringProfName || null,
         recurring_class_professor_phone: mergedRecurringProfPhone || null,
-        experimental_class_status: mergedStatus || null,
+        experimental_class_status: suppressExperimental ? null : mergedStatus || null,
         conversation: conversationsByLeadId.get(leadId) ?? null,
         experimental_class_booking: (() => {
+          if (suppressExperimental) return null;
           if (!bookingWithFallback) return null;
           const base = bookingWithFallback as any;
           const resolvedStatus =
@@ -1189,9 +1248,9 @@ function sectionTimestampMs(row: any, sectionName: "interessados" | "alunos" | "
               null,
           };
         })(),
-        latest_experimental_class_booking: latestPastExpBooking,
-        future_experimental_class_booking: futureExpBooking,
-        latest_past_class_meta: latestPastClassMeta,
+        latest_experimental_class_booking: suppressExperimental ? null : latestPastExpBooking,
+        future_experimental_class_booking: suppressExperimental ? null : futureExpBooking,
+        latest_past_class_meta: suppressExperimental ? null : latestPastClassMeta,
         latest_experimental_class_cancelled_at: cancelledAtByLeadId.get(leadId) ?? null,
         latest_experimental_class_event: latestClassEventByLeadId.get(leadId) ?? null,
         interessados_entered_at: new Date(interessadosTs).toISOString(),

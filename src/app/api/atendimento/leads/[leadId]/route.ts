@@ -41,6 +41,51 @@ function isUndefinedColumnError(error: unknown): boolean {
   return false;
 }
 
+function shouldSuppressExperimentalDataForLead(row: any): boolean {
+  const statusRaw = String(row?.status ?? "").trim().toLowerCase();
+  const funnelRaw = String(row?.funnel_stage ?? "").trim().toLowerCase();
+  const recurringStatusRaw = String(row?.recurring_class_status ?? "").trim().toLowerCase();
+  const contractStatusRaw = String(row?.contract_status ?? "").trim().toLowerCase();
+  const paymentStatusRaw = String(row?.payment_status ?? "").trim().toLowerCase();
+  const paymentConfirmedAtRaw = String(row?.payment_confirmed_at ?? "").trim();
+  const enrollmentNumberRaw = String(row?.enrollment_number ?? "").trim();
+  const regStepRaw = Number(row?.recurring_registration_step ?? NaN);
+  const regStepOk = Number.isFinite(regStepRaw) && regStepRaw >= 1;
+  const hasRecurringPassword =
+    Boolean(String(row?.recurring_registration_password ?? "").trim()) ||
+    Boolean(String(row?.signup_password_raw_temp ?? "").trim());
+  const matriculaConcluida =
+    paymentStatusRaw === "confirmado" ||
+    Boolean(paymentConfirmedAtRaw && paymentConfirmedAtRaw !== "null") ||
+    Boolean(enrollmentNumberRaw) ||
+    statusRaw === "matriculado" ||
+    statusRaw === "matricula_confirmada" ||
+    funnelRaw === "matriculado" ||
+    funnelRaw === "matricula_confirmada";
+  const recurringStageStarted =
+    statusRaw === "aluno" ||
+    statusRaw === "matriculado" ||
+    statusRaw === "cadastro_recorrente_pendente_plataforma" ||
+    statusRaw === "contrato_coletando_dados" ||
+    statusRaw === "contrato_aguardando_aceite" ||
+    statusRaw === "contrato_assinado" ||
+    statusRaw === "matricula_confirmada" ||
+    funnelRaw === "aluno" ||
+    funnelRaw === "aluno_recorrente_cadastrado" ||
+    funnelRaw === "cadastro_recorrente_pendente_plataforma" ||
+    funnelRaw === "contrato_coletando_dados" ||
+    funnelRaw === "contrato_aguardando_aceite" ||
+    funnelRaw === "contrato_assinado" ||
+    funnelRaw === "matricula_confirmada" ||
+    funnelRaw === "matriculado" ||
+    recurringStatusRaw === "cadastro_plataforma_pendente" ||
+    recurringStatusRaw === "confirmado" ||
+    contractStatusRaw === "coletando_dados" ||
+    contractStatusRaw === "aguardando_aceite" ||
+    contractStatusRaw === "assinado";
+  return regStepOk || hasRecurringPassword || matriculaConcluida || recurringStageStarted;
+}
+
 function isExperimentalClassBookingsLessonLinkColumnUnavailable(error: unknown) {
   const code = String((error as any)?.code ?? "").trim();
   const message = String((error as any)?.message ?? "");
@@ -682,7 +727,14 @@ export async function GET(request: Request, context: { params: Promise<{ leadId:
     const finalContractPdfUrl =
       rowContractPdf || (useContractHistoryFallback ? histContractBest!.contract_pdf_url : null);
 
-    const finalBookingForField = bookingWithFallback
+    const suppressExperimental = shouldSuppressExperimentalDataForLead({
+      ...(lead as any),
+      contract_status: finalContractStatus || String((lead as any)?.contract_status ?? "") || null,
+      contract_signed_at: finalContractSignedAt,
+      contract_pdf_url: finalContractPdfUrl || String((lead as any)?.contract_pdf_url ?? "") || null,
+    });
+
+    const finalBookingForField = !suppressExperimental && bookingWithFallback
       ? {
           ...bookingWithFallback,
           assigned_professor_name: (bookingWithFallback as any).assigned_professor_name || mergedExperimentalProfName || null,
@@ -696,15 +748,24 @@ export async function GET(request: Request, context: { params: Promise<{ leadId:
         ...(lead as any),
         is_new_for_attendant: (lead as any)?.is_new_for_attendant ?? false,
         conversation: conversation ?? null,
-        experimental_class_booking: finalBookingForField,
-        latest_experimental_class_booking: existingBookingRaw ?? existingBooking ?? null,
-        future_experimental_class_booking: futureExpBooking,
-        latest_past_class_meta: latestPastClassMeta,
+        experimental_class_booking: suppressExperimental ? null : finalBookingForField,
+        latest_experimental_class_booking: suppressExperimental ? null : existingBookingRaw ?? existingBooking ?? null,
+        future_experimental_class_booking: suppressExperimental ? null : futureExpBooking,
+        latest_past_class_meta: suppressExperimental ? null : latestPastClassMeta,
         latest_experimental_class_cancelled_at: cancelledAt,
         latest_experimental_class_event: latestClassEvent,
         contract_status: finalContractStatus || String((lead as any)?.contract_status ?? "") || null,
         contract_signed_at: finalContractSignedAt,
         contract_pdf_url: finalContractPdfUrl || String((lead as any)?.contract_pdf_url ?? "") || null,
+        experimental_class_status: suppressExperimental ? null : String((lead as any)?.experimental_class_status ?? "") || null,
+        experimental_class_lead_date: suppressExperimental ? null : String((lead as any)?.experimental_class_lead_date ?? "") || null,
+        experimental_class_lead_time: suppressExperimental ? null : String((lead as any)?.experimental_class_lead_time ?? "") || null,
+        experimental_class_professor_date: suppressExperimental ? null : String((lead as any)?.experimental_class_professor_date ?? "") || null,
+        experimental_class_professor_time: suppressExperimental ? null : String((lead as any)?.experimental_class_professor_time ?? "") || null,
+        experimental_class_lead_start_at: suppressExperimental ? null : String((lead as any)?.experimental_class_lead_start_at ?? "") || null,
+        experimental_class_professor_start_at: suppressExperimental ? null : String((lead as any)?.experimental_class_professor_start_at ?? "") || null,
+        experimental_class_link: suppressExperimental ? null : String((lead as any)?.experimental_class_link ?? "") || null,
+        experimental_class_booking_id: suppressExperimental ? null : String((lead as any)?.experimental_class_booking_id ?? "") || null,
       },
       events: (events ?? []) as any[],
     });
