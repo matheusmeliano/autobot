@@ -238,8 +238,12 @@ function shouldHideExperimentalInfoCompletely(
   lead: AtendimentoLeadListItem,
   activeSection: SummarySectionId,
 ): boolean {
-  if (activeSection === "interessados") return false;
-  return leadHasAnyRecurringProgressSignal(lead);
+  void activeSection;
+  return (
+    leadHasAnyRecurringProgressSignal(lead) ||
+    leadHasMatriculaOrRecurringStageInitiated(lead) ||
+    isLeadInAlunosSection(lead)
+  );
 }
 
 function leadHasMatriculaOrRecurringStageInitiated(lead: AtendimentoLeadListItem): boolean {
