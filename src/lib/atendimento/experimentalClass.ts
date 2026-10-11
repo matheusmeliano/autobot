@@ -1559,21 +1559,35 @@ export function calculateDisplayRecurringOccurrence(params: {
   const latestSentAt = sentCandidates.sort((a, b) => b.getTime() - a.getTime())[0] ?? null;
   if (!latestSentAt) return nextOccurrence;
 
-  const currentOrNextOccurrence = calculateCurrentOrNextRecurringOccurrence(params);
-  if (!currentOrNextOccurrence?.professorDate) return nextOccurrence;
+  const nextStartRaw = String(nextOccurrence.professorStartAt ?? nextOccurrence.leadStartAt ?? "").trim();
+  const nextStartMs = nextStartRaw ? new Date(nextStartRaw).getTime() : NaN;
+  if (!Number.isFinite(nextStartMs)) return nextOccurrence;
 
-  const latestSentLocalDate = localDateInTimeZone(latestSentAt, profTz);
-  if (latestSentLocalDate !== currentOrNextOccurrence.professorDate) {
+  const previousOccurrence = calculatePastRecurringOccurrences({
+    weekday: params.weekday,
+    professorTimeHHMM: params.professorTimeHHMM,
+    professorTimeZone: profTz,
+    leadTimeZone: params.leadTimeZone,
+    toDate: new Date(nextStartMs),
+  })[0] ?? null;
+  const previousStartRaw = String(
+    previousOccurrence?.professorStartAt ?? previousOccurrence?.leadStartAt ?? "",
+  ).trim();
+  const previousStartMs = previousStartRaw ? new Date(previousStartRaw).getTime() : NaN;
+  const latestSentAtMs = latestSentAt.getTime();
+
+  const sentForCurrentUpcomingOccurrence =
+    latestSentAtMs < nextStartMs &&
+    (!Number.isFinite(previousStartMs) || latestSentAtMs >= previousStartMs);
+
+  if (!sentForCurrentUpcomingOccurrence) {
     return nextOccurrence;
   }
 
-  const currentStartRaw =
-    String(currentOrNextOccurrence.professorStartAt ?? currentOrNextOccurrence.leadStartAt ?? "").trim();
-  const currentStartMs = currentStartRaw ? new Date(currentStartRaw).getTime() : NaN;
-  const nextFromCurrent = Number.isFinite(currentStartMs)
+  const nextFromCurrent = Number.isFinite(nextStartMs)
     ? calculateNextRecurringOccurrence({
         ...params,
-        fromDate: new Date(currentStartMs + 60_000),
+        fromDate: new Date(nextStartMs + 60_000),
       })
     : null;
 
