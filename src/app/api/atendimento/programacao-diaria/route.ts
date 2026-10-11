@@ -484,6 +484,39 @@ export async function GET(req: Request) {
     const lid = String(b.lead_id ?? "").trim();
     if (lid && !leadIds.includes(lid)) leadIds.push(lid);
   }
+  const recurringNotificationMetaByLeadId = new Map<string, string | null>();
+  const recurringLeadIds = recurringBookings
+    .map((booking) => String(booking.lead_id ?? "").trim())
+    .filter(Boolean);
+  if (recurringLeadIds.length > 0) {
+    try {
+      const res = await fetch(
+        `${SUPABASE_URL}/rest/v1/atendimento_history_events?lead_id=in.(${Array.from(new Set(recurringLeadIds)).map((id) => `"${id}"`).join(",")})&select=lead_id,event_type,created_at,details&event_type=in.(recurring_class_attendant_start_notification_sent,recurring_class_student_start_notification_sent,recurring_class_registered_attendant_start_notification_sent,recurring_class_attendant_start_notification_sent_manual,recurring_class_student_start_notification_sent_manual,recurring_class_registered_attendant_start_notification_sent_manual)&order=created_at.desc`,
+        {
+          method: "GET",
+          headers: restHeaders,
+          cache: "no-store",
+        },
+      );
+      if (res.ok) {
+        const arr = (await res.json()) as Array<Record<string, unknown>> | null;
+        if (Array.isArray(arr)) {
+          for (const event of arr) {
+            const lid = String(event?.lead_id ?? "").trim();
+            if (!lid || recurringNotificationMetaByLeadId.has(lid)) continue;
+            const startAt = String(((event as any)?.details ?? {})?.start_at ?? "").trim();
+            if (startAt) recurringNotificationMetaByLeadId.set(lid, startAt);
+          }
+        }
+      }
+    } catch {}
+  }
+  for (const booking of recurringBookings) {
+    const lid = String(booking.lead_id ?? "").trim();
+    if (!lid) continue;
+    (booking as any).recurring_class_last_notified_occurrence_start_at =
+      recurringNotificationMetaByLeadId.get(lid) ?? null;
+  }
   // JUNTAR AS DUAS LISTAS (experimentais + recorrentes). Mesma estrutura, mesmo código slot abaixo.
   if (recurringBookings.length > 0) {
     for (const rb of recurringBookings) bookings.push(rb);
@@ -708,6 +741,9 @@ export async function GET(req: Request) {
                 String((active as any)?.professor_timezone ?? "").trim() ||
                 ATENDIMENTO_PROFESSOR_TIME_ZONE,
               leadTimeZone: String((active as any)?.lead_timezone ?? "").trim() || null,
+              lastNotifiedOccurrenceStartAt: String(
+                (active as any)?.recurring_class_last_notified_occurrence_start_at ?? "",
+              ).trim(),
               studentNotificationSentAt: String(
                 (active as any)?.recurring_class_student_start_notification_sent_at ?? "",
               ).trim(),

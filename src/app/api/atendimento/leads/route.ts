@@ -320,6 +320,9 @@ export async function GET(req: Request) {
     funnel_stage: string | null;
     status: string | null;
   }>();
+  const recurringNotificationMetaByLeadId = new Map<string, {
+    last_notified_occurrence_start_at: string | null;
+  }>();
   const contractMetaByLeadId = new Map<string, {
     contract_signed_at: string | null;
     contract_status: "assinado" | "aguardando_aceite" | "coletando_dados" | string | null;
@@ -351,6 +354,12 @@ export async function GET(req: Request) {
         "recurring_payment_intent_registered",
         "attendant_clicked_payment_sim",
         "attendant_clicked_payment_nao",
+        "recurring_class_attendant_start_notification_sent",
+        "recurring_class_student_start_notification_sent",
+        "recurring_class_registered_attendant_start_notification_sent",
+        "recurring_class_attendant_start_notification_sent_manual",
+        "recurring_class_student_start_notification_sent_manual",
+        "recurring_class_registered_attendant_start_notification_sent_manual",
       ])
       .order("created_at", { ascending: false });
 
@@ -415,6 +424,24 @@ export async function GET(req: Request) {
       }
       if (eventType.startsWith("experimental_class_") && !latestClassEventByLeadId.has(leadId)) {
         latestClassEventByLeadId.set(leadId, eventType);
+      }
+      if (
+        !recurringNotificationMetaByLeadId.has(leadId) &&
+        (
+          eventType === "recurring_class_attendant_start_notification_sent" ||
+          eventType === "recurring_class_student_start_notification_sent" ||
+          eventType === "recurring_class_registered_attendant_start_notification_sent" ||
+          eventType === "recurring_class_attendant_start_notification_sent_manual" ||
+          eventType === "recurring_class_student_start_notification_sent_manual" ||
+          eventType === "recurring_class_registered_attendant_start_notification_sent_manual"
+        )
+      ) {
+        const startAt = String(details?.start_at ?? "").trim() || null;
+        if (startAt) {
+          recurringNotificationMetaByLeadId.set(leadId, {
+            last_notified_occurrence_start_at: startAt,
+          });
+        }
       }
       const PAYMENT_PRIORITY: Record<string, number> = {
         confirmado: 100,
@@ -1226,6 +1253,8 @@ function sectionTimestampMs(row: any, sectionName: "interessados" | "alunos" | "
         experimental_class_professor_phone: suppressExperimental ? null : mergedExperimentalProfPhone || null,
         recurring_class_professor_name: mergedRecurringProfName || null,
         recurring_class_professor_phone: mergedRecurringProfPhone || null,
+        recurring_class_last_notified_occurrence_start_at:
+          recurringNotificationMetaByLeadId.get(leadId)?.last_notified_occurrence_start_at ?? null,
         experimental_class_status: suppressExperimental ? null : mergedStatus || null,
         conversation: conversationsByLeadId.get(leadId) ?? null,
         experimental_class_booking: (() => {

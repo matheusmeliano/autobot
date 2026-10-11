@@ -1762,6 +1762,9 @@ function BookingDetails({
           professorTimeHHMM: recurringTime,
           professorTimeZone: ATENDIMENTO_PROFESSOR_TIME_ZONE,
           leadTimeZone: lead.timezone || null,
+          lastNotifiedOccurrenceStartAt: String(
+            (lead as any)?.recurring_class_last_notified_occurrence_start_at ?? "",
+          ).trim(),
           studentNotificationSentAt: String(
             (lead as any)?.recurring_class_student_start_notification_sent_at ?? "",
           ).trim(),

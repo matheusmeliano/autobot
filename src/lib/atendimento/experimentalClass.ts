@@ -1532,6 +1532,7 @@ export function calculateDisplayRecurringOccurrence(params: {
   professorTimeZone?: string | null;
   leadTimeZone?: string | null;
   fromDate?: Date;
+  lastNotifiedOccurrenceStartAt?: string | null;
   studentNotificationSentAt?: string | null;
   attendantNotificationSentAt?: string | null;
 }) {
@@ -1541,6 +1542,26 @@ export function calculateDisplayRecurringOccurrence(params: {
   const profTz =
     String(params.professorTimeZone ?? ATENDIMENTO_PROFESSOR_TIME_ZONE ?? "").trim() ||
     ATENDIMENTO_PROFESSOR_TIME_ZONE;
+  const nextStartRaw = String(nextOccurrence.professorStartAt ?? nextOccurrence.leadStartAt ?? "").trim();
+  const nextStartMs = nextStartRaw ? new Date(nextStartRaw).getTime() : NaN;
+
+  const lastNotifiedOccurrenceRaw = String(params.lastNotifiedOccurrenceStartAt ?? "").trim();
+  const lastNotifiedOccurrenceMs = lastNotifiedOccurrenceRaw
+    ? new Date(lastNotifiedOccurrenceRaw).getTime()
+    : NaN;
+  if (Number.isFinite(lastNotifiedOccurrenceMs)) {
+    const afterLastNotified = calculateNextRecurringOccurrence({
+      ...params,
+      fromDate: new Date(lastNotifiedOccurrenceMs + 60_000),
+    });
+    const afterLastStartRaw = String(
+      afterLastNotified?.professorStartAt ?? afterLastNotified?.leadStartAt ?? "",
+    ).trim();
+    const afterLastStartMs = afterLastStartRaw ? new Date(afterLastStartRaw).getTime() : NaN;
+    if (Number.isFinite(afterLastStartMs) && (!Number.isFinite(nextStartMs) || afterLastStartMs > nextStartMs)) {
+      return afterLastNotified ?? nextOccurrence;
+    }
+  }
 
   const sentCandidates = [
     String(params.studentNotificationSentAt ?? "").trim(),
@@ -1559,8 +1580,6 @@ export function calculateDisplayRecurringOccurrence(params: {
   const latestSentAt = sentCandidates.sort((a, b) => b.getTime() - a.getTime())[0] ?? null;
   if (!latestSentAt) return nextOccurrence;
 
-  const nextStartRaw = String(nextOccurrence.professorStartAt ?? nextOccurrence.leadStartAt ?? "").trim();
-  const nextStartMs = nextStartRaw ? new Date(nextStartRaw).getTime() : NaN;
   if (!Number.isFinite(nextStartMs)) return nextOccurrence;
 
   const previousOccurrence = calculatePastRecurringOccurrences({

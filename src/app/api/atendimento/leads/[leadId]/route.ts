@@ -144,9 +144,28 @@ export async function GET(request: Request, context: { params: Promise<{ leadId:
           .eq("lead_id", leadId)
           .order("created_at", { ascending: false })
           .limit(100);
-    const [{ data: lead, error: leadError }, { data: events, error: eventsError }] = await Promise.all([
+    const recurringNotificationEventsPromise = admin
+      .from("atendimento_history_events")
+      .select("event_type, created_at, details")
+      .eq("lead_id", leadId)
+      .in("event_type", [
+        "recurring_class_attendant_start_notification_sent",
+        "recurring_class_student_start_notification_sent",
+        "recurring_class_registered_attendant_start_notification_sent",
+        "recurring_class_attendant_start_notification_sent_manual",
+        "recurring_class_student_start_notification_sent_manual",
+        "recurring_class_registered_attendant_start_notification_sent_manual",
+      ])
+      .order("created_at", { ascending: false })
+      .limit(20);
+    const [
+      { data: lead, error: leadError },
+      { data: events, error: eventsError },
+      { data: recurringNotificationEvents, error: recurringNotificationEventsError },
+    ] = await Promise.all([
       leadPromise,
       eventsPromise,
+      recurringNotificationEventsPromise,
     ]);
 
     if (leadError) {
@@ -154,6 +173,9 @@ export async function GET(request: Request, context: { params: Promise<{ leadId:
     }
     if (eventsError) {
       return Response.json({ ok: false, error: eventsError.message }, { status: 500 });
+    }
+    if (recurringNotificationEventsError) {
+      return Response.json({ ok: false, error: recurringNotificationEventsError.message }, { status: 500 });
     }
     if (!lead?.id) {
       return Response.json({ ok: false, error: "not_found" }, { status: 404 });
@@ -741,6 +763,10 @@ export async function GET(request: Request, context: { params: Promise<{ leadId:
           assigned_professor_phone: (bookingWithFallback as any).assigned_professor_phone || mergedExperimentalProfPhone || null,
         }
       : null;
+    const latestRecurringNotificationOccurrenceStartAt =
+      (Array.isArray(recurringNotificationEvents) ? recurringNotificationEvents : [])
+        .map((event) => String(((event as any)?.details ?? {})?.start_at ?? "").trim())
+        .find(Boolean) || null;
 
     return Response.json({
       ok: true,
@@ -754,6 +780,8 @@ export async function GET(request: Request, context: { params: Promise<{ leadId:
         latest_past_class_meta: suppressExperimental ? null : latestPastClassMeta,
         latest_experimental_class_cancelled_at: cancelledAt,
         latest_experimental_class_event: latestClassEvent,
+        recurring_class_last_notified_occurrence_start_at:
+          latestRecurringNotificationOccurrenceStartAt,
         contract_status: finalContractStatus || String((lead as any)?.contract_status ?? "") || null,
         contract_signed_at: finalContractSignedAt,
         contract_pdf_url: finalContractPdfUrl || String((lead as any)?.contract_pdf_url ?? "") || null,

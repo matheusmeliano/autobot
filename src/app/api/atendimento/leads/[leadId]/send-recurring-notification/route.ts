@@ -5,11 +5,24 @@ import {
   requireAtendimentoUser,
   sendAtendimentoWhatsAppText,
 } from "@/lib/atendimento/server";
-import { buildRecurringClassAttendantStartReminderWhatsAppMessage, buildRecurringClassRegisteredAttendantStartReminderWhatsAppMessage, buildRecurringClassStudentLessonReadyWhatsAppMessage, EXPERIMENTAL_CLASS_ATTENDANT_NOTIFICATION_PHONE, EXPERIMENTAL_CLASS_REGISTERED_ATTENDANT_NOTIFICATION_PHONE, RECURRING_WEEKDAY_LABELS_PT_BR, resolveRecurringClassAssignedProfessorPhone } from "@/lib/atendimento/experimentalClass";
+import {
+  buildRecurringClassAttendantStartReminderWhatsAppMessage,
+  buildRecurringClassRegisteredAttendantStartReminderWhatsAppMessage,
+  buildRecurringClassStudentLessonReadyWhatsAppMessage,
+  calculateDisplayRecurringOccurrence,
+  EXPERIMENTAL_CLASS_ATTENDANT_NOTIFICATION_PHONE,
+  EXPERIMENTAL_CLASS_REGISTERED_ATTENDANT_NOTIFICATION_PHONE,
+  RECURRING_WEEKDAY_LABELS_PT_BR,
+  resolveRecurringClassAssignedProfessorPhone,
+} from "@/lib/atendimento/experimentalClass";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 
 function fn(name: string | null | undefined) { const p = String(name ?? "").trim().split(/\s+/).filter(Boolean); return p[0] ?? "Aluno"; }
 function fl(name: string | null | undefined) { const c = String(name ?? "").trim(); return c || "Aluno sem identificacao"; }
+function normalizeScheduleTimeForComparison(raw: unknown): string {
+  const cleaned = String(raw ?? "").trim().replace(/[hH]$/, "");
+  return /^\d{2}:\d{2}$/.test(cleaned) ? cleaned : "";
+}
 
 export async function POST(req: Request, { params }: { params: Promise<{ leadId: string }> }) {
   const auth = await requireAtendimentoUser();
@@ -51,6 +64,43 @@ export async function POST(req: Request, { params }: { params: Promise<{ leadId:
   const wr = String((lead as any)?.recurring_class_weekday ?? "").trim().toLowerCase();
   const wl = String((lead as any)?.recurring_class_weekday_label ?? "").trim();
   const weekdayLabel = wl || (RECURRING_WEEKDAY_LABELS_PT_BR as Record<string,string>)[wr] || "horario fixo";
+  let lastNotifiedOccurrenceStartAt = "";
+  try {
+    const { data: recurringNotificationEvents } = await admin
+      .from("atendimento_history_events")
+      .select("details, created_at")
+      .eq("lead_id", lid)
+      .in("event_type", [
+        "recurring_class_attendant_start_notification_sent",
+        "recurring_class_student_start_notification_sent",
+        "recurring_class_registered_attendant_start_notification_sent",
+        "recurring_class_attendant_start_notification_sent_manual",
+        "recurring_class_student_start_notification_sent_manual",
+        "recurring_class_registered_attendant_start_notification_sent_manual",
+      ])
+      .order("created_at", { ascending: false })
+      .limit(20);
+    lastNotifiedOccurrenceStartAt =
+      (Array.isArray(recurringNotificationEvents) ? recurringNotificationEvents : [])
+        .map((event) => String(((event as any)?.details ?? {})?.start_at ?? "").trim())
+        .find(Boolean) || "";
+  } catch {}
+  const recurringProfessorTime = normalizeScheduleTimeForComparison(
+    String((lead as any)?.recurring_class_professor_time ?? (lead as any)?.recurring_class_lead_time ?? "").trim(),
+  );
+  const displayOccurrence =
+    ["mon", "tue", "wed", "thu", "fri", "sat", "sun"].includes(wr) && recurringProfessorTime
+      ? calculateDisplayRecurringOccurrence({
+          weekday: wr as "mon" | "tue" | "wed" | "thu" | "fri" | "sat" | "sun",
+          professorTimeHHMM: recurringProfessorTime,
+          professorTimeZone: String((lead as any)?.recurring_class_professor_timezone ?? "").trim() || null,
+          leadTimeZone: String((lead as any)?.recurring_class_lead_timezone ?? "").trim() || null,
+          lastNotifiedOccurrenceStartAt,
+          studentNotificationSentAt: String((lead as any)?.recurring_class_student_start_notification_sent_at ?? "").trim(),
+          attendantNotificationSentAt: String((lead as any)?.recurring_class_attendant_start_notification_sent_at ?? "").trim(),
+        })
+      : null;
+  const targetOccurrenceStartAt = String(displayOccurrence?.professorStartAt ?? displayOccurrence?.leadStartAt ?? "").trim();
   const profPhone = rp?.phone || EXPERIMENTAL_CLASS_ATTENDANT_NOTIFICATION_PHONE;
   let resolvedConversationId: string | null = null;
   try {
@@ -68,19 +118,19 @@ export async function POST(req: Request, { params }: { params: Promise<{ leadId:
   try {
     await sendAtendimentoWhatsAppText({ phone: leadPhone, message: buildRecurringClassStudentLessonReadyWhatsAppMessage(fn(leadName), lessonLink), admin, conversationId: resolvedConversationId, allowNoInbound: true });
     sok = true;
-    await appendHistoryEvent({ leadId: lid, conversationId: null, eventType: "recurring_class_student_start_notification_sent_manual", title: "Link aula recorrente disparado manualmente ao aluno", details: { phone: leadPhone, lesson_link: lessonLink, weekday: wr, weekday_label: weekdayLabel, manually_triggered: true, source: "manual_trigger_button", sent_at: nowIso }, actorType: "attendant", actorEmail: auth.user.email });
+    await appendHistoryEvent({ leadId: lid, conversationId: null, eventType: "recurring_class_student_start_notification_sent_manual", title: "Link aula recorrente disparado manualmente ao aluno", details: { phone: leadPhone, lesson_link: lessonLink, weekday: wr, weekday_label: weekdayLabel, manually_triggered: true, source: "manual_trigger_button", start_at: targetOccurrenceStartAt || null, sent_at: nowIso }, actorType: "attendant", actorEmail: auth.user.email });
   } catch (e) { serr = e instanceof Error ? e.message : String(e); await appendHistoryEvent({ leadId: lid, conversationId: null, eventType: "recurring_class_student_start_notification_failed_manual", title: "Falha disparo manual aula recorrente ao aluno", details: { phone: leadPhone, lesson_link: lessonLink, manually_triggered: true, error: serr }, actorType: "attendant", actorEmail: auth.user.email }); }
 
   try {
     await sendAtendimentoWhatsAppText({ phone: profPhone, message: buildRecurringClassAttendantStartReminderWhatsAppMessage(fl(leadName), weekdayLabel, lessonLink) });
     aok = true;
-    await appendHistoryEvent({ leadId: lid, conversationId: null, eventType: "recurring_class_attendant_start_notification_sent_manual", title: "Lembrete aula recorrente disparado manualmente ao professor", details: { phone: profPhone, lesson_link: lessonLink, weekday: wr, weekday_label: weekdayLabel, manually_triggered: true, resolved_professor: rp ? `${rp.name} (${rp.phone})` : null, sent_at: nowIso }, actorType: "attendant", actorEmail: auth.user.email });
+    await appendHistoryEvent({ leadId: lid, conversationId: null, eventType: "recurring_class_attendant_start_notification_sent_manual", title: "Lembrete aula recorrente disparado manualmente ao professor", details: { phone: profPhone, lesson_link: lessonLink, weekday: wr, weekday_label: weekdayLabel, manually_triggered: true, resolved_professor: rp ? `${rp.name} (${rp.phone})` : null, start_at: targetOccurrenceStartAt || null, sent_at: nowIso }, actorType: "attendant", actorEmail: auth.user.email });
   } catch (e) { aerr = e instanceof Error ? e.message : String(e); await appendHistoryEvent({ leadId: lid, conversationId: null, eventType: "recurring_class_attendant_start_notification_failed_manual", title: "Falha disparo manual lembrete aula recorrente professor", details: { phone: profPhone, lesson_link: lessonLink, manually_triggered: true, error: aerr }, actorType: "attendant", actorEmail: auth.user.email }); }
 
   try {
     await sendAtendimentoWhatsAppText({ phone: EXPERIMENTAL_CLASS_REGISTERED_ATTENDANT_NOTIFICATION_PHONE, message: buildRecurringClassRegisteredAttendantStartReminderWhatsAppMessage(fl(leadName), weekdayLabel, lessonLink) });
     rok = true;
-    await appendHistoryEvent({ leadId: lid, conversationId: null, eventType: "recurring_class_registered_attendant_start_notification_sent_manual", title: "Lembrete aula recorrente disparado manualmente atendente cadastrado", details: { phone: EXPERIMENTAL_CLASS_REGISTERED_ATTENDANT_NOTIFICATION_PHONE, lesson_link: lessonLink, weekday: wr, weekday_label: weekdayLabel, manually_triggered: true, sent_at: nowIso }, actorType: "attendant", actorEmail: auth.user.email });
+    await appendHistoryEvent({ leadId: lid, conversationId: null, eventType: "recurring_class_registered_attendant_start_notification_sent_manual", title: "Lembrete aula recorrente disparado manualmente atendente cadastrado", details: { phone: EXPERIMENTAL_CLASS_REGISTERED_ATTENDANT_NOTIFICATION_PHONE, lesson_link: lessonLink, weekday: wr, weekday_label: weekdayLabel, manually_triggered: true, start_at: targetOccurrenceStartAt || null, sent_at: nowIso }, actorType: "attendant", actorEmail: auth.user.email });
   } catch (e) { rerr = e instanceof Error ? e.message : String(e); await appendHistoryEvent({ leadId: lid, conversationId: null, eventType: "recurring_class_registered_attendant_start_notification_failed_manual", title: "Falha disparo manual lembrete aula recorrente atendente cadastrado", details: { phone: EXPERIMENTAL_CLASS_REGISTERED_ATTENDANT_NOTIFICATION_PHONE, lesson_link: lessonLink, manually_triggered: true, error: rerr }, actorType: "attendant", actorEmail: auth.user.email }); }
 
   try {

@@ -142,6 +142,9 @@ function buildAlunoRecurringScheduleLabel(lead: Record<string, unknown> | null |
       professorTimeHHMM: professorTimeRaw || leadTimeRaw,
       professorTimeZone: ATENDIMENTO_PROFESSOR_TIME_ZONE,
       leadTimeZone: effectiveLeadTimeZone,
+      lastNotifiedOccurrenceStartAt: String(
+        lead?.recurring_class_last_notified_occurrence_start_at ?? "",
+      ).trim(),
       studentNotificationSentAt: String(
         lead?.recurring_class_student_start_notification_sent_at ?? "",
       ).trim(),
