@@ -1918,7 +1918,11 @@ export async function sendRecurringClassStartNotifications(now = new Date()) {
   }
 
   if (rows.length > 0) {
-    rows = rows.filter((row) => isLeadRecurringRegistrationConcluded(row));
+    rows = rows.filter(
+      (row) =>
+        isLeadRecurringRegistrationConcluded(row) &&
+        hasLeadConfirmedPaymentForRecurringNotifications(row),
+    );
   }
 
   let studentSent = 0;
@@ -3924,6 +3928,18 @@ export function isLeadRecurringRegistrationConcluded(lead: unknown): boolean {
     funnelRaw === "matricula_confirmada"
   );
 }
+
+export function hasLeadConfirmedPaymentForRecurringNotifications(lead: unknown): boolean {
+  const obj = (lead ?? {}) as Record<string, unknown>;
+  const payStatusRaw = String(
+    obj?.recurring_payment_status ?? obj?.payment_status ?? "",
+  ).trim().toLowerCase();
+  const payConfirmedAtRaw = String(
+    obj?.recurring_payment_confirmed_at ?? obj?.payment_confirmed_at ?? "",
+  ).trim();
+  return payStatusRaw === "confirmado" || Boolean(payConfirmedAtRaw && payConfirmedAtRaw !== "null");
+}
+
 export async function ensureStudentAuthUserCreatedForLead(params: {
   admin: ReturnType<typeof createSupabaseAdminClient>;
   leadId: string;

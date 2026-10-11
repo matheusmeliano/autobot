@@ -234,6 +234,19 @@ function deriveLeadEffectiveTimeZone(lead: AtendimentoLeadListItem | null | unde
   return savedTz || ATENDIMENTO_PROFESSOR_TIME_ZONE;
 }
 
+function hasLeadConfirmedPaymentForRecurringNotificationsClient(
+  lead: AtendimentoLeadListItem | null | undefined,
+): boolean {
+  if (!lead) return false;
+  const payStatusRaw = String(
+    (lead as any)?.recurring_payment_status ?? (lead as any)?.payment_status ?? "",
+  ).trim().toLowerCase();
+  const payConfirmedAtRaw = String(
+    (lead as any)?.recurring_payment_confirmed_at ?? (lead as any)?.payment_confirmed_at ?? "",
+  ).trim();
+  return payStatusRaw === "confirmado" || Boolean(payConfirmedAtRaw && payConfirmedAtRaw !== "null");
+}
+
 function extractLocalDateFromUtcIso(iso: string, timeZone: string): string {
   try {
     const fmt = new Intl.DateTimeFormat("en-CA", {
@@ -1531,6 +1544,10 @@ export function AtendimentoClient() {
 
   async function handleSendRecurringDisparo(lead: AtendimentoLeadListItem) {
     if (recSendingNotification) return;
+    if (!hasLeadConfirmedPaymentForRecurringNotificationsClient(lead)) {
+      modalToast.warning("Confirme o pagamento pelo painel antes de disparar as notificações da aula recorrente.");
+      return;
+    }
     const phone = String(lead?.phone ?? "").trim();
     if (!phone) {
       modalToast.warning("Registro não possui telefone cadastrado.");
@@ -6020,7 +6037,8 @@ export function AtendimentoClient() {
                           const recLeadTimeRaw = String((sl as any).recurring_class_lead_time ?? "").trim();
                           const recTimeOk = Boolean(recProfTimeRaw) || Boolean(recLeadTimeRaw);
                           const recSchedOk = recWdOk && recTimeOk;
-                          const recCanSendDisparo = Boolean(recAssigned && recSavedLink && recHasPhone && !recSendingNotification);
+                          const recPaymentConfirmed = hasLeadConfirmedPaymentForRecurringNotificationsClient(sl);
+                          const recCanSendDisparo = Boolean(recPaymentConfirmed && recAssigned && recSavedLink && recHasPhone && !recSendingNotification);
                           const recLessonLinkSaveDisabled = (() => {
                             const d = recurringLessonLinkDraft.trim();
                             if (!d && !recSavedLink) return true;
@@ -6045,6 +6063,7 @@ export function AtendimentoClient() {
                                       onClick={() => void handleSendRecurringDisparo(sl)}
                                       disabled={!recCanSendDisparo}
                                       title={(() => {
+                                        if (!recPaymentConfirmed) return "Confirme o pagamento pelo painel antes de disparar.";
                                         if (!recSavedLink && !recAssigned) return "Adicione o link fixo da aula recorrente e selecione o professor antes de disparar.";
                                         if (!recSavedLink) return "Adicione o link fixo da aula recorrente antes de disparar.";
                                         if (!recAssigned) return "Selecione o professor das aulas recorrentes antes de disparar.";
@@ -7525,7 +7544,8 @@ export function AtendimentoClient() {
                         const recLeadTimeRaw = String((sl as any).recurring_class_lead_time ?? "").trim();
                         const recTimeOk = Boolean(recProfTimeRaw) || Boolean(recLeadTimeRaw);
                         const recSchedOk = recWdOk && recTimeOk;
-                        const recCanSendDisparo = Boolean(recAssigned && recSavedLink && recHasPhone && !recSendingNotification);
+                        const recPaymentConfirmed = hasLeadConfirmedPaymentForRecurringNotificationsClient(sl);
+                        const recCanSendDisparo = Boolean(recPaymentConfirmed && recAssigned && recSavedLink && recHasPhone && !recSendingNotification);
                         const recLessonLinkSaveDisabled = (() => {
                           const d = recurringLessonLinkDraft.trim();
                           if (!d && !recSavedLink) return true;
@@ -7550,6 +7570,7 @@ export function AtendimentoClient() {
                                     onClick={() => void handleSendRecurringDisparo(sl)}
                                     disabled={!recCanSendDisparo}
                                     title={(() => {
+                                      if (!recPaymentConfirmed) return "Confirme o pagamento pelo painel antes de disparar.";
                                       if (!recSavedLink && !recAssigned) return "Adicione o link fixo da aula recorrente e selecione o professor antes de disparar.";
                                       if (!recSavedLink) return "Adicione o link fixo da aula recorrente antes de disparar.";
                                       if (!recAssigned) return "Selecione o professor das aulas recorrentes antes de disparar.";

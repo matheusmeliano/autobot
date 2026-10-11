@@ -23,6 +23,17 @@ function isLeadRecurringRegistrationConcludedClient(lead: unknown): boolean {
     funnelRaw === "matricula_confirmada"
   );
 }
+
+function hasLeadConfirmedPaymentForRecurringNotificationsClient(lead: unknown): boolean {
+  const obj = (lead ?? {}) as Record<string, unknown>;
+  const payStatusRaw = String(
+    obj?.recurring_payment_status ?? obj?.payment_status ?? "",
+  ).trim().toLowerCase();
+  const payConfirmedAtRaw = String(
+    obj?.recurring_payment_confirmed_at ?? obj?.payment_confirmed_at ?? "",
+  ).trim();
+  return payStatusRaw === "confirmado" || Boolean(payConfirmedAtRaw && payConfirmedAtRaw !== "null");
+}
 import {
   deriveExperimentalClassBookingDisplayStatus,
   experimentalClassBookingDisplayStatusLabel,
@@ -1918,13 +1929,17 @@ function BookingDetails({
           const hasLinkOk = Boolean(savedRecurringLink);
           const assignedOk = recurringClassAssignedProfessor(lead);
           const hasPhoneOk = Boolean(String(lead?.phone ?? "").trim());
-          const canSend = isMatriculaConcluida && hasLinkOk && assignedOk && hasPhoneOk;
+          const paymentConfirmed = hasLeadConfirmedPaymentForRecurringNotificationsClient(lead);
+          const canSend = isMatriculaConcluida && paymentConfirmed && hasLinkOk && assignedOk && hasPhoneOk;
           return (
             <button
               type="button"
               onClick={() => void onSendRecurringNotification(lead)}
               disabled={!canSend || isSendingRecurringNotification}
               title={(() => {
+                if (!paymentConfirmed) {
+                  return "Confirme o pagamento pelo painel antes de disparar.";
+                }
                 if (!hasLinkOk && !assignedOk) {
                   return "Adicione o link da aula recorrente e selecione o professor antes de disparar.";
                 }
@@ -4465,6 +4480,10 @@ function isRecurringContractFormalized(lead: AtendimentoLeadListItem): boolean {
     const leadId = String(lead?.id ?? "").trim();
     if (!leadId) {
       modalToast.error("Aluno indisponível para disparar a notificação.");
+      return;
+    }
+    if (!hasLeadConfirmedPaymentForRecurringNotificationsClient(lead)) {
+      modalToast.error("Confirme o pagamento pelo painel antes de disparar as notificações da aula recorrente.");
       return;
     }
     const linkOk = Boolean(String((lead as any)?.recurring_class_link ?? "").trim());
