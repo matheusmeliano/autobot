@@ -1,5 +1,6 @@
 import { ATENDIMENTO_PROFESSOR_TIME_ZONE } from "@/lib/atendimento/constants";
 import {
+  calculateDisplayRecurringOccurrence,
   EXPERIMENTAL_CLASS_PROFESSOR_ASSIGNMENT_ALLOWLIST,
   EXPERIMENTAL_CLASS_SLOT_TIMES,
 } from "@/lib/atendimento/experimentalClass";
@@ -378,6 +379,8 @@ export async function GET(req: Request) {
       "recurring_class_lead_time",
       "recurring_class_lead_timezone",
       "recurring_class_created_at",
+      "recurring_class_student_start_notification_sent_at",
+      "recurring_class_attendant_start_notification_sent_at",
       "contract_status",
       "recurring_registration_step",
     ].join(",");
@@ -461,6 +464,13 @@ export async function GET(req: Request) {
               String((r as any).recurring_class_professor_timezone ?? "").trim() || null,
             assigned_professor_name: hasProfessor ? pName || null : null,
             assigned_professor_phone: hasProfessor ? pPhone || null : null,
+            recurring_class_weekday: effectiveWeekday,
+            recurring_class_student_start_notification_sent_at:
+              String((r as any).recurring_class_student_start_notification_sent_at ?? "").trim() ||
+              null,
+            recurring_class_attendant_start_notification_sent_at:
+              String((r as any).recurring_class_attendant_start_notification_sent_at ?? "").trim() ||
+              null,
             __noProfessor: !hasProfessor,
             __type: "recurring",
           };
@@ -680,9 +690,45 @@ export async function GET(req: Request) {
       else if (active) slotStatus = "ocupado";
       else if (s.isPast || isPastByTime) slotStatus = "passado";
 
+      let activeIsCompleted = Boolean(isPastByTime || s.isPast);
+      if (!activeIsCompleted && active && !isCancelled) {
+        const isRecurringActive =
+          String((active as any).__type ?? "").toLowerCase() === "recurring";
+        if (isRecurringActive) {
+          const recurringWeekday = String((active as any)?.recurring_class_weekday ?? "").trim().toLowerCase();
+          const recurringProfessorTime = String(active.professor_time ?? "").trim();
+          if (
+            ["sun", "mon", "tue", "wed", "thu", "fri", "sat"].includes(recurringWeekday) &&
+            recurringHasTime(recurringProfessorTime)
+          ) {
+            const displayOccurrence = calculateDisplayRecurringOccurrence({
+              weekday: recurringWeekday as "sun" | "mon" | "tue" | "wed" | "thu" | "fri" | "sat",
+              professorTimeHHMM: recurringProfessorTime,
+              professorTimeZone:
+                String((active as any)?.professor_timezone ?? "").trim() ||
+                ATENDIMENTO_PROFESSOR_TIME_ZONE,
+              leadTimeZone: String((active as any)?.lead_timezone ?? "").trim() || null,
+              studentNotificationSentAt: String(
+                (active as any)?.recurring_class_student_start_notification_sent_at ?? "",
+              ).trim(),
+              attendantNotificationSentAt: String(
+                (active as any)?.recurring_class_attendant_start_notification_sent_at ?? "",
+              ).trim(),
+            });
+            const nextProfessorDate = String(
+              displayOccurrence?.professorDate ?? displayOccurrence?.leadDate ?? "",
+            ).trim();
+            const currentProfessorDate = String((active as any)?.professor_date ?? "").trim();
+            if (nextProfessorDate && currentProfessorDate && currentProfessorDate < nextProfessorDate) {
+              activeIsCompleted = true;
+            }
+          }
+        }
+      }
+
       if (active && !isCancelled) {
         totalBookings += 1;
-        if (isPastByTime || s.isPast) totalPast += 1;
+        if (activeIsCompleted) totalPast += 1;
         else totalScheduled += 1;
       }
 
@@ -701,17 +747,7 @@ export async function GET(req: Request) {
       const isRecurringRow = active && String((active as any).__type ?? "").toLowerCase() === "recurring";
       const classTypeLabel: "Experimental" | "Recorrente" = isRecurringRow ? "Recorrente" : "Experimental";
       if (active && !isCancelled) {
-        const startIso =
-          (active ? String(active.professor_start_at ?? "").trim() : "") ||
-          s.professorStartAtIso ||
-          "";
-        const startMs = startIso
-          ? new Date(startIso).getTime()
-          : Number.NaN;
-        const nowMs = new Date(nowUtc).getTime();
-        const endMs = Number.isFinite(startMs) ? startMs + 60 * 60 * 1000 : Number.NaN;
-        const isCompleted = Number.isFinite(endMs) && endMs <= nowMs;
-        if (isCompleted) {
+        if (activeIsCompleted) {
           badgeLabel = "Concluído";
           badgeBg = "#16a34a"; // green-600 (fundo verde, texto branco - acessível WCAG AA)
           badgeText = "#ffffff";
