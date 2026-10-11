@@ -650,6 +650,16 @@ function buildExperimentalMetaForList(lead: AtendimentoLeadListItem): { label: s
     }
   }
 
+  if (gRecurringTrulyStarted && (!gRecurringWeekdayOk || !gRecurringTimeOk)) {
+    if (!gRecurringWeekdayOk && !gRecurringTimeOk) {
+      return { label: "Falta dia e horário", tone: "warning" };
+    }
+    if (gRecurringWeekdayOk && !gRecurringTimeOk) {
+      return { label: "Falta horário", tone: "warning" };
+    }
+    return { label: "Falta dia", tone: "warning" };
+  }
+
   // ============================================================
   // CASO EXPERIMENTAL (se não for recorrente)
   // 1ª PRIORIDADE: flat fields (atualizados no Reagendar, sempre)
