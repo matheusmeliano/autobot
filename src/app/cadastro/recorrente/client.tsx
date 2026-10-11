@@ -112,6 +112,9 @@ function CopyButton({ value, label }: { value: string; label?: string }) {
 
 function buildAlunoRecurringScheduleLabel(lead: Record<string, unknown> | null | undefined): string {
   const weekdayRaw = String(lead?.recurring_class_weekday ?? "").trim().toLowerCase();
+  const professorTimeRaw = String(
+    lead?.recurring_class_professor_time ?? lead?.recurring_class_lead_time ?? "",
+  ).trim();
   const leadTimeRaw = String(
     lead?.recurring_class_lead_time ?? lead?.recurring_class_professor_time ?? "",
   ).trim();
@@ -119,13 +122,26 @@ function buildAlunoRecurringScheduleLabel(lead: Record<string, unknown> | null |
   const validWeekday = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"].includes(weekdayRaw)
     ? (weekdayRaw as "mon" | "tue" | "wed" | "thu" | "fri" | "sat" | "sun")
     : null;
+  const browserTimeZone =
+    typeof Intl !== "undefined" && Intl?.DateTimeFormat?.().resolvedOptions?.().timeZone
+      ? Intl.DateTimeFormat().resolvedOptions().timeZone
+      : null;
+  const effectiveLeadTimeZone =
+    resolveStudentTimezone({
+      state: String(lead?.state ?? "").trim() || null,
+      city: String(lead?.city ?? "").trim() || null,
+      phone: String(lead?.phone ?? "").trim() || null,
+      browserTimeZone,
+    }) ||
+    String(lead?.timezone ?? "").trim() ||
+    ATENDIMENTO_PROFESSOR_TIME_ZONE;
 
-  if (validWeekday && /^\d{2}:\d{2}$/.test(leadTimeRaw)) {
+  if (validWeekday && /^\d{2}:\d{2}$/.test(professorTimeRaw || leadTimeRaw)) {
     const displayOccurrence = calculateDisplayRecurringOccurrence({
       weekday: validWeekday,
-      professorTimeHHMM: leadTimeRaw,
+      professorTimeHHMM: professorTimeRaw || leadTimeRaw,
       professorTimeZone: ATENDIMENTO_PROFESSOR_TIME_ZONE,
-      leadTimeZone: String(lead?.timezone ?? "").trim() || null,
+      leadTimeZone: effectiveLeadTimeZone,
       studentNotificationSentAt: String(
         lead?.recurring_class_student_start_notification_sent_at ?? "",
       ).trim(),
@@ -137,21 +153,23 @@ function buildAlunoRecurringScheduleLabel(lead: Record<string, unknown> | null |
     const occurrenceDate = String(
       displayOccurrence?.leadDate ?? displayOccurrence?.professorDate ?? "",
     ).trim();
-    const occurrenceTime = String(displayOccurrence?.leadTime ?? leadTimeRaw).trim();
+    const occurrenceTime = String(
+      displayOccurrence?.leadTime ?? (leadTimeRaw || professorTimeRaw),
+    ).trim();
     if (occurrenceDate && occurrenceTime) {
-      const [, month = "", day = ""] = occurrenceDate.match(/^(\d{4})-(\d{2})-(\d{2})$/) ?? [];
+      const [, , month = "", day = ""] = occurrenceDate.match(/^(\d{4})-(\d{2})-(\d{2})$/) ?? [];
       const weekdayLabel =
         String(displayOccurrence?.weekdayLabel ?? "").trim() ||
         (RECURRING_WEEKDAY_LABELS_PT_BR as Record<string, string>)?.[validWeekday] ||
         weekdayLabelFallback;
       const dateShort = day && month ? `${day}/${month}` : occurrenceDate;
-      if (weekdayLabel && dateShort) return `${weekdayLabel} (${dateShort}) · ${occurrenceTime}`;
-      if (weekdayLabel) return `${weekdayLabel} · ${occurrenceTime}`;
-      return `${occurrenceDate} · ${occurrenceTime}`;
+      if (weekdayLabel && dateShort) return `${weekdayLabel} (${dateShort}) às ${occurrenceTime}`;
+      if (weekdayLabel) return `${weekdayLabel} às ${occurrenceTime}`;
+      return `${occurrenceDate} às ${occurrenceTime}`;
     }
   }
 
-  if (weekdayLabelFallback && leadTimeRaw) return `${weekdayLabelFallback} · ${leadTimeRaw}`;
+  if (weekdayLabelFallback && leadTimeRaw) return `${weekdayLabelFallback} às ${leadTimeRaw}`;
   return weekdayLabelFallback || leadTimeRaw || "—";
 }
 
