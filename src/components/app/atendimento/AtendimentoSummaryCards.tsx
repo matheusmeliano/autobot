@@ -1527,7 +1527,7 @@ function ContractDetails({
             </div>
             <div className="mt-4 grid min-w-0 gap-3 md:grid-cols-2">
               <Field label="Plano" value="Modelo individual" />
-              <Field label="Valor mensal" value="US$ 116,00" />
+              <Field label="Valor mensal" value="US$ 119,00" />
             </div>
           </div>
         ) : null}

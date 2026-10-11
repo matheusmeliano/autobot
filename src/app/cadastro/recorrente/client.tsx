@@ -1701,8 +1701,18 @@ export default function CadastroRecorrenteBody() {
     }
     const alunoContractSigned = Boolean(alunoContractPdfUrl && alunoContractSignedDate);
     const planMonthlyRaw = String(lead?.plan_monthly_value ?? "").trim();
+    const planMonthlyRawNormalized = planMonthlyRaw.replace(/\s+/g, "").replace(",", ".").toLowerCase();
+    const planMonthlyIsLegacy116 =
+      planMonthlyRawNormalized === "116" ||
+      planMonthlyRawNormalized === "116.00" ||
+      planMonthlyRawNormalized === "us$116" ||
+      planMonthlyRawNormalized === "us$116.00" ||
+      planMonthlyRawNormalized === "$116" ||
+      planMonthlyRawNormalized === "$116.00";
     let planMonthlyDisplay = "";
-    if (planMonthlyRaw) {
+    if (planMonthlyIsLegacy116) {
+      planMonthlyDisplay = "US$119";
+    } else if (planMonthlyRaw) {
       const digits = planMonthlyRaw.replace(/\D+/g, "");
       if (/^\d+$/.test(digits)) {
         const n = Number.parseInt(digits, 10);
@@ -1714,7 +1724,7 @@ export default function CadastroRecorrenteBody() {
         planMonthlyDisplay = planMonthlyRaw.startsWith("US$") || planMonthlyRaw.startsWith("$") ? planMonthlyRaw : `US$${planMonthlyRaw}`;
       }
     }
-    if (!planMonthlyDisplay) planMonthlyDisplay = "US$116";
+    if (!planMonthlyDisplay) planMonthlyDisplay = "US$119";
     const statusLabel = "Matrícula concluída";
 
     async function handleCopyEnrollment() {
