@@ -820,6 +820,8 @@ export async function GET(req: Request) {
       const bookingStatus =
         String(active?.status ?? "").trim().toLowerCase() || null;
       const isCancelled = bookingStatus === "cancelled";
+      const isRecurringActive =
+        String((active as any)?.__type ?? "").toLowerCase() === "recurring";
 
       const iso = s.professorStartAtIso;
       const isPastByTime =
@@ -835,14 +837,32 @@ export async function GET(req: Request) {
 
       let activeIsCompleted = Boolean(isPastByTime || s.isPast);
       if (!activeIsCompleted && active && !isCancelled) {
-        const isRecurringActive =
-          String((active as any).__type ?? "").toLowerCase() === "recurring";
         if (isRecurringActive) {
+          const currentProfessorStartRaw = String(
+            (active as any)?.professor_start_at ?? iso ?? "",
+          ).trim();
+          const currentProfessorStartMs = currentProfessorStartRaw
+            ? new Date(currentProfessorStartRaw).getTime()
+            : NaN;
+          const lastNotifiedOccurrenceStartRaw = String(
+            (active as any)?.recurring_class_last_notified_occurrence_start_at ?? "",
+          ).trim();
+          const lastNotifiedOccurrenceStartMs = lastNotifiedOccurrenceStartRaw
+            ? new Date(lastNotifiedOccurrenceStartRaw).getTime()
+            : NaN;
+          if (
+            Number.isFinite(currentProfessorStartMs) &&
+            Number.isFinite(lastNotifiedOccurrenceStartMs) &&
+            currentProfessorStartMs <= lastNotifiedOccurrenceStartMs
+          ) {
+            activeIsCompleted = true;
+          }
+
           const displayOccurrence =
             resolvedRecurringOccurrenceByLeadId.get(
               String((active as any)?.lead_id ?? "").trim(),
             ) ?? null;
-          if (displayOccurrence) {
+          if (!activeIsCompleted && displayOccurrence) {
             const nextProfessorDate = String(
               displayOccurrence?.professorDate ?? displayOccurrence?.leadDate ?? "",
             ).trim();
@@ -858,6 +878,10 @@ export async function GET(req: Request) {
         totalBookings += 1;
         if (activeIsCompleted) totalPast += 1;
         else totalScheduled += 1;
+      }
+
+      if (!isCancelled && active && activeIsCompleted) {
+        slotStatus = "passado";
       }
 
       let aluno = null as {
@@ -937,7 +961,10 @@ export async function GET(req: Request) {
         bookingId: active
           ? String(active.id ?? "").trim() || null
           : null,
-        bookingStatus,
+        bookingStatus:
+          active && !isCancelled && isRecurringActive && activeIsCompleted
+            ? "completed"
+            : bookingStatus,
         classTypeLabel,
         badgeLabel,
         badgeBg,
