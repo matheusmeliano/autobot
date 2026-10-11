@@ -496,19 +496,24 @@ function buildExperimentalMetaForSection(lead: AtendimentoLeadListItem): string 
     futureExp &&
     futureExpStatus !== "cancelled" &&
     (futureExpAttendance === "attended" || futureExpAttendance === "no_show");
-  const recurringInitiated = leadHasAnyRecurringProgressSignal(lead);
+  const recurringInitiated =
+    leadHasAnyRecurringProgressSignal(lead) ||
+    leadHasMatriculaOrRecurringStageInitiated(lead) ||
+    isLeadInAlunosSection(lead);
   if (!recurringInitiated && (bookingResolved || futureResolved || pastDone)) {
     return "Aula experimental concluída";
   }
 
-  if (hasFutureExp && futureExpBody) return `Aula em: ${futureExpBody}`;
-  if (flatExpActiveBody) {
-    return `Aula em: ${flatExpActiveBody}`;
+  if (!recurringInitiated) {
+    if (hasFutureExp && futureExpBody) return `Aula em: ${futureExpBody}`;
+    if (flatExpActiveBody) {
+      return `Aula em: ${flatExpActiveBody}`;
+    }
+    if (booking && bookingHasId && bookingIsNotDraft && bookingStatus !== "cancelled" && bookingBody) {
+      return `Aula em: ${bookingBody}`;
+    }
+    if (pastMeta && pastBody) return `Última aula em: ${pastBody}`;
   }
-  if (booking && bookingHasId && bookingIsNotDraft && bookingStatus !== "cancelled" && bookingBody) {
-    return `Aula em: ${bookingBody}`;
-  }
-  if (pastMeta && pastBody) return `Última aula em: ${pastBody}`;
 
   const bookingAtivaNaoCancelada =
     booking && bookingHasId && bookingIsNotDraft && bookingStatus !== "cancelled";
@@ -4949,7 +4954,10 @@ function isRecurringContractFormalized(lead: AtendimentoLeadListItem): boolean {
       Boolean(String((lead as any)?.recurring_class_status ?? "").trim()) ||
       Number((lead as any)?.recurring_registration_step ?? 0) > 0;
 
-    const recurringProgress = leadHasAnyRecurringProgressSignal(lead);
+    const recurringProgress =
+      leadHasAnyRecurringProgressSignal(lead) ||
+      leadHasMatriculaOrRecurringStageInitiated(lead) ||
+      isLeadInAlunosSection(lead);
     if (recurringProgress) return buildRecurringMetaForSection(lead);
 
     if (activeSection === "agendamentos") {
