@@ -245,6 +245,9 @@ function shouldHideExperimentalInfoCompletely(
 function leadHasMatriculaOrRecurringStageInitiated(lead: AtendimentoLeadListItem): boolean {
   const regStepRaw = Number((lead as any)?.recurring_registration_step ?? NaN);
   const regStepOk = Number.isFinite(regStepRaw) && regStepRaw >= 1 && regStepRaw <= 12;
+  const hasRecurringPassword =
+    Boolean(String((lead as any)?.recurring_registration_password ?? "").trim()) ||
+    Boolean(String((lead as any)?.signup_password_raw_temp ?? "").trim());
   const st = String(lead.status ?? "").trim().toLowerCase();
   const fs = String((lead as any)?.funnel_stage ?? "").trim().toLowerCase();
   const rcs = String((lead as any)?.recurring_class_status ?? "").trim().toLowerCase();
@@ -265,7 +268,7 @@ function leadHasMatriculaOrRecurringStageInitiated(lead: AtendimentoLeadListItem
     fs === "matriculado" ||
     rcs === "cadastro_plataforma_pendente" ||
     rcs === "confirmado";
-  return regStepOk || stOrFsOrRcsOk;
+  return regStepOk || hasRecurringPassword || stOrFsOrRcsOk;
 }
 
 function buildRecurringMetaForSection(lead: AtendimentoLeadListItem): string {
@@ -5300,7 +5303,11 @@ function isRecurringContractFormalized(lead: AtendimentoLeadListItem): boolean {
                       {(() => {
                         if (activeSection === "agendamentos") return null;
                         if (shouldHideExperimentalInfoCompletely(lead, activeSection)) return null;
-                        if (leadHasAnyRecurringProgressSignal(lead)) return null;
+                        if (
+                          leadHasAnyRecurringProgressSignal(lead) ||
+                          leadHasMatriculaOrRecurringStageInitiated(lead) ||
+                          isLeadInAlunosSection(lead)
+                        ) return null;
                         const stateRaw = String((lead as any)?.state ?? "").trim();
                         const cityRaw = String((lead as any)?.city ?? "").trim();
                         if (!stateRaw || !cityRaw) return null;
