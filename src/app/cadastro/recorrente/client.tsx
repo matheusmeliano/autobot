@@ -1639,6 +1639,65 @@ export default function CadastroRecorrenteBody() {
     }
   }, [alunoIsMatriculaConcluida, alunoForcePainel]);
 
+  useEffect(() => {
+    if (!alunoIsMatriculaConcluida && !alunoForcePainel) return;
+    const leadId = String(alunoLeadFull?.id ?? "").trim();
+    const phoneDigits = String(alunoLeadFull?.phone ?? phoneField ?? "").replace(/\D/g, "").trim();
+    if (!leadId && phoneDigits.length < 10) return;
+
+    let cancelled = false;
+    let fallbackRefreshTimer: number | null = null;
+    const supabase = createSupabaseBrowserClient();
+
+    const refreshAlunoLead = async () => {
+      if (cancelled || phoneDigits.length < 10) return;
+      try {
+        const res = await fetch(
+          `/api/cadastro/recorrente/draft?telefone=${encodeURIComponent(phoneDigits)}`,
+          { method: "GET", cache: "no-store" },
+        );
+        const json = (await res.json().catch(() => null)) as
+          | { ok?: boolean; lead?: Record<string, unknown> | null; is_matricula_concluida?: boolean }
+          | null;
+        if (!res.ok || !json?.ok || !json?.lead || cancelled) return;
+        setAlunoLeadFull((prev: any) => (prev ? { ...prev, ...(json.lead as any) } : json.lead));
+        setAlunoIsMatriculaConcluida(Boolean(json.is_matricula_concluida));
+      } catch {}
+    };
+
+    const channel = supabase
+      .channel(`cadastro-recorrente-lead-${leadId || phoneDigits}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "atendimento_leads",
+          filter: leadId ? `id=eq.${leadId}` : `phone=eq.${phoneDigits}`,
+        },
+        () => {
+          void refreshAlunoLead();
+        },
+      )
+      .subscribe((status) => {
+        if (status === "CHANNEL_ERROR" || status === "TIMED_OUT" || status === "CLOSED") {
+          void refreshAlunoLead();
+        }
+      });
+
+    fallbackRefreshTimer = window.setInterval(() => {
+      void refreshAlunoLead();
+    }, 15000);
+
+    return () => {
+      cancelled = true;
+      if (fallbackRefreshTimer != null) {
+        window.clearInterval(fallbackRefreshTimer);
+      }
+      void supabase.removeChannel(channel);
+    };
+  }, [alunoIsMatriculaConcluida, alunoForcePainel, alunoLeadFull?.id, alunoLeadFull?.phone, phoneField]);
+
   async function handleAlunoLoginAttempt() {
     setAlunoLoginErro("");
     const password = alunoLoginSenha.trim();
