@@ -880,10 +880,6 @@ export async function GET(req: Request) {
         else totalScheduled += 1;
       }
 
-      if (!isCancelled && active && activeIsCompleted) {
-        slotStatus = "passado";
-      }
-
       let aluno = null as {
         id: string;
         displayName: string;
