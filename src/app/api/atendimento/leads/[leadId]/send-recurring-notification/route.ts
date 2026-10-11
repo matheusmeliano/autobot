@@ -18,19 +18,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ leadId:
   if (!lid) return Response.json({ ok: false, error: "missing_lead_id" }, { status: 400 });
   const admin = createSupabaseAdminClient();
   const nowIso = new Date().toISOString();
-  const cols = [
-    "id",
-    "full_name",
-    "phone",
-    "payment_status",
-    "payment_confirmed_at",
-    "recurring_class_link",
-    "recurring_class_professor_name",
-    "recurring_class_professor_phone",
-    "recurring_class_weekday",
-    "recurring_class_weekday_label",
-  ].join(",");
-  const { data: lead, error: le } = await admin.from("atendimento_leads").select(cols).eq("id", lid).maybeSingle();
+  const { data: lead, error: le } = await admin.from("atendimento_leads").select("*").eq("id", lid).maybeSingle();
   if (le) return Response.json({ ok: false, error: le.message }, { status: 500 });
   if (!lead) return Response.json({ ok: false, error: "not_found" }, { status: 404 });
   if (!hasLeadConfirmedPaymentForRecurringNotifications(lead)) {

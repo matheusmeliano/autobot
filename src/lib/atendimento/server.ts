@@ -1880,37 +1880,11 @@ export async function sendRecurringClassStartNotifications(now = new Date()) {
     "America/Sao_Paulo"
   ).trim();
 
-  const allRecurringColumns = [
-    "id",
-    "user_id",
-    "full_name",
-    "phone",
-    "status",
-    "funnel_stage",
-    "payment_status",
-    "payment_confirmed_at",
-    "timezone",
-    "recurring_class_weekday",
-    "recurring_class_professor_time",
-    "recurring_class_lead_time",
-    "recurring_class_professor_timezone",
-    "recurring_class_lead_timezone",
-    "recurring_class_link",
-    "recurring_class_professor_name",
-    "recurring_class_professor_phone",
-    "recurring_class_professor_date",
-    "recurring_class_professor_start_at",
-    "recurring_class_lead_date",
-    "recurring_class_lead_start_at",
-    "recurring_class_student_start_notification_sent_at",
-    "recurring_class_attendant_start_notification_sent_at",
-  ];
-
   let rows: any[] = [];
   try {
     const { data, error } = await admin
       .from("atendimento_leads")
-      .select(allRecurringColumns.join(", "))
+      .select("*")
       .not("recurring_class_weekday", "is", null);
     if (!error && Array.isArray(data)) rows = data as any[];
   } catch (_e) {
