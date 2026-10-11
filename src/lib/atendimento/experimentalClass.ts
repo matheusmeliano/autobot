@@ -177,6 +177,11 @@ export type ExperimentalClassTimeOption = {
   displayLabel: string;
 };
 
+export type RecurringOccupiedInterval = {
+  startAt: string;
+  endAt?: string | null;
+};
+
 export type ExperimentalClassBookingDisplayStatus =
   | "incomplete"
   | "scheduled"
@@ -1204,6 +1209,7 @@ export function listRecurringWeekdayAvailability(params: {
   now?: Date;
   leadTimeZone?: string | null;
   bookedProfessorStartAts?: string[];
+  occupiedIntervals?: RecurringOccupiedInterval[];
   lookAheadWeeks?: number;
 }) {
   const now = params.now ?? new Date();
@@ -1212,18 +1218,10 @@ export function listRecurringWeekdayAvailability(params: {
     : 4;
   const leadTimeZone = String(params.leadTimeZone ?? "").trim() || ATENDIMENTO_PROFESSOR_TIME_ZONE;
 
-  const bookedProfessorStarts = (params.bookedProfessorStartAts ?? [])
-    .map((value) => new Date(String(value ?? "")).toISOString())
-    .filter(Boolean);
-  const booked = bookedProfessorStarts
-    .map((iso) => {
-      const d = new Date(iso);
-      const ms = d.getTime();
-      if (!Number.isFinite(ms)) return null;
-      return { dateIso: iso, ms };
-    })
-    .filter((x): x is { dateIso: string; ms: number } => Boolean(x));
-  const blockedExactStarts = new Set<string>(booked.map((b) => b.dateIso));
+  const occupiedIntervals = [
+    ...(params.occupiedIntervals ?? []),
+    ...(params.bookedProfessorStartAts ?? []).map((value) => ({ startAt: String(value ?? "") })),
+  ];
 
   const weekdayOrder: RecurringWeekdayKey[] = ["mon", "tue", "wed", "thu", "fri", "sat"];
   const optionsByWeekdayDate = new Map<string, RecurringWeekdayTimeOption[]>();
@@ -1267,7 +1265,14 @@ export function listRecurringWeekdayAvailability(params: {
         });
         const startMs = new Date(professorStartAt).getTime();
         if (!Number.isFinite(startMs) || startMs <= now.getTime()) continue;
-        if (blockedExactStarts.has(professorStartAt)) continue;
+        if (
+          recurringOccurrenceConflictsWithIntervals({
+            startAt: professorStartAt,
+            occupiedIntervals,
+          })
+        ) {
+          continue;
+        }
 
         slots.push({
           id: `${professorDate}|${weekday}|${professorTime}`,
@@ -1408,6 +1413,8 @@ export function calculateNextRecurringOccurrence(params: {
   leadTimeZone?: string | null;
   leadTimeHHMM?: string | null;
   fromDate?: Date;
+  occupiedIntervals?: RecurringOccupiedInterval[];
+  maxWeeksToScan?: number;
 }) {
   const wantWeekday = String(params.weekday ?? "").trim().toLowerCase();
   if (!wantWeekday) return null;
@@ -1418,9 +1425,13 @@ export function calculateNextRecurringOccurrence(params: {
   const leadTimeRaw = String(params.leadTimeHHMM ?? "").trim();
   const leadTimeHHMM = /^\d{2}:\d{2}$/.test(leadTimeRaw) ? leadTimeRaw : "";
   const now = params.fromDate ?? new Date();
+  const maxWeeksToScan = Number.isFinite(Number(params.maxWeeksToScan))
+    ? Math.max(6, Number(params.maxWeeksToScan))
+    : 24;
+  const maxDaysToScan = maxWeeksToScan * 7;
 
   const todayLocal = localDateInTimeZone(now, profTz);
-  for (let dayOffset = 0; dayOffset < 40; dayOffset++) {
+  for (let dayOffset = 0; dayOffset < maxDaysToScan; dayOffset++) {
     const candidateLocal = addDaysToLocalDate(todayLocal, dayOffset);
     const noonUtc = zonedDateTimeToUtcIso({
       date: candidateLocal,
@@ -1438,6 +1449,14 @@ export function calculateNextRecurringOccurrence(params: {
     const startUtcMs = new Date(startUtcIso).getTime();
     if (!Number.isFinite(startUtcMs)) continue;
     if (dayOffset === 0 && startUtcMs <= now.getTime()) continue;
+    if (
+      recurringOccurrenceConflictsWithIntervals({
+        startAt: startUtcIso,
+        occupiedIntervals: params.occupiedIntervals ?? [],
+      })
+    ) {
+      continue;
+    }
 
     const ptbrLabels: Record<string, string> = {
       mon: "Segunda-feira",
@@ -1542,6 +1561,8 @@ export function calculateDisplayRecurringOccurrence(params: {
   lastNotifiedOccurrenceStartAt?: string | null;
   studentNotificationSentAt?: string | null;
   attendantNotificationSentAt?: string | null;
+  occupiedIntervals?: RecurringOccupiedInterval[];
+  maxWeeksToScan?: number;
 }) {
   const nextOccurrence = calculateNextRecurringOccurrence(params);
   if (!nextOccurrence) return null;
@@ -1709,6 +1730,42 @@ export function calculatePastRecurringOccurrences(params: {
 
   results.sort((a, b) => new Date(b.professorStartAt).getTime() - new Date(a.professorStartAt).getTime());
   return results;
+}
+
+function toRecurringIntervalMs(value: RecurringOccupiedInterval | null | undefined) {
+  const startRaw = String(value?.startAt ?? "").trim();
+  if (!startRaw) return null;
+  const startMs = new Date(startRaw).getTime();
+  if (!Number.isFinite(startMs)) return null;
+
+  const endRaw = String(value?.endAt ?? "").trim();
+  const endMs = endRaw
+    ? new Date(endRaw).getTime()
+    : startMs + EXPERIMENTAL_CLASS_DURATION_MINUTES * 60 * 1000;
+  if (!Number.isFinite(endMs) || endMs <= startMs) return null;
+
+  return { startMs, endMs };
+}
+
+function recurringOccurrenceConflictsWithIntervals(params: {
+  startAt: string;
+  occupiedIntervals?: RecurringOccupiedInterval[];
+}) {
+  const startRaw = String(params.startAt ?? "").trim();
+  if (!startRaw) return false;
+  const startMs = new Date(startRaw).getTime();
+  if (!Number.isFinite(startMs)) return false;
+  const endMs = startMs + EXPERIMENTAL_CLASS_DURATION_MINUTES * 60 * 1000;
+
+  for (const interval of params.occupiedIntervals ?? []) {
+    const normalized = toRecurringIntervalMs(interval);
+    if (!normalized) continue;
+    if (startMs < normalized.endMs && normalized.startMs < endMs) {
+      return true;
+    }
+  }
+
+  return false;
 }
 
 const BRAZILIAN_STATE_KEYWORDS = new Set<string>([

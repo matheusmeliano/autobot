@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
-import { findLeadByPhone } from "@/lib/atendimento/server";
+import {
+  findLeadByPhone,
+  resolveRecurringDisplayOccurrenceMap,
+} from "@/lib/atendimento/server";
 
 function toErrorMessage(raw: unknown, fallback = "Erro desconhecido."): string {
   if (raw === null || raw === undefined) return fallback;
@@ -80,7 +83,7 @@ export async function POST(req: NextRequest) {
         const cands = phoneCandidatesResume(safePhoneDigits);
         const probe = await admin
           .from("atendimento_leads")
-          .select("id, phone, full_name, recurring_registration_password, signup_password_raw_temp, recurring_registration_step, recurring_class_weekday, recurring_class_weekday_label, recurring_class_professor_time, recurring_class_lead_time, recurring_class_student_start_notification_sent_at, recurring_class_attendant_start_notification_sent_at, state, city, country, timezone, contract_pdf_url, contract_signed_at")
+          .select("id, phone, full_name, recurring_registration_password, signup_password_raw_temp, recurring_registration_step, recurring_class_weekday, recurring_class_weekday_label, recurring_class_professor_time, recurring_class_lead_time, recurring_class_professor_name, recurring_class_professor_phone, recurring_class_professor_timezone, recurring_class_lead_timezone, recurring_class_student_start_notification_sent_at, recurring_class_attendant_start_notification_sent_at, state, city, country, timezone, contract_pdf_url, contract_signed_at")
           .in("phone", cands)
           .order("created_at", { ascending: false })
           .limit(5)
@@ -132,6 +135,39 @@ export async function POST(req: NextRequest) {
         ? (stepRaw as 0 | 1 | 2 | 3 | 4 | 5 | 6)
         : 0;
     const safeStep = parsedStep > 0 ? parsedStep : 1;
+    let latestRecurringNotificationOccurrenceStartAt: string | null = null;
+    try {
+      const { data: recurringNotificationEvents } = await admin
+        .from("atendimento_history_events")
+        .select("details, created_at")
+        .eq("lead_id", String((lead as any)?.id ?? ""))
+        .in("event_type", [
+          "recurring_class_attendant_start_notification_sent",
+          "recurring_class_student_start_notification_sent",
+          "recurring_class_registered_attendant_start_notification_sent",
+          "recurring_class_attendant_start_notification_sent_manual",
+          "recurring_class_student_start_notification_sent_manual",
+          "recurring_class_registered_attendant_start_notification_sent_manual",
+        ])
+        .order("created_at", { ascending: false })
+        .limit(20);
+      latestRecurringNotificationOccurrenceStartAt =
+        (Array.isArray(recurringNotificationEvents) ? recurringNotificationEvents : [])
+          .map((event) => String(((event as any)?.details ?? {})?.start_at ?? "").trim())
+          .find(Boolean) || null;
+    } catch {}
+    if (latestRecurringNotificationOccurrenceStartAt) {
+      (lead as any).recurring_class_last_notified_occurrence_start_at =
+        latestRecurringNotificationOccurrenceStartAt;
+    }
+    const resolvedRecurringOccurrenceByLeadId = await resolveRecurringDisplayOccurrenceMap({
+      admin,
+      leads: [lead as Record<string, unknown>],
+      now: new Date(),
+      lookAheadWeeks: 24,
+    });
+    const resolvedRecurringOccurrence =
+      resolvedRecurringOccurrenceByLeadId.get(String((lead as any)?.id ?? "").trim()) ?? null;
 
     return NextResponse.json({
       ok: true,
@@ -152,6 +188,34 @@ export async function POST(req: NextRequest) {
         recurring_class_attendant_start_notification_sent_at: readStr(
           "recurring_class_attendant_start_notification_sent_at",
         ),
+        recurring_class_last_notified_occurrence_start_at:
+          latestRecurringNotificationOccurrenceStartAt,
+        recurring_class_next_professor_date: String(
+          resolvedRecurringOccurrence?.professorDate ?? "",
+        ).trim() || null,
+        recurring_class_next_professor_time: String(
+          resolvedRecurringOccurrence?.professorTime ?? "",
+        ).trim() || null,
+        recurring_class_next_professor_start_at: String(
+          resolvedRecurringOccurrence?.professorStartAt ?? "",
+        ).trim() || null,
+        recurring_class_next_lead_date: String(
+          resolvedRecurringOccurrence?.leadDate ?? "",
+        ).trim() || null,
+        recurring_class_next_lead_time: String(
+          resolvedRecurringOccurrence?.leadTime ?? "",
+        ).trim() || null,
+        recurring_class_next_lead_start_at: String(
+          resolvedRecurringOccurrence?.leadStartAt ?? "",
+        ).trim() || null,
+        recurring_class_next_weekday_label: String(
+          resolvedRecurringOccurrence?.weekdayLabel ?? "",
+        ).trim() || null,
+        recurring_class_next_date: String(
+          resolvedRecurringOccurrence?.leadDate ??
+            resolvedRecurringOccurrence?.professorDate ??
+            "",
+        ).trim() || null,
       },
       progress: {
         step: safeStep,
@@ -166,6 +230,8 @@ export async function POST(req: NextRequest) {
         recurring_class_attendant_start_notification_sent_at: readStr(
           "recurring_class_attendant_start_notification_sent_at",
         ),
+        recurring_class_last_notified_occurrence_start_at:
+          latestRecurringNotificationOccurrenceStartAt,
       },
     });
   } catch (e) {

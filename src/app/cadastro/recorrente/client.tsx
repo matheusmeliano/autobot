@@ -111,6 +111,15 @@ function CopyButton({ value, label }: { value: string; label?: string }) {
 }
 
 function buildAlunoRecurringScheduleLabel(lead: Record<string, unknown> | null | undefined): string {
+  const storedOccurrenceDate = String(
+    lead?.recurring_class_next_lead_date ?? lead?.recurring_class_next_professor_date ?? "",
+  ).trim();
+  const storedOccurrenceTime = String(
+    lead?.recurring_class_next_lead_time ?? lead?.recurring_class_next_professor_time ?? "",
+  ).trim();
+  const storedWeekdayLabel = String(
+    lead?.recurring_class_next_weekday_label ?? "",
+  ).trim();
   const weekdayRaw = String(lead?.recurring_class_weekday ?? "").trim().toLowerCase();
   const professorTimeRaw = String(
     lead?.recurring_class_professor_time ?? lead?.recurring_class_lead_time ?? "",
@@ -135,6 +144,14 @@ function buildAlunoRecurringScheduleLabel(lead: Record<string, unknown> | null |
     }) ||
     String(lead?.timezone ?? "").trim() ||
     ATENDIMENTO_PROFESSOR_TIME_ZONE;
+
+  if (storedOccurrenceDate && storedOccurrenceTime) {
+    const [, , month = "", day = ""] = storedOccurrenceDate.match(/^(\d{4})-(\d{2})-(\d{2})$/) ?? [];
+    const dateShort = day && month ? `${day}/${month}` : storedOccurrenceDate;
+    if (storedWeekdayLabel && dateShort) return `${storedWeekdayLabel} (${dateShort}) às ${storedOccurrenceTime}`;
+    if (storedWeekdayLabel) return `${storedWeekdayLabel} às ${storedOccurrenceTime}`;
+    return `${storedOccurrenceDate} às ${storedOccurrenceTime}`;
+  }
 
   if (validWeekday && /^\d{2}:\d{2}$/.test(professorTimeRaw || leadTimeRaw)) {
     const displayOccurrence = calculateDisplayRecurringOccurrence({
@@ -449,6 +466,10 @@ export default function CadastroRecorrenteBody() {
       const qs = new URLSearchParams();
       qs.set("lead_timezone", tzUse);
       if (tzBrowser) qs.set("timezone", tzBrowser);
+      const leadId = String(alunoLeadFull?.id ?? "").trim();
+      const phoneDigits = String(alunoLeadFull?.phone ?? phoneField ?? "").replace(/\D/g, "").trim();
+      if (leadId) qs.set("lead_id", leadId);
+      if (phoneDigits) qs.set("phone", phoneDigits);
       const res = await fetch(`/api/cadastro/recorrente/availability?${qs.toString()}`);
       const j = (await res.json().catch(() => null)) as any;
       if (!res.ok || !j || !j.ok) throw new Error(String(j?.error ?? "Falha ao carregar horários."));
@@ -1077,6 +1098,10 @@ export default function CadastroRecorrenteBody() {
                 const params = new URLSearchParams();
                 if (tzLead) params.set("lead_timezone", tzLead);
                 if (tzBrowser) params.set("timezone", tzBrowser);
+                const leadId = String(alunoLeadFull?.id ?? "").trim();
+                const phoneDigits = String(alunoLeadFull?.phone ?? phoneField ?? "").replace(/\D/g, "").trim();
+                if (leadId) params.set("lead_id", leadId);
+                if (phoneDigits) params.set("phone", phoneDigits);
                 const qs = params.toString();
                 const url = qs
                   ? `/api/cadastro/recorrente/availability?${qs}`
@@ -1243,6 +1268,10 @@ export default function CadastroRecorrenteBody() {
       const params = new URLSearchParams();
       if (tzLead) params.set("lead_timezone", tzLead);
       if (tzBrowser) params.set("timezone", tzBrowser);
+      const leadId = String(alunoLeadFull?.id ?? "").trim();
+      const phoneDigits = String(alunoLeadFull?.phone ?? phoneField ?? "").replace(/\D/g, "").trim();
+      if (leadId) params.set("lead_id", leadId);
+      if (phoneDigits) params.set("phone", phoneDigits);
       const qs = params.toString();
       const url = qs
         ? `/api/cadastro/recorrente/availability?${qs}`
@@ -1525,6 +1554,10 @@ export default function CadastroRecorrenteBody() {
                 const params = new URLSearchParams();
                 if (tzLead) params.set("lead_timezone", tzLead);
                 if (tzBrowser) params.set("timezone", tzBrowser);
+                const leadId = String(leadData?.id ?? alunoLeadFull?.id ?? "").trim();
+                const phoneDigits = String(leadData?.phone ?? alunoLeadFull?.phone ?? phoneField ?? "").replace(/\D/g, "").trim();
+                if (leadId) params.set("lead_id", leadId);
+                if (phoneDigits) params.set("phone", phoneDigits);
                 const qs = params.toString();
                 const url = qs
                   ? `/api/cadastro/recorrente/availability?${qs}`

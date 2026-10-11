@@ -1,6 +1,9 @@
 import { ATENDIMENTO_PROFESSOR_TIME_ZONE, isZapiInternalBlocklistedPhone } from "@/lib/atendimento/constants";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
-import { requireAtendimentoUser } from "@/lib/atendimento/server";
+import {
+  requireAtendimentoUser,
+  resolveRecurringDisplayOccurrenceMap,
+} from "@/lib/atendimento/server";
 import { calculatePastRecurringOccurrences } from "@/lib/atendimento/experimentalClass";
 import {
   loadHiddenWhatsAppPhoneBlocklist,
@@ -861,7 +864,7 @@ function sectionTimestampMs(row: any, sectionName: "interessados" | "alunos" | "
   return Number.isFinite(tFallback) && tFallback > 0 ? tFallback : Date.now();
 }
 
-  const rows = leadRows
+  let rows = leadRows
     .map((row) => {
       const leadId = String(row.id ?? "");
       const interessadosTs = sectionTimestampMs(row, "interessados", allHistoryEvents);
@@ -1286,6 +1289,48 @@ function sectionTimestampMs(row: any, sectionName: "interessados" | "alunos" | "
         alunos_entered_at: new Date(alunosTs).toISOString(),
         agendamentos_entered_at: new Date(agendamentosTs).toISOString(),
         contratos_entered_at: new Date(contratosTs).toISOString(),
+      };
+    });
+
+  const resolvedRecurringOccurrenceByLeadId = await resolveRecurringDisplayOccurrenceMap({
+    admin,
+    leads: rows as Array<Record<string, unknown>>,
+    now: new Date(),
+    lookAheadWeeks: 24,
+  });
+
+  rows = rows
+    .map((row) => {
+      const resolvedRecurringOccurrence =
+        resolvedRecurringOccurrenceByLeadId.get(String((row as any)?.id ?? "").trim()) ?? null;
+      return {
+        ...row,
+        recurring_class_next_professor_date: String(
+          resolvedRecurringOccurrence?.professorDate ?? "",
+        ).trim() || null,
+        recurring_class_next_professor_time: String(
+          resolvedRecurringOccurrence?.professorTime ?? "",
+        ).trim() || null,
+        recurring_class_next_professor_start_at: String(
+          resolvedRecurringOccurrence?.professorStartAt ?? "",
+        ).trim() || null,
+        recurring_class_next_lead_date: String(
+          resolvedRecurringOccurrence?.leadDate ?? "",
+        ).trim() || null,
+        recurring_class_next_lead_time: String(
+          resolvedRecurringOccurrence?.leadTime ?? "",
+        ).trim() || null,
+        recurring_class_next_lead_start_at: String(
+          resolvedRecurringOccurrence?.leadStartAt ?? "",
+        ).trim() || null,
+        recurring_class_next_weekday_label: String(
+          resolvedRecurringOccurrence?.weekdayLabel ?? "",
+        ).trim() || null,
+        recurring_class_next_date: String(
+          resolvedRecurringOccurrence?.leadDate ??
+            resolvedRecurringOccurrence?.professorDate ??
+            "",
+        ).trim() || null,
       };
     })
     .filter((row) => {

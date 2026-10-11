@@ -2,6 +2,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { ATENDIMENTO_PROFESSOR_TIME_ZONE } from "@/lib/atendimento/constants";
 import { listRecurringWeekdayAvailability } from "@/lib/atendimento/experimentalClass";
+import {
+  loadRecurringCalendarOccupiedIntervals,
+  normalizeRecurringSchedulePhoneDigits,
+} from "@/lib/atendimento/server";
 
 function toErrorMessage(raw: unknown, fallback = "Erro desconhecido."): string {
   if (raw === null || raw === undefined) return fallback;
@@ -30,35 +34,82 @@ function toErrorMessage(raw: unknown, fallback = "Erro desconhecido."): string {
 
 export const runtime = "nodejs";
 
-async function listBookedExperimental(admin: ReturnType<typeof createSupabaseAdminClient>, nowIso: string) {
-  try {
-    const { data, error } = await admin
-      .from("atendimento_experimental_class_bookings")
-      .select("professor_start_at")
-      .eq("status", "scheduled")
-      .gte("professor_start_at", nowIso);
-    if (error && !String((error as any)?.code ?? "").includes("42P01")) return [];
-    const arr = Array.isArray(data) ? (data as Array<{ professor_start_at?: string | null }>) : [];
-    return arr.map((r) => String(r?.professor_start_at ?? "")).filter(Boolean);
-  } catch {
-    return [];
-  }
-}
-
 export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url);
     const tzLead = String(searchParams.get("lead_timezone") ?? "").trim();
     const tzBrowser = String(searchParams.get("timezone") ?? "").trim();
+    const leadId = String(searchParams.get("lead_id") ?? "").trim();
+    const leadPhone = String(searchParams.get("phone") ?? "").trim();
     const tzRaw = tzLead || tzBrowser || ATENDIMENTO_PROFESSOR_TIME_ZONE;
     const admin = createSupabaseAdminClient();
-    const nowIso = new Date().toISOString();
-    const bookedStarts = await listBookedExperimental(admin, nowIso);
+    const now = new Date();
+    const occupiedIntervals = await loadRecurringCalendarOccupiedIntervals({
+      admin,
+      now,
+      lookAheadWeeks: 12,
+    });
+
+    let currentLead: Record<string, unknown> | null = null;
+    if (leadId) {
+      const { data } = await admin.from("atendimento_leads").select("*").eq("id", leadId).maybeSingle();
+      currentLead = (data as Record<string, unknown> | null) ?? null;
+    } else {
+      const phoneDigits = leadPhone.replace(/\D/g, "").trim();
+      if (phoneDigits) {
+        const { data } = await admin
+          .from("atendimento_leads")
+          .select("*")
+          .eq("phone", phoneDigits)
+          .order("created_at", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        currentLead = (data as Record<string, unknown> | null) ?? null;
+      }
+    }
+
+    const currentLeadId = String(currentLead?.id ?? leadId ?? "").trim();
+    const currentLeadPhoneDigits = normalizeRecurringSchedulePhoneDigits(
+      currentLead?.phone ?? leadPhone,
+    );
+    const currentProfessorPhoneDigits = normalizeRecurringSchedulePhoneDigits(
+      currentLead?.recurring_class_professor_phone,
+    );
+    const relevantIntervals = occupiedIntervals
+      .filter((interval) => {
+        if (
+          interval.source === "recurring_schedule" &&
+          currentLeadId &&
+          String(interval.lead_id ?? "").trim() === currentLeadId
+        ) {
+          return false;
+        }
+
+        if (!currentLeadId && !currentLeadPhoneDigits && !currentProfessorPhoneDigits) {
+          return true;
+        }
+
+        const professorMatches =
+          currentProfessorPhoneDigits &&
+          interval.professor_phone_digits &&
+          currentProfessorPhoneDigits === interval.professor_phone_digits;
+        const leadMatches =
+          (currentLeadId && String(interval.lead_id ?? "").trim() === currentLeadId) ||
+          (currentLeadPhoneDigits &&
+            interval.lead_phone_digits &&
+            currentLeadPhoneDigits === interval.lead_phone_digits);
+
+        return Boolean(professorMatches || leadMatches);
+      })
+      .map((interval) => ({
+        startAt: interval.start_at,
+        endAt: interval.end_at,
+      }));
 
     const result = listRecurringWeekdayAvailability({
-      now: new Date(nowIso),
+      now,
       leadTimeZone: tzRaw,
-      bookedProfessorStartAts: bookedStarts,
+      occupiedIntervals: relevantIntervals,
       lookAheadWeeks: 2,
     });
 
@@ -74,7 +125,7 @@ export async function GET(req: NextRequest) {
       slotsByWeekday: slotsObj,
       slotsByWeekdayDate: slotsObj,
       timeZone: tzRaw,
-      generatedAt: nowIso,
+      generatedAt: now.toISOString(),
     });
   } catch (err) {
     return NextResponse.json(

@@ -1,5 +1,10 @@
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
-import { requireAtendimentoUser, maybeNotifyRegisteredAttendantAboutExperimentalClassScheduled, maybeSendExperimentalClassConfirmationToStudent } from "@/lib/atendimento/server";
+import {
+  requireAtendimentoUser,
+  maybeNotifyRegisteredAttendantAboutExperimentalClassScheduled,
+  maybeSendExperimentalClassConfirmationToStudent,
+  resolveRecurringDisplayOccurrenceMap,
+} from "@/lib/atendimento/server";
 import { isAtendimentoOnlyAccessScope, normalizeAccessScope } from "@/lib/auth/access";
 import { ATENDIMENTO_PROFESSOR_TIME_ZONE } from "@/lib/atendimento/constants";
 import { calculatePastRecurringOccurrences } from "@/lib/atendimento/experimentalClass";
@@ -767,6 +772,18 @@ export async function GET(request: Request, context: { params: Promise<{ leadId:
       (Array.isArray(recurringNotificationEvents) ? recurringNotificationEvents : [])
         .map((event) => String(((event as any)?.details ?? {})?.start_at ?? "").trim())
         .find(Boolean) || null;
+    if (latestRecurringNotificationOccurrenceStartAt) {
+      (lead as any).recurring_class_last_notified_occurrence_start_at =
+        latestRecurringNotificationOccurrenceStartAt;
+    }
+    const resolvedRecurringOccurrenceByLeadId = await resolveRecurringDisplayOccurrenceMap({
+      admin,
+      leads: [lead as Record<string, unknown>],
+      now: new Date(),
+      lookAheadWeeks: 24,
+    });
+    const resolvedRecurringOccurrence =
+      resolvedRecurringOccurrenceByLeadId.get(String((lead as any)?.id ?? "").trim()) ?? null;
 
     return Response.json({
       ok: true,
@@ -782,6 +799,32 @@ export async function GET(request: Request, context: { params: Promise<{ leadId:
         latest_experimental_class_event: latestClassEvent,
         recurring_class_last_notified_occurrence_start_at:
           latestRecurringNotificationOccurrenceStartAt,
+        recurring_class_next_professor_date: String(
+          resolvedRecurringOccurrence?.professorDate ?? "",
+        ).trim() || null,
+        recurring_class_next_professor_time: String(
+          resolvedRecurringOccurrence?.professorTime ?? "",
+        ).trim() || null,
+        recurring_class_next_professor_start_at: String(
+          resolvedRecurringOccurrence?.professorStartAt ?? "",
+        ).trim() || null,
+        recurring_class_next_lead_date: String(
+          resolvedRecurringOccurrence?.leadDate ?? "",
+        ).trim() || null,
+        recurring_class_next_lead_time: String(
+          resolvedRecurringOccurrence?.leadTime ?? "",
+        ).trim() || null,
+        recurring_class_next_lead_start_at: String(
+          resolvedRecurringOccurrence?.leadStartAt ?? "",
+        ).trim() || null,
+        recurring_class_next_weekday_label: String(
+          resolvedRecurringOccurrence?.weekdayLabel ?? "",
+        ).trim() || null,
+        recurring_class_next_date: String(
+          resolvedRecurringOccurrence?.leadDate ??
+            resolvedRecurringOccurrence?.professorDate ??
+            "",
+        ).trim() || null,
         contract_status: finalContractStatus || String((lead as any)?.contract_status ?? "") || null,
         contract_signed_at: finalContractSignedAt,
         contract_pdf_url: finalContractPdfUrl || String((lead as any)?.contract_pdf_url ?? "") || null,

@@ -1755,8 +1755,22 @@ function BookingDetails({
         hasAttendantNotification ||
         hasAttendanceStatus ||
         hasValidExperimentalDateTime);
+  const storedNextRecurring =
+    String((lead as any)?.recurring_class_next_professor_date ?? (lead as any)?.recurring_class_next_lead_date ?? "").trim() &&
+    String((lead as any)?.recurring_class_next_professor_time ?? (lead as any)?.recurring_class_next_lead_time ?? "").trim()
+      ? {
+          professorDate: String((lead as any)?.recurring_class_next_professor_date ?? "").trim() || null,
+          professorTime: String((lead as any)?.recurring_class_next_professor_time ?? "").trim() || null,
+          professorStartAt: String((lead as any)?.recurring_class_next_professor_start_at ?? "").trim() || null,
+          leadDate: String((lead as any)?.recurring_class_next_lead_date ?? "").trim() || null,
+          leadTime: String((lead as any)?.recurring_class_next_lead_time ?? "").trim() || null,
+          leadStartAt: String((lead as any)?.recurring_class_next_lead_start_at ?? "").trim() || null,
+          weekdayLabel: String((lead as any)?.recurring_class_next_weekday_label ?? "").trim() || null,
+        }
+      : null;
   const nextRecurring =
-    hasRecurringClass && recurringWeekday && /^\d{2}:\d{2}$/.test(recurringTime)
+    storedNextRecurring ??
+    (hasRecurringClass && recurringWeekday && /^\d{2}:\d{2}$/.test(recurringTime)
       ? calculateDisplayRecurringOccurrence({
           weekday: recurringWeekday,
           professorTimeHHMM: recurringTime,
@@ -1773,7 +1787,7 @@ function BookingDetails({
             (lead as any)?.recurring_class_attendant_start_notification_sent_at ?? "",
           ).trim(),
         })
-      : null;
+      : null);
   const pastRecurringOccurrences = useMemo(() => {
     if (!hasRecurringClass || !recurringWeekday || !/^\d{2}:\d{2}$/.test(recurringTime)) return [];
     return calculatePastRecurringOccurrences({

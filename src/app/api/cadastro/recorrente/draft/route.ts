@@ -5,6 +5,7 @@ import {
   triggerRecurringPaymentIntentIfNeeded,
   sendAtendimentoWhatsAppText,
   isLeadRecurringRegistrationConcluded,
+  resolveRecurringDisplayOccurrenceMap,
 } from "@/lib/atendimento/server";
 import { ATENDIMENTO_STAGE_ORDER, ATENDIMENTO_STATUS_ORDER } from "@/lib/atendimento/constants";
 import {
@@ -158,7 +159,7 @@ export async function GET(req: NextRequest) {
       } else if (/column.*does not exist|PGRST204|42703/i.test(String(selFull.error?.message ?? ""))) {
           const fallback = await admin
             .from("atendimento_leads")
-            .select("id, phone, full_name, cpf, legal_responsible_name, legal_responsible_cpf, contract_pdf_url, contract_signed_at, state, city, country, timezone, recurring_registration_step, signup_password_raw_temp, recurring_registration_password, recurring_class_weekday, recurring_class_weekday_label, recurring_class_professor_time, recurring_class_lead_time, recurring_class_professor_name, plan_name, plan_monthly_value, payment_status, payment_confirmed_at, recurring_class_student_start_notification_sent_at, recurring_class_attendant_start_notification_sent_at, status, funnel_stage, enrollment_number, student_email, email")
+            .select("id, phone, full_name, cpf, legal_responsible_name, legal_responsible_cpf, contract_pdf_url, contract_signed_at, state, city, country, timezone, recurring_registration_step, signup_password_raw_temp, recurring_registration_password, recurring_class_weekday, recurring_class_weekday_label, recurring_class_professor_time, recurring_class_lead_time, recurring_class_professor_name, recurring_class_professor_phone, recurring_class_professor_timezone, recurring_class_lead_timezone, plan_name, plan_monthly_value, payment_status, payment_confirmed_at, recurring_class_student_start_notification_sent_at, recurring_class_attendant_start_notification_sent_at, status, funnel_stage, enrollment_number, student_email, email")
             .eq("phone", normalizedPhone)
             .limit(1)
             .maybeSingle();
@@ -172,7 +173,7 @@ export async function GET(req: NextRequest) {
         try {
           const fallback = await admin
             .from("atendimento_leads")
-            .select("id, phone, full_name, cpf, legal_responsible_name, legal_responsible_cpf, contract_pdf_url, contract_signed_at, state, city, country, timezone, recurring_registration_step, signup_password_raw_temp, recurring_registration_password, recurring_class_weekday, recurring_class_weekday_label, recurring_class_professor_time, recurring_class_lead_time, recurring_class_professor_name, plan_name, plan_monthly_value, payment_status, payment_confirmed_at, recurring_class_student_start_notification_sent_at, recurring_class_attendant_start_notification_sent_at, status, funnel_stage, enrollment_number, student_email, email")
+            .select("id, phone, full_name, cpf, legal_responsible_name, legal_responsible_cpf, contract_pdf_url, contract_signed_at, state, city, country, timezone, recurring_registration_step, signup_password_raw_temp, recurring_registration_password, recurring_class_weekday, recurring_class_weekday_label, recurring_class_professor_time, recurring_class_lead_time, recurring_class_professor_name, recurring_class_professor_phone, recurring_class_professor_timezone, recurring_class_lead_timezone, plan_name, plan_monthly_value, payment_status, payment_confirmed_at, recurring_class_student_start_notification_sent_at, recurring_class_attendant_start_notification_sent_at, status, funnel_stage, enrollment_number, student_email, email")
             .eq("phone", normalizedPhone)
             .limit(1)
             .maybeSingle();
@@ -276,6 +277,41 @@ export async function GET(req: NextRequest) {
       } catch {}
     }
 
+    let latestRecurringNotificationOccurrenceStartAt: string | null = null;
+    try {
+      const { data: recurringNotificationEvents } = await admin
+        .from("atendimento_history_events")
+        .select("details, created_at")
+        .eq("lead_id", String((data as any)?.id ?? ""))
+        .in("event_type", [
+          "recurring_class_attendant_start_notification_sent",
+          "recurring_class_student_start_notification_sent",
+          "recurring_class_registered_attendant_start_notification_sent",
+          "recurring_class_attendant_start_notification_sent_manual",
+          "recurring_class_student_start_notification_sent_manual",
+          "recurring_class_registered_attendant_start_notification_sent_manual",
+        ])
+        .order("created_at", { ascending: false })
+        .limit(20);
+      latestRecurringNotificationOccurrenceStartAt =
+        (Array.isArray(recurringNotificationEvents) ? recurringNotificationEvents : [])
+          .map((event) => String(((event as any)?.details ?? {})?.start_at ?? "").trim())
+          .find(Boolean) || null;
+    } catch {}
+    if (latestRecurringNotificationOccurrenceStartAt) {
+      (data as any).recurring_class_last_notified_occurrence_start_at =
+        latestRecurringNotificationOccurrenceStartAt;
+    }
+
+    const resolvedRecurringOccurrenceByLeadId = await resolveRecurringDisplayOccurrenceMap({
+      admin,
+      leads: [data as Record<string, unknown>],
+      now: new Date(),
+      lookAheadWeeks: 24,
+    });
+    const resolvedRecurringOccurrence =
+      resolvedRecurringOccurrenceByLeadId.get(String((data as any)?.id ?? "").trim()) ?? null;
+
     const readStr = (key: string) => {
       const v = (data as any)?.[key];
       return typeof v === "string" && v.trim() ? v.trim() : null;
@@ -310,6 +346,34 @@ export async function GET(req: NextRequest) {
         recurring_class_attendant_start_notification_sent_at: readStr(
           "recurring_class_attendant_start_notification_sent_at",
         ),
+        recurring_class_last_notified_occurrence_start_at:
+          latestRecurringNotificationOccurrenceStartAt,
+        recurring_class_next_professor_date: String(
+          resolvedRecurringOccurrence?.professorDate ?? "",
+        ).trim() || null,
+        recurring_class_next_professor_time: String(
+          resolvedRecurringOccurrence?.professorTime ?? "",
+        ).trim() || null,
+        recurring_class_next_professor_start_at: String(
+          resolvedRecurringOccurrence?.professorStartAt ?? "",
+        ).trim() || null,
+        recurring_class_next_lead_date: String(
+          resolvedRecurringOccurrence?.leadDate ?? "",
+        ).trim() || null,
+        recurring_class_next_lead_time: String(
+          resolvedRecurringOccurrence?.leadTime ?? "",
+        ).trim() || null,
+        recurring_class_next_lead_start_at: String(
+          resolvedRecurringOccurrence?.leadStartAt ?? "",
+        ).trim() || null,
+        recurring_class_next_weekday_label: String(
+          resolvedRecurringOccurrence?.weekdayLabel ?? "",
+        ).trim() || null,
+        recurring_class_next_date: String(
+          resolvedRecurringOccurrence?.leadDate ??
+            resolvedRecurringOccurrence?.professorDate ??
+            "",
+        ).trim() || null,
         status: readStr("status"),
         funnel_stage: readStr("funnel_stage"),
         recurring_matricula_concluida_dismissed_at: readStr("recurring_matricula_concluida_dismissed_at"),

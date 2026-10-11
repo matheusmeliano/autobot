@@ -1,11 +1,13 @@
 import { ATENDIMENTO_PROFESSOR_TIME_ZONE } from "@/lib/atendimento/constants";
 import {
-  calculateDisplayRecurringOccurrence,
   EXPERIMENTAL_CLASS_PROFESSOR_ASSIGNMENT_ALLOWLIST,
   EXPERIMENTAL_CLASS_SLOT_TIMES,
 } from "@/lib/atendimento/experimentalClass";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
-import { requireAtendimentoUser } from "@/lib/atendimento/server";
+import {
+  requireAtendimentoUser,
+  resolveRecurringDisplayOccurrenceMap,
+} from "@/lib/atendimento/server";
 // ====================================================================
 // LÓGICA SINCRONIZADA — TUDO que define "contar aulas no dia X" está
 // na lib calendarSync. NÃO DUPLIQUE regras aqui nem no /badges.
@@ -452,6 +454,7 @@ export async function GET(req: Request) {
           const entry: Record<string, unknown> = {
             id: `recurring-${String(r.id ?? "")}`,
             lead_id: String(r.id ?? ""),
+            phone: String(r.phone ?? "").trim() || null,
             status: stRec || "scheduled",
             professor_date: targetDate,
             professor_time: pTime,
@@ -517,6 +520,31 @@ export async function GET(req: Request) {
     (booking as any).recurring_class_last_notified_occurrence_start_at =
       recurringNotificationMetaByLeadId.get(lid) ?? null;
   }
+  const resolvedRecurringOccurrenceByLeadId = await resolveRecurringDisplayOccurrenceMap({
+    admin,
+    leads: recurringBookings.map((booking) => ({
+      id: String((booking as any)?.lead_id ?? "").trim(),
+      phone: String((booking as any)?.phone ?? "").trim() || null,
+      recurring_class_weekday: String((booking as any)?.recurring_class_weekday ?? "").trim() || null,
+      recurring_class_professor_time: String((booking as any)?.professor_time ?? "").trim() || null,
+      recurring_class_lead_time: String((booking as any)?.lead_time ?? "").trim() || null,
+      recurring_class_professor_timezone: String((booking as any)?.professor_timezone ?? "").trim() || null,
+      recurring_class_lead_timezone: String((booking as any)?.lead_timezone ?? "").trim() || null,
+      recurring_class_professor_phone: String((booking as any)?.assigned_professor_phone ?? "").trim() || null,
+      recurring_class_professor_name: String((booking as any)?.assigned_professor_name ?? "").trim() || null,
+      recurring_class_last_notified_occurrence_start_at: String(
+        (booking as any)?.recurring_class_last_notified_occurrence_start_at ?? "",
+      ).trim() || null,
+      recurring_class_student_start_notification_sent_at: String(
+        (booking as any)?.recurring_class_student_start_notification_sent_at ?? "",
+      ).trim() || null,
+      recurring_class_attendant_start_notification_sent_at: String(
+        (booking as any)?.recurring_class_attendant_start_notification_sent_at ?? "",
+      ).trim() || null,
+    })),
+    now: new Date(nowUtc),
+    lookAheadWeeks: 24,
+  });
   // JUNTAR AS DUAS LISTAS (experimentais + recorrentes). Mesma estrutura, mesmo código slot abaixo.
   if (recurringBookings.length > 0) {
     for (const rb of recurringBookings) bookings.push(rb);
@@ -728,29 +756,11 @@ export async function GET(req: Request) {
         const isRecurringActive =
           String((active as any).__type ?? "").toLowerCase() === "recurring";
         if (isRecurringActive) {
-          const recurringWeekday = String((active as any)?.recurring_class_weekday ?? "").trim().toLowerCase();
-          const recurringProfessorTime = String(active.professor_time ?? "").trim();
-          if (
-            ["sun", "mon", "tue", "wed", "thu", "fri", "sat"].includes(recurringWeekday) &&
-            recurringHasTime(recurringProfessorTime)
-          ) {
-            const displayOccurrence = calculateDisplayRecurringOccurrence({
-              weekday: recurringWeekday as "sun" | "mon" | "tue" | "wed" | "thu" | "fri" | "sat",
-              professorTimeHHMM: recurringProfessorTime,
-              professorTimeZone:
-                String((active as any)?.professor_timezone ?? "").trim() ||
-                ATENDIMENTO_PROFESSOR_TIME_ZONE,
-              leadTimeZone: String((active as any)?.lead_timezone ?? "").trim() || null,
-              lastNotifiedOccurrenceStartAt: String(
-                (active as any)?.recurring_class_last_notified_occurrence_start_at ?? "",
-              ).trim(),
-              studentNotificationSentAt: String(
-                (active as any)?.recurring_class_student_start_notification_sent_at ?? "",
-              ).trim(),
-              attendantNotificationSentAt: String(
-                (active as any)?.recurring_class_attendant_start_notification_sent_at ?? "",
-              ).trim(),
-            });
+          const displayOccurrence =
+            resolvedRecurringOccurrenceByLeadId.get(
+              String((active as any)?.lead_id ?? "").trim(),
+            ) ?? null;
+          if (displayOccurrence) {
             const nextProfessorDate = String(
               displayOccurrence?.professorDate ?? displayOccurrence?.leadDate ?? "",
             ).trim();

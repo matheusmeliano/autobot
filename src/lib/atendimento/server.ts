@@ -28,9 +28,11 @@ import {
   buildRecurringClassStudentLessonReadyWhatsAppMessage,
   buildRecurringPaymentConfirmedStudentWelcomeMessage,
   buildRecurringPaymentPendingConfirmationAttendantNotification,
+  calculateDisplayRecurringOccurrence,
   calculateNextRecurringOccurrence,
   calculateCurrentOrNextRecurringOccurrence,
   EXPERIMENTAL_CLASS_ATTENDANT_NOTIFICATION_PHONE,
+  EXPERIMENTAL_CLASS_DURATION_MINUTES,
   EXPERIMENTAL_CLASS_REGISTERED_ATTENDANT_NOTIFICATION_PHONE,
   EXPERIMENTAL_CLASS_ATTENDANT_START_REMINDER_MINUTES,
   EXPERIMENTAL_CLASS_DEFAULT_STUDENT_DASHBOARD_LINK,
@@ -39,6 +41,7 @@ import {
   RECURRING_WEEKDAY_LABELS_PT_BR,
   resolveExperimentalClassAssignedProfessorPhone,
   resolveRecurringClassAssignedProfessorPhone,
+  type RecurringOccupiedInterval,
   type RecurringWeekdayKey,
 } from "@/lib/atendimento/experimentalClass";
 import { buildAtendimentoPublicUrl, isAtendimentoEmail, makeConversationSessionSlug, summarizePreview } from "@/lib/atendimento/utils";
@@ -3273,7 +3276,7 @@ export async function findLeadByPhone(params: { phone: string; userId?: string |
     try {
       const selMin = await admin
         .from("atendimento_leads")
-        .select("id, phone, full_name, funnel_stage, status, recurring_registration_step, recurring_registration_password, signup_password_raw_temp, recurring_class_weekday, recurring_class_weekday_label, recurring_class_professor_time, recurring_class_lead_time, recurring_class_professor_name, plan_name, plan_monthly_value, payment_status, payment_confirmed_at, contract_pdf_url, contract_signed_at, contract_status, enrollment_number, state, city, country, timezone, cpf, legal_responsible_name, legal_responsible_cpf, student_email, email")
+        .select("id, phone, full_name, funnel_stage, status, recurring_registration_step, recurring_registration_password, signup_password_raw_temp, recurring_class_weekday, recurring_class_weekday_label, recurring_class_professor_time, recurring_class_lead_time, recurring_class_professor_name, recurring_class_professor_phone, recurring_class_professor_timezone, recurring_class_lead_timezone, plan_name, plan_monthly_value, payment_status, payment_confirmed_at, contract_pdf_url, contract_signed_at, contract_status, enrollment_number, state, city, country, timezone, cpf, legal_responsible_name, legal_responsible_cpf, student_email, email")
         .in("phone", candidates)
         .order("created_at", { ascending: false })
         .limit(10)
@@ -3299,7 +3302,7 @@ export async function findLeadByPhone(params: { phone: string; userId?: string |
     try {
       const selMinAll = await admin
         .from("atendimento_leads")
-        .select("id, phone, full_name, funnel_stage, status, recurring_registration_step, recurring_registration_password, signup_password_raw_temp, recurring_class_weekday, recurring_class_weekday_label, recurring_class_professor_time, recurring_class_lead_time, recurring_class_professor_name, plan_name, plan_monthly_value, payment_status, payment_confirmed_at, contract_pdf_url, contract_signed_at, contract_status, enrollment_number, state, city, country, timezone, cpf, legal_responsible_name, legal_responsible_cpf, student_email, email")
+        .select("id, phone, full_name, funnel_stage, status, recurring_registration_step, recurring_registration_password, signup_password_raw_temp, recurring_class_weekday, recurring_class_weekday_label, recurring_class_professor_time, recurring_class_lead_time, recurring_class_professor_name, recurring_class_professor_phone, recurring_class_professor_timezone, recurring_class_lead_timezone, plan_name, plan_monthly_value, payment_status, payment_confirmed_at, contract_pdf_url, contract_signed_at, contract_status, enrollment_number, state, city, country, timezone, cpf, legal_responsible_name, legal_responsible_cpf, student_email, email")
         .order("created_at", { ascending: false })
         .limit(300);
       if (selMinAll && !selMinAll.error && Array.isArray(selMinAll.data)) {
@@ -3921,6 +3924,248 @@ export function hasLeadConfirmedPaymentForRecurringNotifications(lead: unknown):
     obj?.recurring_payment_confirmed_at ?? obj?.payment_confirmed_at ?? "",
   ).trim();
   return payStatusRaw === "confirmado" || Boolean(payConfirmedAtRaw && payConfirmedAtRaw !== "null");
+}
+
+export type RecurringCalendarOccupiedInterval = {
+  start_at: string;
+  end_at: string;
+  lead_id: string | null;
+  lead_phone_digits: string | null;
+  professor_phone_digits: string | null;
+  source: "experimental_booking" | "recurring_schedule";
+};
+
+export function normalizeRecurringSchedulePhoneDigits(value: unknown): string {
+  return String(value ?? "").replace(/\D/g, "").trim();
+}
+
+function buildRecurringOccupiedInterval(startAt: string, meta: {
+  leadId?: string | null;
+  leadPhoneDigits?: string | null;
+  professorPhoneDigits?: string | null;
+  source: "experimental_booking" | "recurring_schedule";
+}): RecurringCalendarOccupiedInterval | null {
+  const startRaw = String(startAt ?? "").trim();
+  if (!startRaw) return null;
+  const startMs = new Date(startRaw).getTime();
+  if (!Number.isFinite(startMs)) return null;
+  const endAt = new Date(startMs + EXPERIMENTAL_CLASS_DURATION_MINUTES * 60 * 1000).toISOString();
+  return {
+    start_at: startRaw,
+    end_at: endAt,
+    lead_id: String(meta.leadId ?? "").trim() || null,
+    lead_phone_digits: normalizeRecurringSchedulePhoneDigits(meta.leadPhoneDigits),
+    professor_phone_digits: normalizeRecurringSchedulePhoneDigits(meta.professorPhoneDigits),
+    source: meta.source,
+  };
+}
+
+export async function loadRecurringCalendarOccupiedIntervals(params: {
+  admin: ReturnType<typeof createSupabaseAdminClient>;
+  now?: Date;
+  lookAheadWeeks?: number;
+}): Promise<RecurringCalendarOccupiedInterval[]> {
+  const admin = params.admin;
+  const now = params.now ?? new Date();
+  const lookAheadWeeks = Number.isFinite(Number(params.lookAheadWeeks))
+    ? Math.max(6, Number(params.lookAheadWeeks))
+    : 24;
+  const endIso = new Date(now.getTime() + lookAheadWeeks * 7 * 24 * 60 * 60 * 1000).toISOString();
+  const intervals: RecurringCalendarOccupiedInterval[] = [];
+
+  try {
+    const { data: bookedExperimental } = await admin
+      .from("atendimento_experimental_class_bookings")
+      .select("lead_id, professor_start_at, assigned_professor_phone, status")
+      .in("status", ["scheduled", "confirmed", "in_progress"])
+      .gte("professor_start_at", now.toISOString())
+      .lt("professor_start_at", endIso);
+    for (const row of Array.isArray(bookedExperimental) ? bookedExperimental : []) {
+      const interval = buildRecurringOccupiedInterval(
+        String((row as any)?.professor_start_at ?? "").trim(),
+        {
+          leadId: String((row as any)?.lead_id ?? "").trim() || null,
+          professorPhoneDigits: String((row as any)?.assigned_professor_phone ?? "").trim() || null,
+          source: "experimental_booking",
+        },
+      );
+      if (interval) intervals.push(interval);
+    }
+  } catch (_error) {}
+
+  try {
+    const { data: recurringRows } = await admin
+      .from("atendimento_leads")
+      .select("*")
+      .not("recurring_class_weekday", "is", null);
+    for (const row of Array.isArray(recurringRows) ? recurringRows : []) {
+      const weekdayRaw = String((row as any)?.recurring_class_weekday ?? "").trim().toLowerCase();
+      if (!["mon", "tue", "wed", "thu", "fri", "sat", "sun"].includes(weekdayRaw)) continue;
+
+      const professorTimeHHMM = /^\d{2}:\d{2}$/.test(String((row as any)?.recurring_class_professor_time ?? ""))
+        ? String((row as any)?.recurring_class_professor_time ?? "").trim()
+        : /^\d{2}:\d{2}$/.test(String((row as any)?.recurring_class_lead_time ?? ""))
+          ? String((row as any)?.recurring_class_lead_time ?? "").trim()
+          : "";
+      if (!professorTimeHHMM) continue;
+
+      const professorResolved = resolveRecurringClassAssignedProfessorPhone({
+        flatAssignedPhone: String((row as any)?.recurring_class_professor_phone ?? "").trim() || null,
+        flatAssignedName: String((row as any)?.recurring_class_professor_name ?? "").trim() || null,
+      });
+      const professorPhoneDigits = normalizeRecurringSchedulePhoneDigits(
+        professorResolved?.phone ??
+          String((row as any)?.recurring_class_professor_phone ?? "").trim(),
+      );
+      const leadPhoneDigits = normalizeRecurringSchedulePhoneDigits((row as any)?.phone);
+      const professorTimeZone =
+        String((row as any)?.recurring_class_professor_timezone ?? "").trim() ||
+        String(
+          process.env.EXPERIMENTAL_CLASS_PROFESSOR_TIME_ZONE ||
+            process.env.ATENDIMENTO_PROFESSOR_TIME_ZONE ||
+            "America/Sao_Paulo",
+        ).trim();
+      const leadTimeZone =
+        String((row as any)?.recurring_class_lead_timezone ?? "").trim() ||
+        professorTimeZone;
+      const leadTimeHHMM = /^\d{2}:\d{2}$/.test(String((row as any)?.recurring_class_lead_time ?? ""))
+        ? String((row as any)?.recurring_class_lead_time ?? "").trim()
+        : professorTimeHHMM;
+
+      let occurrence = calculateNextRecurringOccurrence({
+        weekday: weekdayRaw as RecurringWeekdayKey,
+        professorTimeHHMM,
+        professorTimeZone,
+        leadTimeZone,
+        leadTimeHHMM,
+        fromDate: now,
+        maxWeeksToScan: lookAheadWeeks,
+      });
+
+      for (let weekIndex = 0; weekIndex < lookAheadWeeks && occurrence; weekIndex++) {
+        const startRaw = String(occurrence.professorStartAt ?? "").trim();
+        const startMs = new Date(startRaw).getTime();
+        if (!Number.isFinite(startMs) || startRaw >= endIso) break;
+
+        const interval = buildRecurringOccupiedInterval(startRaw, {
+          leadId: String((row as any)?.id ?? "").trim() || null,
+          leadPhoneDigits,
+          professorPhoneDigits,
+          source: "recurring_schedule",
+        });
+        if (interval) intervals.push(interval);
+
+        occurrence = calculateNextRecurringOccurrence({
+          weekday: weekdayRaw as RecurringWeekdayKey,
+          professorTimeHHMM,
+          professorTimeZone,
+          leadTimeZone,
+          leadTimeHHMM,
+          fromDate: new Date(startMs + 60_000),
+          maxWeeksToScan: lookAheadWeeks,
+        });
+      }
+    }
+  } catch (_error) {}
+
+  return intervals;
+}
+
+export async function resolveRecurringDisplayOccurrenceMap(params: {
+  admin: ReturnType<typeof createSupabaseAdminClient>;
+  leads: Array<Record<string, unknown>>;
+  now?: Date;
+  lookAheadWeeks?: number;
+}): Promise<Map<string, ReturnType<typeof calculateDisplayRecurringOccurrence>>> {
+  const now = params.now ?? new Date();
+  const lookAheadWeeks = Number.isFinite(Number(params.lookAheadWeeks))
+    ? Math.max(6, Number(params.lookAheadWeeks))
+    : 24;
+  const occupiedIntervals = await loadRecurringCalendarOccupiedIntervals({
+    admin: params.admin,
+    now,
+    lookAheadWeeks,
+  });
+  const resolved = new Map<string, ReturnType<typeof calculateDisplayRecurringOccurrence>>();
+
+  for (const lead of params.leads ?? []) {
+    const leadId = String((lead as any)?.id ?? "").trim();
+    if (!leadId) continue;
+
+    const weekdayRaw = String((lead as any)?.recurring_class_weekday ?? "").trim().toLowerCase();
+    if (!["mon", "tue", "wed", "thu", "fri", "sat", "sun"].includes(weekdayRaw)) continue;
+
+    const professorTimeHHMM = /^\d{2}:\d{2}$/.test(String((lead as any)?.recurring_class_professor_time ?? ""))
+      ? String((lead as any)?.recurring_class_professor_time ?? "").trim()
+      : /^\d{2}:\d{2}$/.test(String((lead as any)?.recurring_class_lead_time ?? ""))
+        ? String((lead as any)?.recurring_class_lead_time ?? "").trim()
+        : "";
+    if (!professorTimeHHMM) continue;
+
+    const professorResolved = resolveRecurringClassAssignedProfessorPhone({
+      flatAssignedPhone: String((lead as any)?.recurring_class_professor_phone ?? "").trim() || null,
+      flatAssignedName: String((lead as any)?.recurring_class_professor_name ?? "").trim() || null,
+    });
+    const professorPhoneDigits = normalizeRecurringSchedulePhoneDigits(
+      professorResolved?.phone ??
+        String((lead as any)?.recurring_class_professor_phone ?? "").trim(),
+    );
+    const leadPhoneDigits = normalizeRecurringSchedulePhoneDigits((lead as any)?.phone);
+
+    const relevantIntervals: RecurringOccupiedInterval[] = occupiedIntervals
+      .filter((interval) => {
+        if (interval.source === "recurring_schedule" && String(interval.lead_id ?? "").trim() === leadId) {
+          return false;
+        }
+
+        const professorMatches =
+          professorPhoneDigits &&
+          interval.professor_phone_digits &&
+          professorPhoneDigits === interval.professor_phone_digits;
+        const leadMatches =
+          (leadId && String(interval.lead_id ?? "").trim() === leadId) ||
+          (leadPhoneDigits &&
+            interval.lead_phone_digits &&
+            leadPhoneDigits === interval.lead_phone_digits);
+
+        return Boolean(professorMatches || leadMatches);
+      })
+      .map((interval) => ({
+        startAt: interval.start_at,
+        endAt: interval.end_at,
+      }));
+
+    const occurrence = calculateDisplayRecurringOccurrence({
+      weekday: weekdayRaw as RecurringWeekdayKey,
+      professorTimeHHMM,
+      professorTimeZone:
+        String((lead as any)?.recurring_class_professor_timezone ?? "").trim() || null,
+      leadTimeZone:
+        String((lead as any)?.recurring_class_lead_timezone ?? (lead as any)?.timezone ?? "").trim() ||
+        null,
+      leadTimeHHMM:
+        String((lead as any)?.recurring_class_lead_time ?? (lead as any)?.recurring_class_professor_time ?? "").trim() ||
+        null,
+      fromDate: now,
+      lastNotifiedOccurrenceStartAt: String(
+        (lead as any)?.recurring_class_last_notified_occurrence_start_at ?? "",
+      ).trim(),
+      studentNotificationSentAt: String(
+        (lead as any)?.recurring_class_student_start_notification_sent_at ?? "",
+      ).trim(),
+      attendantNotificationSentAt: String(
+        (lead as any)?.recurring_class_attendant_start_notification_sent_at ?? "",
+      ).trim(),
+      occupiedIntervals: relevantIntervals,
+      maxWeeksToScan: lookAheadWeeks,
+    });
+
+    if (occurrence) {
+      resolved.set(leadId, occurrence);
+    }
+  }
+
+  return resolved;
 }
 
 type PaymentHistoryMetaForRecurring = {

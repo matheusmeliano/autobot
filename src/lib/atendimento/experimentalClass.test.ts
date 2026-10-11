@@ -498,3 +498,43 @@ test("calculateDisplayRecurringOccurrence preserva o horario salvo do aluno ao a
   assert.equal(occurrence?.professorTime, "14:00");
   assert.equal(occurrence?.leadTime, "11:00");
 });
+
+test("calculateDisplayRecurringOccurrence pula a proxima semana quando ha conflito de agenda", () => {
+  const occurrence = calculateDisplayRecurringOccurrence({
+    weekday: "mon",
+    professorTimeHHMM: "14:00",
+    professorTimeZone: "America/Sao_Paulo",
+    leadTimeZone: "America/New_York",
+    leadTimeHHMM: "11:00",
+    lastNotifiedOccurrenceStartAt: "2026-10-12T17:00:00.000Z",
+    fromDate: new Date("2026-10-13T12:00:00.000Z"),
+    occupiedIntervals: [
+      {
+        startAt: "2026-10-19T17:00:00.000Z",
+      },
+    ],
+  });
+
+  assert.equal(occurrence?.professorDate, "2026-10-26");
+  assert.equal(occurrence?.professorTime, "14:00");
+  assert.equal(occurrence?.leadTime, "11:00");
+});
+
+test("listRecurringWeekdayAvailability remove horario recorrente quando o intervalo ja esta ocupado", () => {
+  const availability = listRecurringWeekdayAvailability({
+    now: new Date("2026-07-13T10:00:00.000Z"),
+    leadTimeZone: "America/Cuiaba",
+    occupiedIntervals: [
+      {
+        startAt: "2026-07-13T12:00:00.000Z",
+      },
+    ],
+    lookAheadWeeks: 2,
+  });
+  const monThisWeek = availability.dates.find((d) => d.weekday === "mon" && d.weekIndex === 0);
+  assert.ok(monThisWeek);
+  const monSlots = availability.slotsByWeekdayDate[monThisWeek.id] ?? [];
+  const monTimes = monSlots.map((s) => s.professorTime);
+  assert.equal(monTimes.includes("08:00"), false);
+  assert.ok(monTimes.includes("09:00"));
+});

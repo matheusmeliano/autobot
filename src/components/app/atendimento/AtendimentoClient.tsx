@@ -427,6 +427,29 @@ function weekdayShortFromLocalDate(localDate: string, timeZone: string): string 
 function buildRecurringNextOccurrenceNiceLabel(
   lead: AtendimentoLeadListItem
 ): { weekdayWithDate: string; time: string } | null {
+  const storedNextLocal = String(
+    (lead as any)?.recurring_class_next_lead_date ??
+      (lead as any)?.recurring_class_next_professor_date ??
+      "",
+  ).trim();
+  const storedNextTime = String(
+    (lead as any)?.recurring_class_next_lead_time ??
+      (lead as any)?.recurring_class_next_professor_time ??
+      "",
+  ).trim();
+  const storedWeekdayLabel = String(
+    (lead as any)?.recurring_class_next_weekday_label ?? "",
+  ).trim();
+  if (storedNextLocal) {
+    const [, mm, dd] = storedNextLocal.split("-");
+    const shortDm = mm && dd ? `${dd}/${mm}` : storedNextLocal;
+    const wdWithDate = storedWeekdayLabel ? `${storedWeekdayLabel} (${shortDm})` : "";
+    const cleanTime = storedNextTime
+      ? `${storedNextTime.replace(/h$/i, "").trim()}h`
+      : "";
+    return { weekdayWithDate: wdWithDate, time: cleanTime };
+  }
+
   // Campos da recorrência
   const wdRaw = String((lead as any)?.recurring_class_weekday ?? "").trim();
   const wdLabelRaw = String((lead as any)?.recurring_class_weekday_label ?? "").trim();
@@ -642,26 +665,50 @@ function buildExperimentalMetaForList(lead: AtendimentoLeadListItem): { label: s
   // IGUAL ao card azul da Visão Geral.
   // ============================================================
   if (gRecurringTrulyStarted && gRecurringWeekdayOk && gRecurringTimeOk) {
-    const displayOccurrence = calculateDisplayRecurringOccurrence({
-      weekday: normalizeWeekday(gRecurringWeekdayRaw) as "mon" | "tue" | "wed" | "thu" | "fri" | "sat" | "sun",
-      professorTimeHHMM:
-        normalizeScheduleTimeForComparison(
-          (lead as any)?.recurring_class_professor_time ??
-            (lead as any)?.recurring_class_lead_time,
-        ) || normalizeScheduleTimeForComparison(gRecurringLeadTimeRaw),
-      professorTimeZone: ATENDIMENTO_PROFESSOR_TIME_ZONE,
-      leadTimeZone: leadEffectiveTz,
-      leadTimeHHMM: normalizeScheduleTimeForComparison(gRecurringLeadTimeRaw),
-      lastNotifiedOccurrenceStartAt: String(
-        (lead as any)?.recurring_class_last_notified_occurrence_start_at ?? "",
-      ).trim(),
-      studentNotificationSentAt: String(
-        (lead as any)?.recurring_class_student_start_notification_sent_at ?? "",
-      ).trim(),
-      attendantNotificationSentAt: String(
-        (lead as any)?.recurring_class_attendant_start_notification_sent_at ?? "",
-      ).trim(),
-    });
+    const storedNextLocal = String(
+      (lead as any)?.recurring_class_next_lead_date ??
+        (lead as any)?.recurring_class_next_professor_date ??
+        "",
+    ).trim();
+    const storedNextTime = String(
+      (lead as any)?.recurring_class_next_lead_time ??
+        (lead as any)?.recurring_class_next_professor_time ??
+        "",
+    ).trim();
+    const displayOccurrence =
+      storedNextLocal && storedNextTime
+        ? {
+            leadDate: storedNextLocal,
+            professorDate: String(
+              (lead as any)?.recurring_class_next_professor_date ?? storedNextLocal,
+            ).trim(),
+            leadTime: storedNextTime,
+            weekdayLabel: String(
+              (lead as any)?.recurring_class_next_weekday_label ??
+                (lead as any)?.recurring_class_weekday_label ??
+                "",
+            ).trim(),
+          }
+        : calculateDisplayRecurringOccurrence({
+            weekday: normalizeWeekday(gRecurringWeekdayRaw) as "mon" | "tue" | "wed" | "thu" | "fri" | "sat" | "sun",
+            professorTimeHHMM:
+              normalizeScheduleTimeForComparison(
+                (lead as any)?.recurring_class_professor_time ??
+                  (lead as any)?.recurring_class_lead_time,
+              ) || normalizeScheduleTimeForComparison(gRecurringLeadTimeRaw),
+            professorTimeZone: ATENDIMENTO_PROFESSOR_TIME_ZONE,
+            leadTimeZone: leadEffectiveTz,
+            leadTimeHHMM: normalizeScheduleTimeForComparison(gRecurringLeadTimeRaw),
+            lastNotifiedOccurrenceStartAt: String(
+              (lead as any)?.recurring_class_last_notified_occurrence_start_at ?? "",
+            ).trim(),
+            studentNotificationSentAt: String(
+              (lead as any)?.recurring_class_student_start_notification_sent_at ?? "",
+            ).trim(),
+            attendantNotificationSentAt: String(
+              (lead as any)?.recurring_class_attendant_start_notification_sent_at ?? "",
+            ).trim(),
+          });
     const nextLocal = String(
       displayOccurrence?.leadDate ?? displayOccurrence?.professorDate ?? "",
     ).trim();

@@ -40,6 +40,14 @@ export type AtendimentoLead = {
   recurring_class_student_start_notification_sent_at?: string | null;
   recurring_class_attendant_start_notification_sent_at?: string | null;
   recurring_class_last_notified_occurrence_start_at?: string | null;
+  recurring_class_next_professor_date?: string | null;
+  recurring_class_next_professor_time?: string | null;
+  recurring_class_next_professor_start_at?: string | null;
+  recurring_class_next_lead_date?: string | null;
+  recurring_class_next_lead_time?: string | null;
+  recurring_class_next_lead_start_at?: string | null;
+  recurring_class_next_weekday_label?: string | null;
+  recurring_class_next_date?: string | null;
   signup_password_raw_temp?: string | null;
   legal_responsible_name?: string | null;
   legal_responsible_cpf?: string | null;
