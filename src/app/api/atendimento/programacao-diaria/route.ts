@@ -333,6 +333,7 @@ export async function GET(req: Request) {
       nameFromHistory: string | null;
     }
   >();
+  const leadSuppressionCache = new Map<string, Record<string, unknown> | null>();
   const fetchLeadById = async (id: string) => {
     id = String(id ?? "").trim();
     if (!id) return { row: null, nameFromHistory: null };
@@ -346,21 +347,7 @@ export async function GET(req: Request) {
     // Colunas que EXISTEM DE VERDADE (confirmado via debug SQL direto):
     //   id, full_name, phone, funnel_stage, status, recurring_class_status
     try {
-      const sel = [
-        "id",
-        "full_name",
-        "phone",
-        "funnel_stage",
-        "status",
-        "recurring_class_status",
-        "contract_status",
-        "payment_status",
-        "payment_confirmed_at",
-        "enrollment_number",
-        "recurring_registration_step",
-        "recurring_registration_password",
-        "signup_password_raw_temp",
-      ].join(",");
+      const sel = "id,full_name,phone,funnel_stage,status,recurring_class_status";
       const res = await fetch(`${SUPABASE_URL}/rest/v1/atendimento_leads?id=eq.${encodeURIComponent(id)}&select=${sel}`, {
         method: "GET",
         headers: restHeaders,
@@ -412,6 +399,26 @@ export async function GET(req: Request) {
     const entry = { row, nameFromHistory: historyName };
     leadCache.set(id, entry);
     return entry;
+  };
+  const fetchLeadForExperimentalSuppression = async (id: string) => {
+    id = String(id ?? "").trim();
+    if (!id) return null;
+    if (leadSuppressionCache.has(id)) return leadSuppressionCache.get(id) ?? null;
+
+    let row: Record<string, unknown> | null = null;
+    try {
+      const { data } = await admin
+        .from("atendimento_leads")
+        .select("*")
+        .eq("id", id)
+        .maybeSingle();
+      if (data && typeof data === "object") {
+        row = data as Record<string, unknown>;
+      }
+    } catch {}
+
+    leadSuppressionCache.set(id, row);
+    return row;
   };
   // 1.5) BUSCAR AULAS RECORRENTES (alunos matriculados, contratados) que caem NO DIA targetDate
   // Diferente de experimental (booking específico por dia), recorrente é armazenado em colunas
@@ -625,7 +632,7 @@ export async function GET(req: Request) {
     const leadId = String((booking as any).lead_id ?? "").trim();
     if (!leadId) continue;
 
-    const { row: leadRow } = await fetchLeadById(leadId);
+    const leadRow = await fetchLeadForExperimentalSuppression(leadId);
     if (leadRow && shouldSuppressExperimentalDataForLead(leadRow)) {
       bookings.splice(index, 1);
     }
