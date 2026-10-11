@@ -45,6 +45,51 @@ function isLeadsMissing(err: unknown) {
   return LEADS_MISSING.test(String((err as any)?.message ?? "").toLowerCase());
 }
 
+function shouldSuppressExperimentalDataForLead(row: any): boolean {
+  const statusRaw = String(row?.status ?? "").trim().toLowerCase();
+  const funnelRaw = String(row?.funnel_stage ?? "").trim().toLowerCase();
+  const recurringStatusRaw = String(row?.recurring_class_status ?? "").trim().toLowerCase();
+  const contractStatusRaw = String(row?.contract_status ?? "").trim().toLowerCase();
+  const paymentStatusRaw = String(row?.payment_status ?? "").trim().toLowerCase();
+  const paymentConfirmedAtRaw = String(row?.payment_confirmed_at ?? "").trim();
+  const enrollmentNumberRaw = String(row?.enrollment_number ?? "").trim();
+  const regStepRaw = Number(row?.recurring_registration_step ?? NaN);
+  const regStepOk = Number.isFinite(regStepRaw) && regStepRaw >= 1;
+  const hasRecurringPassword =
+    Boolean(String(row?.recurring_registration_password ?? "").trim()) ||
+    Boolean(String(row?.signup_password_raw_temp ?? "").trim());
+  const matriculaConcluida =
+    paymentStatusRaw === "confirmado" ||
+    Boolean(paymentConfirmedAtRaw && paymentConfirmedAtRaw !== "null") ||
+    Boolean(enrollmentNumberRaw) ||
+    statusRaw === "matriculado" ||
+    statusRaw === "matricula_confirmada" ||
+    funnelRaw === "matriculado" ||
+    funnelRaw === "matricula_confirmada";
+  const recurringStageStarted =
+    statusRaw === "aluno" ||
+    statusRaw === "matriculado" ||
+    statusRaw === "cadastro_recorrente_pendente_plataforma" ||
+    statusRaw === "contrato_coletando_dados" ||
+    statusRaw === "contrato_aguardando_aceite" ||
+    statusRaw === "contrato_assinado" ||
+    statusRaw === "matricula_confirmada" ||
+    funnelRaw === "aluno" ||
+    funnelRaw === "aluno_recorrente_cadastrado" ||
+    funnelRaw === "cadastro_recorrente_pendente_plataforma" ||
+    funnelRaw === "contrato_coletando_dados" ||
+    funnelRaw === "contrato_aguardando_aceite" ||
+    funnelRaw === "contrato_assinado" ||
+    funnelRaw === "matricula_confirmada" ||
+    funnelRaw === "matriculado" ||
+    recurringStatusRaw === "cadastro_plataforma_pendente" ||
+    recurringStatusRaw === "confirmado" ||
+    contractStatusRaw === "coletando_dados" ||
+    contractStatusRaw === "aguardando_aceite" ||
+    contractStatusRaw === "assinado";
+  return regStepOk || hasRecurringPassword || matriculaConcluida || recurringStageStarted;
+}
+
 function weekdayShort(localDateYYYYMMDD: string): string {
   return weekdayShortIso(localDateYYYYMMDD);
 }
@@ -301,7 +346,21 @@ export async function GET(req: Request) {
     // Colunas que EXISTEM DE VERDADE (confirmado via debug SQL direto):
     //   id, full_name, phone, funnel_stage, status, recurring_class_status
     try {
-      const sel = "id,full_name,phone,funnel_stage,status,recurring_class_status";
+      const sel = [
+        "id",
+        "full_name",
+        "phone",
+        "funnel_stage",
+        "status",
+        "recurring_class_status",
+        "contract_status",
+        "payment_status",
+        "payment_confirmed_at",
+        "enrollment_number",
+        "recurring_registration_step",
+        "recurring_registration_password",
+        "signup_password_raw_temp",
+      ].join(",");
       const res = await fetch(`${SUPABASE_URL}/rest/v1/atendimento_leads?id=eq.${encodeURIComponent(id)}&select=${sel}`, {
         method: "GET",
         headers: restHeaders,
@@ -554,6 +613,22 @@ export async function GET(req: Request) {
   if (leadIds.length > 0) {
     const uniqIds = Array.from(new Set(leadIds));
     for (const id of uniqIds) await fetchLeadById(id);
+  }
+
+  // Quando o lead já iniciou a matrícula recorrente, o modal deve parar de exibir
+  // qualquer resquício da aula experimental e considerar apenas a recorrência.
+  for (let index = bookings.length - 1; index >= 0; index--) {
+    const booking = bookings[index];
+    const bookingType = String((booking as any).__type ?? "").trim().toLowerCase();
+    if (!bookingType.startsWith("experimental")) continue;
+
+    const leadId = String((booking as any).lead_id ?? "").trim();
+    if (!leadId) continue;
+
+    const { row: leadRow } = await fetchLeadById(leadId);
+    if (leadRow && shouldSuppressExperimentalDataForLead(leadRow)) {
+      bookings.splice(index, 1);
+    }
   }
 
   // 3) Gerar slots da grade para o dia (08:00-22:00 PADRÃO)
