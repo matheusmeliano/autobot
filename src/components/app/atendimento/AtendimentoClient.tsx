@@ -16,6 +16,7 @@ import { modalToast } from "@/lib/modalToast";
 import { formatAtendimentoDate, formatAtendimentoDateTime, leadMatchesSearchQuery } from "@/lib/atendimento/utils";
 import {
   buildExperimentalClassPostAttendanceWhatsAppMessages,
+  calculateDisplayRecurringOccurrence,
   EXPERIMENTAL_CLASS_DEFAULT_STUDENT_DASHBOARD_LINK,
 } from "@/lib/atendimento/experimentalClass";
 import { AppModal } from "@/components/app/AppModal";
@@ -413,51 +414,36 @@ function weekdayShortFromLocalDate(localDate: string, timeZone: string): string 
 function buildRecurringNextOccurrenceNiceLabel(
   lead: AtendimentoLeadListItem
 ): { weekdayWithDate: string; time: string } | null {
-  // Helpers (idênticos aos de buildExperimentalMetaForList)
-  const addDaysLocal = (localDate: string, days: number): string => {
-    const [y, m, d] = localDate.split("-").map(Number);
-    const dt = new Date(Date.UTC(y, m - 1, d, 12, 0, 0));
-    dt.setUTCDate(dt.getUTCDate() + days);
-    const yy = dt.getUTCFullYear();
-    const mm = String(dt.getUTCMonth() + 1).padStart(2, "0");
-    const dd = String(dt.getUTCDate()).padStart(2, "0");
-    return `${yy}-${mm}-${dd}`;
-  };
-  const todayLocalInTz = (tz: string): string => {
-    const parts = new Intl.DateTimeFormat("en-CA", { timeZone: tz, year: "numeric", month: "2-digit", day: "2-digit" }).formatToParts(new Date());
-    const map: Record<string, string> = {};
-    parts.forEach((p: any) => { map[p.type] = p.value; });
-    return `${map.year || ""}-${map.month || ""}-${map.day || ""}`;
-  };
-  const weekdayShortInTz = (localDate: string, tz: string): string => {
-    const [y, m, d] = localDate.split("-").map(Number);
-    const dt = new Date(Date.UTC(y, m - 1, d, 12, 0, 0));
-    return new Intl.DateTimeFormat("en-US", { timeZone: tz, weekday: "short" }).format(dt).toLowerCase().slice(0, 3);
-  };
-  const computeNextWeekdayFromToday = (targetWdRaw: string, tz: string): string | null => {
-    const target = normalizeRecurringWeekdayToken(targetWdRaw);
-    if (!["mon", "tue", "wed", "thu", "fri", "sat", "sun"].includes(target)) return null;
-    const startLocal = todayLocalInTz(tz);
-    for (let i = 0; i <= 14; i++) {
-      const candidate = addDaysLocal(startLocal, i);
-      if (weekdayShortInTz(candidate, tz) === target) return candidate;
-    }
-    return null;
-  };
-
   // Campos da recorrência
   const wdRaw = String((lead as any)?.recurring_class_weekday ?? "").trim();
   const wdLabelRaw = String((lead as any)?.recurring_class_weekday_label ?? "").trim();
   const tmRaw = String((lead as any)?.recurring_class_lead_time ?? (lead as any)?.recurring_class_professor_time ?? "").trim();
   const tz = deriveLeadEffectiveTimeZone(lead);
+  const normalizedWeekday = normalizeRecurringWeekdayToken(wdRaw || wdLabelRaw);
+  if (!["mon", "tue", "wed", "thu", "fri", "sat", "sun"].includes(normalizedWeekday)) return null;
 
-  const wdOk = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"].includes(normalizeRecurringWeekdayToken(wdRaw) || normalizeRecurringWeekdayToken(wdLabelRaw));
-  if (!wdOk) return null;
-
-  const nextLocal = computeNextWeekdayFromToday(wdRaw || wdLabelRaw, tz);
+  const displayOccurrence = calculateDisplayRecurringOccurrence({
+    weekday: normalizedWeekday as "mon" | "tue" | "wed" | "thu" | "fri" | "sat" | "sun",
+    professorTimeHHMM:
+      normalizeScheduleTimeForComparison(
+        (lead as any)?.recurring_class_professor_time ??
+          (lead as any)?.recurring_class_lead_time,
+      ) || normalizeScheduleTimeForComparison(tmRaw),
+    professorTimeZone: ATENDIMENTO_PROFESSOR_TIME_ZONE,
+    leadTimeZone: tz,
+    studentNotificationSentAt: String(
+      (lead as any)?.recurring_class_student_start_notification_sent_at ?? "",
+    ).trim(),
+    attendantNotificationSentAt: String(
+      (lead as any)?.recurring_class_attendant_start_notification_sent_at ?? "",
+    ).trim(),
+  });
+  const nextLocal = String(
+    displayOccurrence?.leadDate ?? displayOccurrence?.professorDate ?? "",
+  ).trim();
   if (!nextLocal) return null;
 
-  const [yy, mm, dd] = nextLocal.split("-");
+  const [, mm, dd] = nextLocal.split("-");
   const shortDm = `${dd}/${mm}`;
 
   // Monta "Quarta-feira (07/10)" a partir do label salvo, ou fallback:
@@ -470,7 +456,7 @@ function buildRecurringNextOccurrenceNiceLabel(
       return s;
     }
     // Fallback via weekdayShortInTz → pt-BR longo
-    const wdShort = weekdayShortInTz(nextLocal, tz);
+    const wdShort = weekdayShortFromLocalDate(nextLocal, tz);
     const toPTLong: Record<string, string> = {
       mon: "Segunda-feira", tue: "Terça-feira", wed: "Quarta-feira", thu: "Quinta-feira",
       fri: "Sexta-feira", sat: "Sábado", sun: "Domingo",
@@ -480,7 +466,7 @@ function buildRecurringNextOccurrenceNiceLabel(
   const wdWithDate = cleanWdLabel ? `${cleanWdLabel} (${shortDm})` : "";
 
   const cleanTime = (() => {
-    const t = tmRaw.trim();
+    const t = String(displayOccurrence?.leadTime ?? tmRaw).trim();
     if (!t) return "";
     if (/h$/i.test(t)) return t;
     return `${t.replace(/h$/i, "")}h`;
@@ -639,9 +625,28 @@ function buildExperimentalMetaForList(lead: AtendimentoLeadListItem): { label: s
   // IGUAL ao card azul da Visão Geral.
   // ============================================================
   if (gRecurringTrulyStarted && gRecurringWeekdayOk && gRecurringTimeOk) {
-    const nextLocal = computeNextWeekdayFromToday(gRecurringWeekdayRaw, leadEffectiveTz);
-    if (nextLocal) {
-      return { label: formatDateNice(nextLocal, gRecurringLeadTimeRaw), tone: "success" };
+    const displayOccurrence = calculateDisplayRecurringOccurrence({
+      weekday: normalizeWeekday(gRecurringWeekdayRaw) as "mon" | "tue" | "wed" | "thu" | "fri" | "sat" | "sun",
+      professorTimeHHMM:
+        normalizeScheduleTimeForComparison(
+          (lead as any)?.recurring_class_professor_time ??
+            (lead as any)?.recurring_class_lead_time,
+        ) || normalizeScheduleTimeForComparison(gRecurringLeadTimeRaw),
+      professorTimeZone: ATENDIMENTO_PROFESSOR_TIME_ZONE,
+      leadTimeZone: leadEffectiveTz,
+      studentNotificationSentAt: String(
+        (lead as any)?.recurring_class_student_start_notification_sent_at ?? "",
+      ).trim(),
+      attendantNotificationSentAt: String(
+        (lead as any)?.recurring_class_attendant_start_notification_sent_at ?? "",
+      ).trim(),
+    });
+    const nextLocal = String(
+      displayOccurrence?.leadDate ?? displayOccurrence?.professorDate ?? "",
+    ).trim();
+    const nextTime = String(displayOccurrence?.leadTime ?? gRecurringLeadTimeRaw).trim();
+    if (nextLocal && nextTime) {
+      return { label: formatDateNice(nextLocal, nextTime), tone: "success" };
     }
   }
 

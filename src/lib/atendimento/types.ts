@@ -37,6 +37,8 @@ export type AtendimentoLead = {
   recurring_class_professor_time?: string | null;
   recurring_class_lead_time?: string | null;
   recurring_class_created_at?: string | null;
+  recurring_class_student_start_notification_sent_at?: string | null;
+  recurring_class_attendant_start_notification_sent_at?: string | null;
   signup_password_raw_temp?: string | null;
   legal_responsible_name?: string | null;
   legal_responsible_cpf?: string | null;

@@ -1526,6 +1526,60 @@ export function calculateCurrentOrNextRecurringOccurrence(params: {
   return null;
 }
 
+export function calculateDisplayRecurringOccurrence(params: {
+  weekday: "mon" | "tue" | "wed" | "thu" | "fri" | "sat" | "sun";
+  professorTimeHHMM: string;
+  professorTimeZone?: string | null;
+  leadTimeZone?: string | null;
+  fromDate?: Date;
+  studentNotificationSentAt?: string | null;
+  attendantNotificationSentAt?: string | null;
+}) {
+  const nextOccurrence = calculateNextRecurringOccurrence(params);
+  if (!nextOccurrence) return null;
+
+  const profTz =
+    String(params.professorTimeZone ?? ATENDIMENTO_PROFESSOR_TIME_ZONE ?? "").trim() ||
+    ATENDIMENTO_PROFESSOR_TIME_ZONE;
+
+  const sentCandidates = [
+    String(params.studentNotificationSentAt ?? "").trim(),
+    String(params.attendantNotificationSentAt ?? "").trim(),
+  ]
+    .map((value) => {
+      if (!value) return null;
+      const date = new Date(value);
+      const ms = date.getTime();
+      return Number.isFinite(ms) ? date : null;
+    })
+    .filter(Boolean) as Date[];
+
+  if (sentCandidates.length === 0) return nextOccurrence;
+
+  const latestSentAt = sentCandidates.sort((a, b) => b.getTime() - a.getTime())[0] ?? null;
+  if (!latestSentAt) return nextOccurrence;
+
+  const currentOrNextOccurrence = calculateCurrentOrNextRecurringOccurrence(params);
+  if (!currentOrNextOccurrence?.professorDate) return nextOccurrence;
+
+  const latestSentLocalDate = localDateInTimeZone(latestSentAt, profTz);
+  if (latestSentLocalDate !== currentOrNextOccurrence.professorDate) {
+    return nextOccurrence;
+  }
+
+  const currentStartRaw =
+    String(currentOrNextOccurrence.professorStartAt ?? currentOrNextOccurrence.leadStartAt ?? "").trim();
+  const currentStartMs = currentStartRaw ? new Date(currentStartRaw).getTime() : NaN;
+  const nextFromCurrent = Number.isFinite(currentStartMs)
+    ? calculateNextRecurringOccurrence({
+        ...params,
+        fromDate: new Date(currentStartMs + 60_000),
+      })
+    : null;
+
+  return nextFromCurrent ?? nextOccurrence;
+}
+
 export function calculatePastRecurringOccurrences(params: {
   weekday: "mon" | "tue" | "wed" | "thu" | "fri" | "sat" | "sun";
   professorTimeHHMM: string;

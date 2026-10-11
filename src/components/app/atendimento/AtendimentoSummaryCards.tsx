@@ -26,7 +26,7 @@ function isLeadRecurringRegistrationConcludedClient(lead: unknown): boolean {
 import {
   deriveExperimentalClassBookingDisplayStatus,
   experimentalClassBookingDisplayStatusLabel,
-  calculateNextRecurringOccurrence,
+  calculateDisplayRecurringOccurrence,
   calculatePastRecurringOccurrences,
 } from "@/lib/atendimento/experimentalClass";
 import type { AtendimentoLeadListItem, AtendimentoSummary } from "@/lib/atendimento/types";
@@ -1746,11 +1746,17 @@ function BookingDetails({
         hasValidExperimentalDateTime);
   const nextRecurring =
     hasRecurringClass && recurringWeekday && /^\d{2}:\d{2}$/.test(recurringTime)
-      ? calculateNextRecurringOccurrence({
+      ? calculateDisplayRecurringOccurrence({
           weekday: recurringWeekday,
           professorTimeHHMM: recurringTime,
           professorTimeZone: ATENDIMENTO_PROFESSOR_TIME_ZONE,
           leadTimeZone: lead.timezone || null,
+          studentNotificationSentAt: String(
+            (lead as any)?.recurring_class_student_start_notification_sent_at ?? "",
+          ).trim(),
+          attendantNotificationSentAt: String(
+            (lead as any)?.recurring_class_attendant_start_notification_sent_at ?? "",
+          ).trim(),
         })
       : null;
   const pastRecurringOccurrences = useMemo(() => {
@@ -4493,6 +4499,27 @@ function isRecurringContractFormalized(lead: AtendimentoLeadListItem): boolean {
       const sOk = payload?.student_notification_sent !== false;
       const aOk = payload?.attendant_notification_sent !== false;
       const rOk = payload?.registered_attendant_notification_sent !== false;
+      const shouldRefreshLead =
+        payload?.student_notification_sent === true ||
+        payload?.attendant_notification_sent === true ||
+        payload?.registered_attendant_notification_sent === true ||
+        Boolean(payload?.ok);
+      if (shouldRefreshLead) {
+        const fresh = await fetch(`/api/atendimento/leads/${encodeURIComponent(leadId)}?skipEvents=1`, {
+          cache: "no-store",
+        })
+          .then(async (resp) => (resp.ok ? resp.json().catch(() => null) : null))
+          .catch(() => null) as { ok?: boolean; lead?: Record<string, unknown> | null } | null;
+        if (fresh?.ok && fresh.lead?.id) {
+          setLocalLeads((current) =>
+            current.map((item) =>
+              item.id === leadId
+                ? ({ ...item, ...(fresh.lead as any) } as AtendimentoLeadListItem)
+                : item,
+            ),
+          );
+        }
+      }
       if (r.ok && payload?.ok) {
         if (sOk && aOk && rOk) {
           modalToast.success("Notificações enviadas ao aluno, professor e atendente.");

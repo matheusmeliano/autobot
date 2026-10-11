@@ -62,7 +62,12 @@ export async function POST(req: Request, { params }: { params: Promise<{ leadId:
     await appendHistoryEvent({ leadId: lid, conversationId: null, eventType: "recurring_class_registered_attendant_start_notification_sent_manual", title: "Lembrete aula recorrente disparado manualmente atendente cadastrado", details: { phone: EXPERIMENTAL_CLASS_REGISTERED_ATTENDANT_NOTIFICATION_PHONE, lesson_link: lessonLink, weekday: wr, weekday_label: weekdayLabel, manually_triggered: true, sent_at: nowIso }, actorType: "attendant", actorEmail: auth.user.email });
   } catch (e) { rerr = e instanceof Error ? e.message : String(e); await appendHistoryEvent({ leadId: lid, conversationId: null, eventType: "recurring_class_registered_attendant_start_notification_failed_manual", title: "Falha disparo manual lembrete aula recorrente atendente cadastrado", details: { phone: EXPERIMENTAL_CLASS_REGISTERED_ATTENDANT_NOTIFICATION_PHONE, lesson_link: lessonLink, manually_triggered: true, error: rerr }, actorType: "attendant", actorEmail: auth.user.email }); }
 
-  try { await admin.from("atendimento_leads").update({ updated_at: nowIso } as any).eq("id", lid); } catch(_){}
+  try {
+    const updateData: Record<string, unknown> = { updated_at: nowIso };
+    if (sok) updateData.recurring_class_student_start_notification_sent_at = nowIso;
+    if (aok) updateData.recurring_class_attendant_start_notification_sent_at = nowIso;
+    await admin.from("atendimento_leads").update(updateData as any).eq("id", lid);
+  } catch(_){}
   const allOk = sok && aok;
   const errMsg = allOk ? null : [serr?`aluno: ${serr}`:null, aerr?`atendente: ${aerr}`:null, rerr?`atendente cadastrado: ${rerr}`:null].filter(Boolean).join(" | ") || "Algum destinatário obrigatório não recebeu.";
   return Response.json({ ok: allOk, all_mandatory_sent: allOk, student_notification_sent: sok, student_notification_error: serr, attendant_notification_sent: aok, attendant_notification_error: aerr, registered_attendant_notification_sent: rok, registered_attendant_notification_error: rerr, error: errMsg }, { status: allOk ? 200 : 502 });
