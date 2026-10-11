@@ -391,6 +391,14 @@ function buildRecurringMetaForSection(lead: AtendimentoLeadListItem): string {
 }
 
 function buildExperimentalMetaForSection(lead: AtendimentoLeadListItem): string {
+  if (
+    leadHasAnyRecurringProgressSignal(lead) ||
+    leadHasMatriculaOrRecurringStageInitiated(lead) ||
+    isLeadInAlunosSection(lead)
+  ) {
+    return "";
+  }
+
   const booking = lead.experimental_class_booking;
   const bookingStatus = String(booking?.status ?? "").trim().toLowerCase();
   const bookingHasId = Boolean(String(booking?.id ?? "").trim());
