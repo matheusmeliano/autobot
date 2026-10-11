@@ -1892,11 +1892,20 @@ export async function sendRecurringClassStartNotifications(now = new Date()) {
   }
 
   if (rows.length > 0) {
-    rows = rows.filter(
-      (row) =>
-        isLeadRecurringRegistrationConcluded(row) &&
-        hasLeadConfirmedPaymentForRecurringNotifications(row),
+    const paymentMetaByLeadId = await loadPaymentHistoryMetaByLeadIds(
+      admin,
+      rows.map((row) => String((row as any)?.id ?? "").trim()).filter(Boolean),
     );
+    rows = rows.filter((row) => {
+      if (!isLeadRecurringRegistrationConcluded(row)) return false;
+      if (hasLeadConfirmedPaymentForRecurringNotifications(row)) return true;
+      const leadId = String((row as any)?.id ?? "").trim();
+      const historyMeta = paymentMetaByLeadId.get(leadId);
+      return (
+        String(historyMeta?.payment_status ?? "").trim().toLowerCase() === "confirmado" ||
+        Boolean(String(historyMeta?.payment_confirmed_at ?? "").trim())
+      );
+    });
   }
 
   let studentSent = 0;
@@ -3914,6 +3923,106 @@ export function hasLeadConfirmedPaymentForRecurringNotifications(lead: unknown):
   return payStatusRaw === "confirmado" || Boolean(payConfirmedAtRaw && payConfirmedAtRaw !== "null");
 }
 
+type PaymentHistoryMetaForRecurring = {
+  payment_status: "confirmado" | "nao_realizado" | "pendente_confirmacao" | null;
+  payment_confirmed_at: string | null;
+};
+
+export async function loadPaymentHistoryMetaByLeadIds(
+  admin: ReturnType<typeof createSupabaseAdminClient>,
+  leadIds: string[],
+): Promise<Map<string, PaymentHistoryMetaForRecurring>> {
+  const ids = Array.from(
+    new Set(
+      leadIds
+        .map((value) => String(value ?? "").trim())
+        .filter(Boolean),
+    ),
+  );
+  const metaByLeadId = new Map<string, PaymentHistoryMetaForRecurring>();
+  if (ids.length === 0) return metaByLeadId;
+
+  const { data: historyEvents, error } = await admin
+    .from("atendimento_history_events")
+    .select("lead_id, event_type, created_at, details")
+    .in("lead_id", ids)
+    .in("event_type", [
+      "recurring_payment_confirmed",
+      "recurring_payment_rejected",
+      "recurring_payment_intent_registered",
+      "attendant_clicked_payment_sim",
+      "attendant_clicked_payment_nao",
+    ])
+    .order("created_at", { ascending: false });
+
+  if (error || !Array.isArray(historyEvents)) return metaByLeadId;
+
+  const PAYMENT_PRIORITY: Record<string, number> = {
+    confirmado: 100,
+    nao_realizado: 50,
+    pendente_confirmacao: 10,
+  };
+
+  for (const event of historyEvents) {
+    const leadId = String((event as any)?.lead_id ?? "").trim();
+    if (!leadId) continue;
+    const eventType = String((event as any)?.event_type ?? "").trim().toLowerCase();
+    const createdAt = String((event as any)?.created_at ?? "").trim() || null;
+    const details = ((event as any)?.details ?? {}) as Record<string, unknown>;
+    const existing = metaByLeadId.get(leadId);
+    const existingRank = existing?.payment_status
+      ? PAYMENT_PRIORITY[existing.payment_status] ?? 0
+      : 0;
+
+    let candidateStatus: PaymentHistoryMetaForRecurring["payment_status"] = null;
+    let candidateConfirmedAt: string | null = null;
+
+    if (eventType === "recurring_payment_confirmed" || eventType === "attendant_clicked_payment_sim") {
+      candidateStatus = "confirmado";
+      candidateConfirmedAt =
+        (typeof details?.confirmed_at === "string" ? String(details.confirmed_at).trim() : "") ||
+        createdAt ||
+        null;
+    } else if (
+      eventType === "recurring_payment_rejected" ||
+      eventType === "attendant_clicked_payment_nao"
+    ) {
+      candidateStatus = "nao_realizado";
+    } else if (eventType === "recurring_payment_intent_registered") {
+      candidateStatus = "pendente_confirmacao";
+    }
+
+    if (!candidateStatus) continue;
+    const candidateRank = PAYMENT_PRIORITY[candidateStatus] ?? 0;
+    if (!existing || candidateRank > existingRank) {
+      metaByLeadId.set(leadId, {
+        payment_status: candidateStatus,
+        payment_confirmed_at: candidateConfirmedAt,
+      });
+    }
+  }
+
+  return metaByLeadId;
+}
+
+export async function hasLeadConfirmedPaymentForRecurringNotificationsResolved(params: {
+  admin: ReturnType<typeof createSupabaseAdminClient>;
+  lead: unknown;
+  leadId?: string | null;
+}): Promise<boolean> {
+  const { admin, lead, leadId } = params;
+  if (hasLeadConfirmedPaymentForRecurringNotifications(lead)) return true;
+  const resolvedLeadId =
+    String(leadId ?? (lead as Record<string, unknown> | null | undefined)?.id ?? "").trim();
+  if (!resolvedLeadId) return false;
+  const paymentMeta = await loadPaymentHistoryMetaByLeadIds(admin, [resolvedLeadId]);
+  const historyMeta = paymentMeta.get(resolvedLeadId);
+  return (
+    String(historyMeta?.payment_status ?? "").trim().toLowerCase() === "confirmado" ||
+    Boolean(String(historyMeta?.payment_confirmed_at ?? "").trim())
+  );
+}
+
 export async function ensureStudentAuthUserCreatedForLead(params: {
   admin: ReturnType<typeof createSupabaseAdminClient>;
   leadId: string;
@@ -4156,6 +4265,8 @@ export async function ensureStudentAuthUserCreatedForLead(params: {
 }
 
 const SUSPECT_MISSING_COLUMNS_BL = [
+  "recurring_payment_confirmed_at",
+  "recurring_payment_status",
   "payment_confirmed_at",
   "payment_rejected_at",
   "contract_signed_at",
@@ -4214,18 +4325,30 @@ export async function confirmLeadRecurringPayment(params: {
 
   const payStatusNow = String((lead as any).payment_status ?? "").trim().toLowerCase();
   const payConfirmedAtRaw = String((lead as any).payment_confirmed_at ?? "").trim();
+  const recurringPayStatusNow = String((lead as any).recurring_payment_status ?? "").trim().toLowerCase();
+  const recurringPayConfirmedAtRaw = String((lead as any).recurring_payment_confirmed_at ?? "").trim();
+  const alreadyExplicitlyConfirmed = hasLeadConfirmedPaymentForRecurringNotifications(lead);
   const alreadyConfirmed =
+    alreadyExplicitlyConfirmed ||
     payStatusNow === "confirmado" ||
     payStatusNow === "matriculado" ||
+    recurringPayStatusNow === "confirmado" ||
     Boolean(payConfirmedAtRaw && payConfirmedAtRaw !== "null") ||
+    Boolean(recurringPayConfirmedAtRaw && recurringPayConfirmedAtRaw !== "null") ||
     String((lead as any).status ?? "").trim() === "matriculado" ||
     String((lead as any).status ?? "").trim() === "matricula_confirmada" ||
     String((lead as any).funnel_stage ?? "").trim() === "matriculado" ||
     String((lead as any).funnel_stage ?? "").trim() === "matricula_confirmada";
   const now = new Date().toISOString();
+  const confirmedAtForPatch =
+    recurringPayConfirmedAtRaw ||
+    payConfirmedAtRaw ||
+    now;
   const patch: any = {
     payment_status: "confirmado",
-    payment_confirmed_at: now,
+    payment_confirmed_at: confirmedAtForPatch,
+    recurring_payment_status: "confirmado",
+    recurring_payment_confirmed_at: confirmedAtForPatch,
     updated_at: now,
   };
   const currentStage = String((lead as any).funnel_stage ?? "");
@@ -4243,34 +4366,6 @@ export async function confirmLeadRecurringPayment(params: {
   }
   if (targetStatusIdx >= 0 && (statusIdx < 0 || statusIdx < targetStatusIdx)) {
     patch.status = "matriculado";
-  }
-
-  try {
-    if (!alreadyConfirmed) {
-      await appendHistoryEvent({
-        leadId,
-        eventType: "recurring_payment_confirmed",
-        title: "Pagamento marcado como Sim (confirmado)",
-        details: {
-          enrollment_number: (lead as any).enrollment_number || null,
-          confirmed_at: now,
-          confirmed_by: attendantEmail || (actorType === "attendant" ? "Atendente painel" : actorType),
-          idempotent: false,
-        },
-        actorType,
-      });
-    }
-  } catch {}
-
-  if (alreadyConfirmed) {
-    try {
-      await ensureStudentAuthUserCreatedForLead({ admin, leadId, lead });
-    } catch {}
-    return {
-      ok: true,
-      confirmed_at: payConfirmedAtRaw || now,
-      idempotent: true,
-    };
   }
 
   let applied = false;
@@ -4296,6 +4391,39 @@ export async function confirmLeadRecurringPayment(params: {
     }
     return { ok: false, error };
   };
+
+  try {
+    if (!alreadyConfirmed) {
+      await appendHistoryEvent({
+        leadId,
+        eventType: "recurring_payment_confirmed",
+        title: "Pagamento marcado como Sim (confirmado)",
+        details: {
+          enrollment_number: (lead as any).enrollment_number || null,
+          confirmed_at: now,
+          confirmed_by: attendantEmail || (actorType === "attendant" ? "Atendente painel" : actorType),
+          idempotent: false,
+        },
+        actorType,
+      });
+    }
+  } catch {}
+
+  if (alreadyConfirmed && !alreadyExplicitlyConfirmed) {
+    await runPatch(patch);
+  }
+
+  if (alreadyConfirmed) {
+    try {
+      await ensureStudentAuthUserCreatedForLead({ admin, leadId, lead });
+    } catch {}
+    return {
+      ok: true,
+      confirmed_at: recurringPayConfirmedAtRaw || payConfirmedAtRaw || now,
+      idempotent: true,
+    };
+  }
+
   const patchRes = await runPatch(patch);
   if (!patchRes.ok && !applied) {
     return { ok: false, error: (patchRes as any).error?.message ?? "Falha ao atualizar lead." };

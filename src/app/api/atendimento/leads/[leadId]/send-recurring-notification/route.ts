@@ -1,6 +1,7 @@
 import {
   appendHistoryEvent,
   hasLeadConfirmedPaymentForRecurringNotifications,
+  hasLeadConfirmedPaymentForRecurringNotificationsResolved,
   requireAtendimentoUser,
   sendAtendimentoWhatsAppText,
 } from "@/lib/atendimento/server";
@@ -21,7 +22,14 @@ export async function POST(req: Request, { params }: { params: Promise<{ leadId:
   const { data: lead, error: le } = await admin.from("atendimento_leads").select("*").eq("id", lid).maybeSingle();
   if (le) return Response.json({ ok: false, error: le.message }, { status: 500 });
   if (!lead) return Response.json({ ok: false, error: "not_found" }, { status: 404 });
-  if (!hasLeadConfirmedPaymentForRecurringNotifications(lead)) {
+  const paymentConfirmed =
+    hasLeadConfirmedPaymentForRecurringNotifications(lead) ||
+    await hasLeadConfirmedPaymentForRecurringNotificationsResolved({
+      admin,
+      lead,
+      leadId: lid,
+    });
+  if (!paymentConfirmed) {
     return Response.json(
       {
         ok: false,
