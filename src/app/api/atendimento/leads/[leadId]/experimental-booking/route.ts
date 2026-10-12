@@ -140,6 +140,12 @@ function safeIsoDate(date: string, time: string, timezone: string): string | nul
   }
 }
 
+function normalizeExperimentalBookingStatusForPersistence(value: string | null | undefined) {
+  const normalized = String(value ?? "").trim().toLowerCase();
+  if (!normalized || normalized === "booked") return "scheduled";
+  return normalized;
+}
+
 export async function POST(req: Request, { params }: { params: Promise<{ leadId: string }> }) {
   try {
     const leadIdRaw = (await params).leadId;
@@ -170,7 +176,9 @@ export async function POST(req: Request, { params }: { params: Promise<{ leadId:
       return Response.json({ ok: false, error: "invalid_payload" }, { status: 400 });
     }
 
-    const safeStatus = parsed.data.status ?? "scheduled";
+    const safeStatus = normalizeExperimentalBookingStatusForPersistence(
+      parsed.data.status ?? "scheduled",
+    );
     const safeProfessorDate = String(parsed.data.professor_date ?? "").trim() || null;
     const safeProfessorTime = String(parsed.data.professor_time ?? "").trim() || null;
     const safeLeadDate = String(parsed.data.lead_date ?? "").trim() || null;

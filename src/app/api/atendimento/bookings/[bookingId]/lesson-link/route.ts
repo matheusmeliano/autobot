@@ -1,6 +1,12 @@
 import { appendHistoryEvent, requireAtendimentoUser } from "@/lib/atendimento/server";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 
+function normalizeExperimentalBookingStatusForPersistence(value: string | null | undefined) {
+  const normalized = String(value ?? "").trim().toLowerCase();
+  if (!normalized || normalized === "booked") return "scheduled";
+  return normalized;
+}
+
 function isExperimentalClassBookingsTableUnavailable(error: unknown) {
   const code = String((error as any)?.code ?? "").trim();
   const message = String((error as any)?.message ?? "");
@@ -234,7 +240,9 @@ export async function POST(
     id: String((resolvedBooking as any)?.id ?? normalizedBookingId),
     lead_id: leadId,
     conversation_id: conversationId,
-    status: String((resolvedBooking as any)?.status ?? payload?.status ?? "scheduled").trim() || "scheduled",
+    status: normalizeExperimentalBookingStatusForPersistence(
+      String((resolvedBooking as any)?.status ?? payload?.status ?? "scheduled").trim() || "scheduled",
+    ),
     lesson_link: lessonLink,
     professor_timezone: String((resolvedBooking as any)?.professor_timezone ?? payload?.professorTimeZone ?? "").trim(),
     lead_timezone: String((resolvedBooking as any)?.lead_timezone ?? payload?.leadTimeZone ?? "").trim(),
@@ -252,6 +260,10 @@ export async function POST(
     const { data: updatedBooking, error: updateError } = await admin
       .from("atendimento_experimental_class_bookings")
       .update({
+        status: normalizeExperimentalBookingStatusForPersistence(
+          String((resolvedBooking as any)?.status ?? responseBooking.status ?? "scheduled").trim() ||
+            "scheduled",
+        ),
         lesson_link: lessonLink,
         updated_at: new Date().toISOString(),
       })
@@ -279,7 +291,9 @@ export async function POST(
       id: normalizedBookingId,
       lead_id: leadId,
       conversation_id: conversationId || null,
-      status: String(responseBooking.status ?? "scheduled").trim() || "scheduled",
+      status: normalizeExperimentalBookingStatusForPersistence(
+        String(responseBooking.status ?? "scheduled").trim() || "scheduled",
+      ),
       professor_timezone: String(responseBooking.professor_timezone ?? "").trim(),
       lead_timezone: String(responseBooking.lead_timezone ?? "").trim(),
       professor_date: String(responseBooking.professor_date ?? "").trim(),

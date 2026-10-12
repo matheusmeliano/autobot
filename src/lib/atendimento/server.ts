@@ -1278,7 +1278,7 @@ export async function sendExperimentalClassStartNotifications(now = new Date()) 
       const r1 = await admin
         .from("atendimento_experimental_class_bookings")
         .select(bookingsSelectWithLessonLink)
-        .eq("status", "scheduled")
+        .in("status", ["scheduled", "booked", "in_progress"])
         .gte("professor_start_at", candidateWindowStartIso)
         .lte("professor_start_at", candidateWindowEndIso)
         .order("professor_start_at", { ascending: true });
@@ -1286,7 +1286,7 @@ export async function sendExperimentalClassStartNotifications(now = new Date()) 
         const r2 = await admin
           .from("atendimento_experimental_class_bookings")
           .select(bookingsSelectWithoutLessonLink)
-          .eq("status", "scheduled")
+          .in("status", ["scheduled", "booked", "in_progress"])
           .gte("professor_start_at", candidateWindowStartIso)
           .lte("professor_start_at", candidateWindowEndIso)
           .order("professor_start_at", { ascending: true });
@@ -1306,7 +1306,7 @@ export async function sendExperimentalClassStartNotifications(now = new Date()) 
         cancelledLeadBookingIds.add(leadId);
         continue;
       }
-      if (status !== "scheduled") continue;
+      if (status !== "scheduled" && status !== "booked" && status !== "in_progress") continue;
       if (bookingsByLeadId.has(leadId)) continue;
       bookingsByLeadId.set(leadId, {
         ...booking,
@@ -1526,7 +1526,7 @@ export async function sendExperimentalClassStartNotifications(now = new Date()) 
     const leadId = String(booking?.lead_id ?? "").trim();
     if (!leadId) continue;
     if (status === "cancelled") continue;
-    if (status !== "scheduled" && status !== "in_progress") continue;
+    if (status !== "scheduled" && status !== "booked" && status !== "in_progress") continue;
     if (cancelledByHistoryLeadIds.has(leadId)) continue;
 
     const startAt = String(booking?.professor_start_at ?? "");
