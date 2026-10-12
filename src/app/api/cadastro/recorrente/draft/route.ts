@@ -814,25 +814,23 @@ export async function PATCH(req: NextRequest) {
             .order("created_at", { ascending: false })
             .limit(1)
             .maybeSingle();
-          if ((convRow as any)?.id) {
-            const { appendHistoryEvent } = await import("@/lib/atendimento/server");
-            await appendHistoryEvent({
-              leadId: String(lead.id),
-              conversationId: String((convRow as any).id),
-              eventType: "recurring_class_schedule_changed_notification_sent",
-              title: "Notificação de alteração de dia/horário recorrente enviada",
-              details: {
-                from_weekday: oldWeekday || null,
-                from_time: oldTime || null,
-                to_weekday: newWeekday || null,
-                to_time: newTime || null,
-                attendant_notified_phone: regPhone,
-                professor_notified_phone: assigned?.phone ?? null,
-                professor_notified_name: assigned?.name ?? null,
-              },
-              actorType: "system",
-            }).catch(() => {});
-          }
+          const { appendHistoryEvent } = await import("@/lib/atendimento/server");
+          await appendHistoryEvent({
+            leadId: String(lead.id),
+            conversationId: String((convRow as any)?.id ?? "").trim() || null,
+            eventType: "recurring_class_schedule_changed_notification_sent",
+            title: "Notificação de alteração de dia/horário recorrente enviada",
+            details: {
+              from_weekday: oldWeekday || null,
+              from_time: oldTime || null,
+              to_weekday: newWeekday || null,
+              to_time: newTime || null,
+              attendant_notified_phone: regPhone,
+              professor_notified_phone: assigned?.phone ?? null,
+              professor_notified_name: assigned?.name ?? null,
+            },
+            actorType: "system",
+          }).catch(() => {});
         } catch {}
       }
     } catch (outerE) {
@@ -867,23 +865,21 @@ export async function PATCH(req: NextRequest) {
         .order("created_at", { ascending: false })
         .limit(1)
         .maybeSingle();
-      if ((convRow as any)?.id) {
-        const { appendHistoryEvent } = await import("@/lib/atendimento/server");
-        await appendHistoryEvent({
-          leadId: String(lead.id),
-          conversationId: String((convRow as any).id),
-          eventType: "recurring_class_draft_saved",
-          title: "Rascunho de dia/horário recorrente salvo (plataforma)",
-          details: {
-            weekday: validWeekday || null,
-            weekday_label: patch.recurring_class_weekday_label || null,
-            professor_time: safeProfessorTime || null,
-            lead_time: (patch.recurring_class_lead_time as string) || null,
-            source: "cadastro_recorrente_plataforma_draft",
-          },
-          actorType: "lead",
-        }).catch(() => {});
-      }
+      const { appendHistoryEvent } = await import("@/lib/atendimento/server");
+      await appendHistoryEvent({
+        leadId: String(lead.id),
+        conversationId: String((convRow as any)?.id ?? "").trim() || null,
+        eventType: "recurring_class_draft_saved",
+        title: "Rascunho de dia/horário recorrente salvo (plataforma)",
+        details: {
+          weekday: validWeekday || null,
+          weekday_label: patch.recurring_class_weekday_label || null,
+          professor_time: safeProfessorTime || null,
+          lead_time: (patch.recurring_class_lead_time as string) || null,
+          source: "cadastro_recorrente_plataforma_draft",
+        },
+        actorType: "lead",
+      }).catch(() => {});
     } catch {}
 
     return NextResponse.json({

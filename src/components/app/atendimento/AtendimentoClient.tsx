@@ -4265,6 +4265,14 @@ export function AtendimentoClient() {
           void loadPanelLeads();
         },
       )
+      .on(
+        "postgres_changes",
+        { event: "INSERT", schema: "public", table: "atendimento_history_events" },
+        () => {
+          void loadSummary({ silent: true });
+          void loadPanelLeads();
+        },
+      )
       .subscribe((status) => {
         if (status === "SUBSCRIBED") {
           realtimeSubscribedRef.current = true;
