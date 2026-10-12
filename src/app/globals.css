@@ -881,3 +881,14 @@ body {
 .mp-brick-wrapper [class*="value-prop"] {
   display: none !important;
 }
+
+#trae-badge-plugin,
+#trae-badge-styles,
+#trae-badge-plugin-styles,
+.trae-badge,
+[id^="trae-badge-"] {
+  display: none !important;
+  visibility: hidden !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+}
