@@ -273,6 +273,28 @@ export default function CadastroRecorrenteBody() {
   function formatPhoneMasked(v: string | null | undefined): string {
     const d = digitsOnly(v).slice(0, 13);
     if (!d) return "";
+    if (d.startsWith("1")) {
+      const rest = d.slice(1);
+      if (!rest) return "+1";
+      if (rest.length <= 3) return `+1 (${rest}`;
+      const area = rest.slice(0, 3);
+      const local = rest.slice(3);
+      if (!local) return `+1 (${area})`;
+      if (local.length <= 3) return `+1 (${area}) ${local}`;
+      if (local.length <= 7) return `+1 (${area}) ${local.slice(0, 3)}-${local.slice(3)}`;
+      return `+1 (${area}) ${local.slice(0, 3)}-${local.slice(3, 7)} ${local.slice(7)}`.trim();
+    }
+    if (d.startsWith("55")) {
+      const rest = d.slice(2);
+      if (!rest) return "+55";
+      if (rest.length <= 2) return `+55 (${rest}`;
+      const ddd = rest.slice(0, 2);
+      const local = rest.slice(2);
+      if (!local) return `+55 (${ddd})`;
+      if (local.length <= 4) return `+55 (${ddd}) ${local}`;
+      if (local.length <= 9) return `+55 (${ddd}) ${local.slice(0, 5)}-${local.slice(5)}`;
+      return `+55 (${ddd}) ${local.slice(0, 5)}-${local.slice(5, 9)} ${local.slice(9)}`.trim();
+    }
     if (d.length <= 10) {
       let out = "(" + d.slice(0, 2);
       if (d.length > 2) out += ") " + d.slice(2, 6);
