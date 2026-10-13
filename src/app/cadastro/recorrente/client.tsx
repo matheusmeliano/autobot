@@ -276,13 +276,13 @@ export default function CadastroRecorrenteBody() {
     if (d.startsWith("1")) {
       const rest = d.slice(1);
       if (!rest) return "+1";
-      if (rest.length <= 3) return `+1 (${rest}`;
+      if (rest.length <= 3) return `+1 ${rest}`;
       const area = rest.slice(0, 3);
       const local = rest.slice(3);
-      if (!local) return `+1 (${area})`;
-      if (local.length <= 3) return `+1 (${area}) ${local}`;
-      if (local.length <= 7) return `+1 (${area}) ${local.slice(0, 3)}-${local.slice(3)}`;
-      return `+1 (${area}) ${local.slice(0, 3)}-${local.slice(3, 7)} ${local.slice(7)}`.trim();
+      if (!local) return `+1 ${area}`;
+      if (local.length <= 3) return `+1 ${area} ${local}`;
+      if (local.length <= 7) return `+1 ${area} ${local.slice(0, 3)}-${local.slice(3)}`;
+      return `+1 ${area} ${local.slice(0, 3)}-${local.slice(3, 7)} ${local.slice(7)}`.trim();
     }
     if (d.startsWith("55")) {
       const rest = d.slice(2);
@@ -1655,6 +1655,17 @@ export default function CadastroRecorrenteBody() {
   function alunoFormatPhoneMasked(raw: unknown): string {
     const d = String(raw ?? "").replace(/\D/g, "").trim();
     if (!d) return "";
+    if (d.startsWith("1")) {
+      const rest = d.slice(1);
+      if (!rest) return "+1";
+      if (rest.length <= 3) return `+1 ${rest}`;
+      const area = rest.slice(0, 3);
+      const local = rest.slice(3);
+      if (!local) return `+1 ${area}`;
+      if (local.length <= 3) return `+1 ${area} ${local}`;
+      if (local.length <= 7) return `+1 ${area} ${local.slice(0, 3)}-${local.slice(3)}`;
+      return `+1 ${area} ${local.slice(0, 3)}-${local.slice(3, 7)} ${local.slice(7)}`.trim();
+    }
     if (d.startsWith("55")) {
       const rest = d.slice(2);
       if (rest.length === 10) {
