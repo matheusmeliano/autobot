@@ -150,6 +150,11 @@ export function resolveRecurringClassAssignedProfessorPhone(input: {
     const match = EXPERIMENTAL_CLASS_PROFESSOR_ASSIGNMENT_ALLOWLIST.find((p) => String(p.phone) === phone);
     if (match) return { name: match.name, phone: match.phone };
   }
+  const normalized = normalizarExperimentalProfessorParaAllowlist({
+    name: input.flatAssignedName ?? null,
+    phone: input.flatAssignedPhone ?? null,
+  });
+  if (normalized) return normalized;
   return null;
 }
 

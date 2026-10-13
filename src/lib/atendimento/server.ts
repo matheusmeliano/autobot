@@ -1927,6 +1927,8 @@ export async function sendRecurringClassStartNotifications(now = new Date()) {
   const recurringLeadIds = (rows as any[]).map((r: any) => String(r?.id ?? "")).filter(Boolean);
   const sentOccurrencesByLeadId = new Map<string, Set<string>>();
   const conversationIdByLeadId = new Map<string, string | null>();
+  const normalizeRecurringNotificationEventTypeForDedup = (eventType: unknown) =>
+    String(eventType ?? "").trim().replace(/_manual$/, "");
   if (recurringLeadIds.length > 0) {
     try {
       const { data: hist } = await admin
@@ -1937,6 +1939,9 @@ export async function sendRecurringClassStartNotifications(now = new Date()) {
           "recurring_class_attendant_start_notification_sent",
           "recurring_class_student_start_notification_sent",
           "recurring_class_registered_attendant_start_notification_sent",
+          "recurring_class_attendant_start_notification_sent_manual",
+          "recurring_class_student_start_notification_sent_manual",
+          "recurring_class_registered_attendant_start_notification_sent_manual",
         ])
         .order("created_at", { ascending: false })
         .limit(2000);
@@ -1944,7 +1949,7 @@ export async function sendRecurringClassStartNotifications(now = new Date()) {
         for (const ev of hist as any[]) {
           const lid = String(ev?.lead_id ?? "").trim();
           const startIso = String((ev?.details ?? {})?.start_at ?? "").trim();
-          const etype = String(ev?.event_type ?? "").trim();
+          const etype = normalizeRecurringNotificationEventTypeForDedup(ev?.event_type);
           if (!lid || !startIso) continue;
           const key = `${etype}|${startIso}`;
           const set = sentOccurrencesByLeadId.get(lid) ?? new Set<string>();
@@ -2070,7 +2075,6 @@ export async function sendRecurringClassStartNotifications(now = new Date()) {
       !cachedStudentSent &&
       nowMs >= studentFireMs &&
       nowMs <= studentLateWindowEndMs;
-
     if (process.env.NODE_ENV !== "production" || attendantDue || registeredAttendantDue || studentDue) {
       const profDate = new Date(professorStartAtMsFinal);
       const studDate = new Date(studentFireMs);
@@ -2151,7 +2155,7 @@ export async function sendRecurringClassStartNotifications(now = new Date()) {
       }
     }
 
-    if (attendantDue && !cachedRegisteredAttendantSent) {
+    if (registeredAttendantDue && !cachedRegisteredAttendantSent) {
       try {
         await sendAtendimentoWhatsAppText({
           phone: EXPERIMENTAL_CLASS_REGISTERED_ATTENDANT_NOTIFICATION_PHONE,

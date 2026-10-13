@@ -16,6 +16,7 @@ import {
   findExperimentalClassTimeOption,
   listExperimentalClassAvailability,
   listRecurringWeekdayAvailability,
+  resolveRecurringClassAssignedProfessorPhone,
 } from "./experimentalClass.ts";
 
 test("listExperimentalClassAvailability comeca no dia seguinte ao domingo atual, com todos os slots horarios", () => {
@@ -537,4 +538,16 @@ test("listRecurringWeekdayAvailability remove horario recorrente quando o interv
   const monTimes = monSlots.map((s) => s.professorTime);
   assert.equal(monTimes.includes("08:00"), false);
   assert.ok(monTimes.includes("09:00"));
+});
+
+test("resolveRecurringClassAssignedProfessorPhone normaliza nome e telefone do professor recorrente", () => {
+  const resolved = resolveRecurringClassAssignedProfessorPhone({
+    flatAssignedName: "lucas brum",
+    flatAssignedPhone: "556598079407",
+  });
+
+  assert.deepEqual(resolved, {
+    name: "Lucas Brum",
+    phone: "+55 65 9807-9407",
+  });
 });
