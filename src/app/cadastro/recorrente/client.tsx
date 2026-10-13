@@ -508,6 +508,34 @@ export default function CadastroRecorrenteBody() {
     }
   }
 
+  async function refreshAlunoLeadNow(params?: {
+    phoneDigits?: string | null;
+    leadId?: string | null;
+  }): Promise<boolean> {
+    const phoneDigits = String(
+      params?.phoneDigits ?? alunoLeadFull?.phone ?? phoneField ?? "",
+    )
+      .replace(/\D/g, "")
+      .trim();
+    const leadId = String(params?.leadId ?? alunoLeadFull?.id ?? "").trim();
+    if (!leadId && phoneDigits.length < 10) return false;
+    try {
+      const res = await fetch(
+        `/api/cadastro/recorrente/draft?telefone=${encodeURIComponent(phoneDigits)}`,
+        { method: "GET", cache: "no-store" },
+      );
+      const json = (await res.json().catch(() => null)) as
+        | { ok?: boolean; lead?: Record<string, unknown> | null; is_matricula_concluida?: boolean }
+        | null;
+      if (!res.ok || !json?.ok || !json?.lead) return false;
+      setAlunoLeadFull((prev: any) => (prev ? { ...prev, ...(json.lead as any) } : json.lead));
+      setAlunoIsMatriculaConcluida(Boolean(json.is_matricula_concluida));
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
   function openAlunoSched() {
     setAlunoSchedStep(0);
     setAlunoSchedDayId(null);
@@ -601,8 +629,17 @@ export default function CadastroRecorrenteBody() {
           recurring_class_weekday_label: String(alunoSchedSelectedDay!.displayLabel || alunoSchedSelectedDay!.label),
           recurring_class_professor_time: String(alunoSchedTimeOpt!.professorTime ?? ""),
           recurring_class_lead_time: String(alunoSchedTimeOpt!.leadTime || alunoSchedTimeOpt!.displayLabel || ""),
+          recurring_class_next_professor_date: null,
+          recurring_class_next_professor_time: null,
+          recurring_class_next_professor_start_at: null,
+          recurring_class_next_lead_date: null,
+          recurring_class_next_lead_time: null,
+          recurring_class_next_lead_start_at: null,
+          recurring_class_next_weekday_label: null,
+          recurring_class_next_date: null,
         };
       });
+      await refreshAlunoLeadNow({ phoneDigits: tel, leadId: lid || null });
       closeAlunoSched();
     } catch (e) {
       setAlunoSchedSaveError(e instanceof Error ? e.message : String(e ?? "Erro desconhecido."));
@@ -1739,18 +1776,7 @@ export default function CadastroRecorrenteBody() {
 
     const refreshAlunoLead = async () => {
       if (cancelled || phoneDigits.length < 10) return;
-      try {
-        const res = await fetch(
-          `/api/cadastro/recorrente/draft?telefone=${encodeURIComponent(phoneDigits)}`,
-          { method: "GET", cache: "no-store" },
-        );
-        const json = (await res.json().catch(() => null)) as
-          | { ok?: boolean; lead?: Record<string, unknown> | null; is_matricula_concluida?: boolean }
-          | null;
-        if (!res.ok || !json?.ok || !json?.lead || cancelled) return;
-        setAlunoLeadFull((prev: any) => (prev ? { ...prev, ...(json.lead as any) } : json.lead));
-        setAlunoIsMatriculaConcluida(Boolean(json.is_matricula_concluida));
-      } catch {}
+      await refreshAlunoLeadNow({ phoneDigits, leadId });
     };
 
     const channel = supabase
