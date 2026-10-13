@@ -1988,7 +1988,8 @@ export async function sendRecurringClassStartNotifications(now = new Date()) {
         ? String(row?.recurring_class_lead_time ?? "").trim()
         : "";
     const professorTz = String(row?.recurring_class_professor_timezone ?? "").trim() || PROF_TZ;
-    const leadTz = String(row?.recurring_class_lead_timezone ?? "").trim() || professorTz;
+    const leadTz =
+      String(row?.recurring_class_lead_timezone ?? row?.timezone ?? "").trim() || professorTz;
 
     if (!validWeekdayKeys.has(weekdayRaw) || !professorTimeHHMM) {
       missingRecurringMeta += 1;
@@ -4030,7 +4031,7 @@ export async function loadRecurringCalendarOccupiedIntervals(params: {
             "America/Sao_Paulo",
         ).trim();
       const leadTimeZone =
-        String((row as any)?.recurring_class_lead_timezone ?? "").trim() ||
+        String((row as any)?.recurring_class_lead_timezone ?? (row as any)?.timezone ?? "").trim() ||
         professorTimeZone;
       const leadTimeHHMM = /^\d{2}:\d{2}$/.test(String((row as any)?.recurring_class_lead_time ?? ""))
         ? String((row as any)?.recurring_class_lead_time ?? "").trim()

@@ -1427,8 +1427,6 @@ export function calculateNextRecurringOccurrence(params: {
   if (!/^\d{2}:\d{2}$/.test(time)) return null;
   const profTz = String(params.professorTimeZone ?? ATENDIMENTO_PROFESSOR_TIME_ZONE ?? "").trim() || ATENDIMENTO_PROFESSOR_TIME_ZONE;
   const leadTz = String(params.leadTimeZone ?? "").trim() || profTz;
-  const leadTimeRaw = String(params.leadTimeHHMM ?? "").trim();
-  const leadTimeHHMM = /^\d{2}:\d{2}$/.test(leadTimeRaw) ? leadTimeRaw : "";
   const now = params.fromDate ?? new Date();
   const maxWeeksToScan = Number.isFinite(Number(params.maxWeeksToScan))
     ? Math.max(6, Number(params.maxWeeksToScan))
@@ -1479,7 +1477,7 @@ export function calculateNextRecurringOccurrence(params: {
       professorTimeZone: profTz,
       professorStartAt: startUtcIso,
       leadDate: localDateInTimeZone(new Date(startUtcMs), leadTz),
-      leadTime: leadTimeHHMM || formatTimeInTimeZone(startUtcIso, leadTz),
+      leadTime: formatTimeInTimeZone(startUtcIso, leadTz),
       leadStartAt: startUtcIso,
       leadTimeZone: leadTz,
       weekdayLabel:
@@ -1505,8 +1503,6 @@ export function calculateCurrentOrNextRecurringOccurrence(params: {
   if (!/^\d{2}:\d{2}$/.test(time)) return null;
   const profTz = String(params.professorTimeZone ?? ATENDIMENTO_PROFESSOR_TIME_ZONE ?? "").trim() || ATENDIMENTO_PROFESSOR_TIME_ZONE;
   const leadTz = String(params.leadTimeZone ?? "").trim() || profTz;
-  const leadTimeRaw = String(params.leadTimeHHMM ?? "").trim();
-  const leadTimeHHMM = /^\d{2}:\d{2}$/.test(leadTimeRaw) ? leadTimeRaw : "";
   const now = params.fromDate ?? new Date();
 
   const todayLocal = localDateInTimeZone(now, profTz);
@@ -1544,7 +1540,7 @@ export function calculateCurrentOrNextRecurringOccurrence(params: {
       professorTimeZone: profTz,
       professorStartAt: startUtcIso,
       leadDate: localDateInTimeZone(new Date(startUtcMs), leadTz),
-      leadTime: leadTimeHHMM || formatTimeInTimeZone(startUtcIso, leadTz),
+      leadTime: formatTimeInTimeZone(startUtcIso, leadTz),
       leadStartAt: startUtcIso,
       leadTimeZone: leadTz,
       weekdayLabel:
@@ -1661,8 +1657,6 @@ export function calculatePastRecurringOccurrences(params: {
   if (!/^\d{2}:\d{2}$/.test(time)) return [];
   const profTz = String(params.professorTimeZone ?? ATENDIMENTO_PROFESSOR_TIME_ZONE ?? "").trim() || ATENDIMENTO_PROFESSOR_TIME_ZONE;
   const leadTz = String(params.leadTimeZone ?? "").trim() || profTz;
-  const leadTimeRaw = String(params.leadTimeHHMM ?? "").trim();
-  const leadTimeHHMM = /^\d{2}:\d{2}$/.test(leadTimeRaw) ? leadTimeRaw : "";
   const to = params.toDate ?? new Date();
 
   let fromMs: number;
@@ -1720,7 +1714,7 @@ export function calculatePastRecurringOccurrences(params: {
           professorTimeZone: profTz,
           professorStartAt: startUtcIso,
           leadDate: localDateInTimeZone(new Date(startUtcMs), leadTz),
-          leadTime: leadTimeHHMM || formatTimeInTimeZone(startUtcIso, leadTz),
+          leadTime: formatTimeInTimeZone(startUtcIso, leadTz),
           leadStartAt: startUtcIso,
           leadTimeZone: leadTz,
           weekdayLabel:

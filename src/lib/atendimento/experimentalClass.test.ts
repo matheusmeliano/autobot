@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {
+  calculateCurrentOrNextRecurringOccurrence,
   calculateDisplayRecurringOccurrence,
   buildExperimentalClassAttendantWhatsAppMessage,
   buildExperimentalClassAttendantStartReminderWhatsAppMessage,
@@ -484,7 +485,7 @@ test("findExperimentalClassTimeOption fallback para professorTime quando horario
   assert.equal(fallback?.leadTime, "11:00");
 });
 
-test("calculateDisplayRecurringOccurrence preserva o horario salvo do aluno ao avancar para a proxima aula", () => {
+test("calculateDisplayRecurringOccurrence recalcula o horario local do aluno ao avancar para a proxima aula", () => {
   const occurrence = calculateDisplayRecurringOccurrence({
     weekday: "mon",
     professorTimeHHMM: "14:00",
@@ -497,10 +498,40 @@ test("calculateDisplayRecurringOccurrence preserva o horario salvo do aluno ao a
 
   assert.equal(occurrence?.professorDate, "2026-10-19");
   assert.equal(occurrence?.professorTime, "14:00");
-  assert.equal(occurrence?.leadTime, "11:00");
+  assert.equal(occurrence?.leadTime, "13:00");
 });
 
-test("calculateDisplayRecurringOccurrence pula a proxima semana quando ha conflito de agenda", () => {
+test("calculateDisplayRecurringOccurrence recalcula horario local do aluno apos DST nos EUA", () => {
+  const occurrence = calculateDisplayRecurringOccurrence({
+    weekday: "tue",
+    professorTimeHHMM: "20:00",
+    professorTimeZone: "America/Cuiaba",
+    leadTimeZone: "America/New_York",
+    leadTimeHHMM: "20:00",
+    fromDate: new Date("2026-11-02T12:00:00.000Z"),
+  });
+
+  assert.equal(occurrence?.professorDate, "2026-11-03");
+  assert.equal(occurrence?.professorTime, "20:00");
+  assert.equal(occurrence?.leadTime, "19:00");
+});
+
+test("calculateCurrentOrNextRecurringOccurrence recalcula horario local do aluno em fusos dos EUA", () => {
+  const occurrence = calculateCurrentOrNextRecurringOccurrence({
+    weekday: "wed",
+    professorTimeHHMM: "09:00",
+    professorTimeZone: "America/Cuiaba",
+    leadTimeZone: "America/Chicago",
+    leadTimeHHMM: "08:00",
+    fromDate: new Date("2026-11-02T12:00:00.000Z"),
+  });
+
+  assert.equal(occurrence?.professorDate, "2026-11-04");
+  assert.equal(occurrence?.professorTime, "09:00");
+  assert.equal(occurrence?.leadTime, "07:00");
+});
+
+test("calculateDisplayRecurringOccurrence pula a proxima semana com horario local recalculado para o aluno", () => {
   const occurrence = calculateDisplayRecurringOccurrence({
     weekday: "mon",
     professorTimeHHMM: "14:00",
@@ -518,7 +549,7 @@ test("calculateDisplayRecurringOccurrence pula a proxima semana quando ha confli
 
   assert.equal(occurrence?.professorDate, "2026-10-26");
   assert.equal(occurrence?.professorTime, "14:00");
-  assert.equal(occurrence?.leadTime, "11:00");
+  assert.equal(occurrence?.leadTime, "13:00");
 });
 
 test("listRecurringWeekdayAvailability remove horario recorrente quando o intervalo ja esta ocupado", () => {
