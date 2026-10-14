@@ -484,6 +484,126 @@ function formatRecurringCardTime(raw: unknown): string {
   return `${value.replace(/h$/i, "").trim()}h`;
 }
 
+function resolveRecurringOccurrenceComparableMs(params: {
+  startAt?: unknown;
+  localDate?: unknown;
+  time?: unknown;
+  timeZone: string;
+}): number | null {
+  const startAt = String(params.startAt ?? "").trim();
+  if (startAt) {
+    const parsed = new Date(startAt).getTime();
+    if (Number.isFinite(parsed)) return parsed;
+  }
+
+  const localDate = String(params.localDate ?? "").trim();
+  const time = normalizeScheduleTimeForComparison(params.time);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(localDate) || !time) return null;
+
+  try {
+    return new Date(
+      zonedDateTimeToUtcIso({
+        date: localDate,
+        time,
+        timeZone: params.timeZone,
+      }),
+    ).getTime();
+  } catch {
+    return null;
+  }
+}
+
+function getValidStoredNextRecurringOccurrence(lead: AtendimentoLeadListItem): {
+  leadDate: string;
+  leadTime: string;
+  professorDate: string;
+  professorTime: string;
+  weekdayLabel: string;
+} | null {
+  const leadDate = String((lead as any)?.recurring_class_next_lead_date ?? "").trim();
+  const leadTime = String((lead as any)?.recurring_class_next_lead_time ?? "").trim();
+  const professorDate = String((lead as any)?.recurring_class_next_professor_date ?? "").trim();
+  const professorTime = String((lead as any)?.recurring_class_next_professor_time ?? "").trim();
+  const weekdayLabel = String((lead as any)?.recurring_class_next_weekday_label ?? "").trim();
+  const effectiveLeadTz = deriveLeadEffectiveTimeZone(lead);
+
+  const storedProfessorMs = resolveRecurringOccurrenceComparableMs({
+    startAt: (lead as any)?.recurring_class_next_professor_start_at,
+    localDate: professorDate || leadDate,
+    time:
+      professorTime ||
+      (lead as any)?.recurring_class_professor_time ||
+      leadTime ||
+      (lead as any)?.recurring_class_lead_time,
+    timeZone: ATENDIMENTO_PROFESSOR_TIME_ZONE,
+  });
+  const storedLeadMs = resolveRecurringOccurrenceComparableMs({
+    startAt: (lead as any)?.recurring_class_next_lead_start_at,
+    localDate: leadDate || professorDate,
+    time:
+      leadTime ||
+      (lead as any)?.recurring_class_lead_time ||
+      professorTime ||
+      (lead as any)?.recurring_class_professor_time,
+    timeZone: effectiveLeadTz,
+  });
+
+  const anchorProfessorMs = resolveRecurringOccurrenceComparableMs({
+    startAt: (lead as any)?.recurring_class_first_class_at,
+    localDate: (lead as any)?.recurring_class_professor_date,
+    time:
+      (lead as any)?.recurring_class_professor_time ??
+      (lead as any)?.recurring_class_lead_time,
+    timeZone: ATENDIMENTO_PROFESSOR_TIME_ZONE,
+  });
+  const anchorLeadMs = resolveRecurringOccurrenceComparableMs({
+    localDate:
+      (lead as any)?.recurring_class_lead_date ??
+      (lead as any)?.recurring_class_professor_date,
+    time:
+      (lead as any)?.recurring_class_lead_time ??
+      (lead as any)?.recurring_class_professor_time,
+    timeZone: effectiveLeadTz,
+  });
+
+  const hasStoredOccurrence = Boolean(leadDate || professorDate);
+  if (!hasStoredOccurrence) return null;
+
+  const staleAgainstProfessorAnchor =
+    storedProfessorMs != null &&
+    anchorProfessorMs != null &&
+    storedProfessorMs < anchorProfessorMs;
+  const staleAgainstLeadAnchor =
+    storedLeadMs != null &&
+    anchorLeadMs != null &&
+    storedLeadMs < anchorLeadMs;
+  const staleAgainstProfessorDate =
+    Boolean(professorDate) &&
+    Boolean(String((lead as any)?.recurring_class_professor_date ?? "").trim()) &&
+    professorDate < String((lead as any)?.recurring_class_professor_date ?? "").trim();
+  const staleAgainstLeadDate =
+    Boolean(leadDate) &&
+    Boolean(String((lead as any)?.recurring_class_lead_date ?? "").trim()) &&
+    leadDate < String((lead as any)?.recurring_class_lead_date ?? "").trim();
+
+  if (
+    staleAgainstProfessorAnchor ||
+    staleAgainstLeadAnchor ||
+    staleAgainstProfessorDate ||
+    staleAgainstLeadDate
+  ) {
+    return null;
+  }
+
+  return {
+    leadDate,
+    leadTime,
+    professorDate,
+    professorTime,
+    weekdayLabel,
+  };
+}
+
 function buildRecurringScheduleDisplayInfo(
   lead: AtendimentoLeadListItem
 ): {
@@ -494,35 +614,14 @@ function buildRecurringScheduleDisplayInfo(
   professorDateRaw: string;
   professorTimeRaw: string;
 } | null {
-  const storedNextLeadLocal = String(
-    (lead as any)?.recurring_class_next_lead_date ??
-      "",
-  ).trim();
-  const storedNextProfessorLocal = String(
-    (lead as any)?.recurring_class_next_professor_date ??
-      "",
-  ).trim();
-  const storedNextLocal = String(
-    storedNextLeadLocal ||
-      storedNextProfessorLocal ||
-      "",
-  ).trim();
-  const storedNextLeadTime = String(
-    (lead as any)?.recurring_class_next_lead_time ??
-      "",
-  ).trim();
-  const storedNextProfessorTime = String(
-    (lead as any)?.recurring_class_next_professor_time ??
-      "",
-  ).trim();
-  const storedNextTime = String(
-    storedNextLeadTime ||
-      storedNextProfessorTime ||
-      "",
-  ).trim();
-  const storedWeekdayLabel = String(
-    (lead as any)?.recurring_class_next_weekday_label ?? "",
-  ).trim();
+  const storedNextOccurrence = getValidStoredNextRecurringOccurrence(lead);
+  const storedNextLeadLocal = String(storedNextOccurrence?.leadDate ?? "").trim();
+  const storedNextProfessorLocal = String(storedNextOccurrence?.professorDate ?? "").trim();
+  const storedNextLocal = String(storedNextLeadLocal || storedNextProfessorLocal || "").trim();
+  const storedNextLeadTime = String(storedNextOccurrence?.leadTime ?? "").trim();
+  const storedNextProfessorTime = String(storedNextOccurrence?.professorTime ?? "").trim();
+  const storedNextTime = String(storedNextLeadTime || storedNextProfessorTime || "").trim();
+  const storedWeekdayLabel = String(storedNextOccurrence?.weekdayLabel ?? "").trim();
   const baseProfessorTimeRaw = String(
     (lead as any)?.recurring_class_professor_time ?? (lead as any)?.recurring_class_lead_time ?? "",
   ).trim();
@@ -781,14 +880,15 @@ function buildExperimentalMetaForList(lead: AtendimentoLeadListItem): { label: s
   // IGUAL ao card azul da Visão Geral.
   // ============================================================
   if (gRecurringTrulyStarted && gRecurringWeekdayOk && gRecurringTimeOk) {
+    const storedNextOccurrence = getValidStoredNextRecurringOccurrence(lead);
     const storedNextLocal = String(
-      (lead as any)?.recurring_class_next_lead_date ??
-        (lead as any)?.recurring_class_next_professor_date ??
+      storedNextOccurrence?.leadDate ??
+        storedNextOccurrence?.professorDate ??
         "",
     ).trim();
     const storedNextTime = String(
-      (lead as any)?.recurring_class_next_lead_time ??
-        (lead as any)?.recurring_class_next_professor_time ??
+      storedNextOccurrence?.leadTime ??
+        storedNextOccurrence?.professorTime ??
         "",
     ).trim();
     const displayOccurrence =
@@ -796,11 +896,11 @@ function buildExperimentalMetaForList(lead: AtendimentoLeadListItem): { label: s
         ? {
             leadDate: storedNextLocal,
             professorDate: String(
-              (lead as any)?.recurring_class_next_professor_date ?? storedNextLocal,
+              storedNextOccurrence?.professorDate ?? storedNextLocal,
             ).trim(),
             leadTime: storedNextTime,
             weekdayLabel: String(
-              (lead as any)?.recurring_class_next_weekday_label ??
+              storedNextOccurrence?.weekdayLabel ??
                 (lead as any)?.recurring_class_weekday_label ??
                 "",
             ).trim(),
