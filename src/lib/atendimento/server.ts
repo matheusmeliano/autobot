@@ -39,6 +39,7 @@ import {
   getExperimentalClassInternalStaffPhoneNumbers,
   RECURRING_CLASS_ATTENDANT_START_REMINDER_MINUTES,
   RECURRING_WEEKDAY_LABELS_PT_BR,
+  resolveRecurringOccurrenceSearchFromDate,
   resolveExperimentalClassAssignedProfessorPhone,
   resolveRecurringClassAssignedProfessorPhone,
   type RecurringOccupiedInterval,
@@ -1996,12 +1997,16 @@ export async function sendRecurringClassStartNotifications(now = new Date()) {
       continue;
     }
 
+    const occurrenceSearchFromDate = resolveRecurringOccurrenceSearchFromDate({
+      now,
+      firstClassAt: String(row?.recurring_class_first_class_at ?? "").trim() || null,
+    });
     const occurrence = calculateCurrentOrNextRecurringOccurrence({
       weekday: weekdayRaw as RecurringWeekdayKey,
       professorTimeHHMM,
       professorTimeZone: professorTz,
       leadTimeZone: leadTz,
-      fromDate: now,
+      fromDate: occurrenceSearchFromDate,
     });
 
     if (!occurrence) {
@@ -4140,6 +4145,10 @@ export async function resolveRecurringDisplayOccurrenceMap(params: {
         endAt: interval.end_at,
       }));
 
+    const occurrenceSearchFromDate = resolveRecurringOccurrenceSearchFromDate({
+      now,
+      firstClassAt: String((lead as any)?.recurring_class_first_class_at ?? "").trim() || null,
+    });
     const occurrence = calculateDisplayRecurringOccurrence({
       weekday: weekdayRaw as RecurringWeekdayKey,
       professorTimeHHMM,
@@ -4151,7 +4160,7 @@ export async function resolveRecurringDisplayOccurrenceMap(params: {
       leadTimeHHMM:
         String((lead as any)?.recurring_class_lead_time ?? (lead as any)?.recurring_class_professor_time ?? "").trim() ||
         null,
-      fromDate: now,
+      fromDate: occurrenceSearchFromDate,
       lastNotifiedOccurrenceStartAt: String(
         (lead as any)?.recurring_class_last_notified_occurrence_start_at ?? "",
       ).trim(),

@@ -6,6 +6,7 @@ import {
   RECURRING_WEEKDAY_LABELS_PT_BR,
   calculateDisplayRecurringOccurrence,
   inferCountry,
+  resolveRecurringOccurrenceSearchFromDate,
 } from "../../../lib/atendimento/experimentalClass";
 import { ATENDIMENTO_PROFESSOR_TIME_ZONE } from "../../../lib/atendimento/constants";
 import { resolveStudentTimezone } from "../../../lib/timezone";
@@ -154,12 +155,16 @@ function buildAlunoRecurringScheduleLabel(lead: Record<string, unknown> | null |
   }
 
   if (validWeekday && /^\d{2}:\d{2}$/.test(professorTimeRaw || leadTimeRaw)) {
+    const displayFromDate = resolveRecurringOccurrenceSearchFromDate({
+      firstClassAt: String(lead?.recurring_class_first_class_at ?? "").trim() || null,
+    });
     const displayOccurrence = calculateDisplayRecurringOccurrence({
       weekday: validWeekday,
       professorTimeHHMM: professorTimeRaw || leadTimeRaw,
       professorTimeZone: ATENDIMENTO_PROFESSOR_TIME_ZONE,
       leadTimeZone: effectiveLeadTimeZone,
       leadTimeHHMM: leadTimeRaw || professorTimeRaw,
+      fromDate: displayFromDate,
       lastNotifiedOccurrenceStartAt: String(
         lead?.recurring_class_last_notified_occurrence_start_at ?? "",
       ).trim(),
@@ -611,6 +616,8 @@ export default function CadastroRecorrenteBody() {
         weekdayLabel: alunoSchedSelectedDay.displayLabel || alunoSchedSelectedDay.label,
         professorTime: alunoSchedTimeOpt.professorTime || null,
         leadTime: alunoSchedTimeOpt.leadTime || alunoSchedTimeOpt.displayLabel || null,
+        professorDate: alunoSchedSelectedDay.professorDate || alunoSchedTimeOpt.professorDate || null,
+        professorStartAt: alunoSchedTimeOpt.professorStartAtIso || null,
       };
       const lid = String(alunoLeadFull?.id ?? "").trim();
       if (lid) (payload as any).leadId = lid;
@@ -629,6 +636,10 @@ export default function CadastroRecorrenteBody() {
           recurring_class_weekday_label: String(alunoSchedSelectedDay!.displayLabel || alunoSchedSelectedDay!.label),
           recurring_class_professor_time: String(alunoSchedTimeOpt!.professorTime ?? ""),
           recurring_class_lead_time: String(alunoSchedTimeOpt!.leadTime || alunoSchedTimeOpt!.displayLabel || ""),
+          recurring_class_professor_date: String(
+            alunoSchedSelectedDay!.professorDate ?? alunoSchedTimeOpt!.professorDate ?? "",
+          ).trim() || null,
+          recurring_class_first_class_at: String(alunoSchedTimeOpt!.professorStartAtIso ?? "").trim() || null,
           recurring_class_next_professor_date: null,
           recurring_class_next_professor_time: null,
           recurring_class_next_professor_start_at: null,

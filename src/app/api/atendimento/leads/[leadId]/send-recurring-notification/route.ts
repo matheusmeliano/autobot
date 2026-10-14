@@ -13,6 +13,7 @@ import {
   EXPERIMENTAL_CLASS_ATTENDANT_NOTIFICATION_PHONE,
   EXPERIMENTAL_CLASS_REGISTERED_ATTENDANT_NOTIFICATION_PHONE,
   RECURRING_WEEKDAY_LABELS_PT_BR,
+  resolveRecurringOccurrenceSearchFromDate,
   resolveRecurringClassAssignedProfessorPhone,
 } from "@/lib/atendimento/experimentalClass";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
@@ -95,6 +96,9 @@ export async function POST(req: Request, { params }: { params: Promise<{ leadId:
           professorTimeHHMM: recurringProfessorTime,
           professorTimeZone: String((lead as any)?.recurring_class_professor_timezone ?? "").trim() || null,
           leadTimeZone: String((lead as any)?.recurring_class_lead_timezone ?? "").trim() || null,
+          fromDate: resolveRecurringOccurrenceSearchFromDate({
+            firstClassAt: String((lead as any)?.recurring_class_first_class_at ?? "").trim() || null,
+          }),
           lastNotifiedOccurrenceStartAt,
           studentNotificationSentAt: String((lead as any)?.recurring_class_student_start_notification_sent_at ?? "").trim(),
           attendantNotificationSentAt: String((lead as any)?.recurring_class_attendant_start_notification_sent_at ?? "").trim(),

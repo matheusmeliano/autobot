@@ -18,6 +18,7 @@ import {
   buildExperimentalClassPostAttendanceWhatsAppMessages,
   calculateDisplayRecurringOccurrence,
   EXPERIMENTAL_CLASS_DEFAULT_STUDENT_DASHBOARD_LINK,
+  resolveRecurringOccurrenceSearchFromDate,
 } from "@/lib/atendimento/experimentalClass";
 import { AppModal } from "@/components/app/AppModal";
 import { AppDateRangePicker, type AppDateRange } from "@/components/app/AppDateRangePicker";
@@ -458,6 +459,9 @@ function buildRecurringNextOccurrenceNiceLabel(
   const normalizedWeekday = normalizeRecurringWeekdayToken(wdRaw || wdLabelRaw);
   if (!["mon", "tue", "wed", "thu", "fri", "sat", "sun"].includes(normalizedWeekday)) return null;
 
+  const displayFromDate = resolveRecurringOccurrenceSearchFromDate({
+    firstClassAt: String((lead as any)?.recurring_class_first_class_at ?? "").trim() || null,
+  });
   const displayOccurrence = calculateDisplayRecurringOccurrence({
     weekday: normalizedWeekday as "mon" | "tue" | "wed" | "thu" | "fri" | "sat" | "sun",
     professorTimeHHMM:
@@ -468,6 +472,7 @@ function buildRecurringNextOccurrenceNiceLabel(
     professorTimeZone: ATENDIMENTO_PROFESSOR_TIME_ZONE,
     leadTimeZone: tz,
     leadTimeHHMM: normalizeScheduleTimeForComparison(tmRaw),
+    fromDate: displayFromDate,
     lastNotifiedOccurrenceStartAt: String(
       (lead as any)?.recurring_class_last_notified_occurrence_start_at ?? "",
     ).trim(),
@@ -699,6 +704,9 @@ function buildExperimentalMetaForList(lead: AtendimentoLeadListItem): { label: s
             professorTimeZone: ATENDIMENTO_PROFESSOR_TIME_ZONE,
             leadTimeZone: leadEffectiveTz,
             leadTimeHHMM: normalizeScheduleTimeForComparison(gRecurringLeadTimeRaw),
+            fromDate: resolveRecurringOccurrenceSearchFromDate({
+              firstClassAt: String((lead as any)?.recurring_class_first_class_at ?? "").trim() || null,
+            }),
             lastNotifiedOccurrenceStartAt: String(
               (lead as any)?.recurring_class_last_notified_occurrence_start_at ?? "",
             ).trim(),

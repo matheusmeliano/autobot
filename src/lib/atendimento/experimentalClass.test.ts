@@ -17,6 +17,7 @@ import {
   findExperimentalClassTimeOption,
   listExperimentalClassAvailability,
   listRecurringWeekdayAvailability,
+  resolveRecurringOccurrenceSearchFromDate,
   resolveRecurringClassAssignedProfessorPhone,
 } from "./experimentalClass.ts";
 
@@ -529,6 +530,25 @@ test("calculateCurrentOrNextRecurringOccurrence recalcula horario local do aluno
   assert.equal(occurrence?.professorDate, "2026-11-04");
   assert.equal(occurrence?.professorTime, "09:00");
   assert.equal(occurrence?.leadTime, "07:00");
+});
+
+test("resolveRecurringOccurrenceSearchFromDate ancora a proxima ocorrencia na data futura escolhida", () => {
+  const fromDate = resolveRecurringOccurrenceSearchFromDate({
+    now: new Date("2026-10-13T23:58:00.000Z"),
+    firstClassAt: "2026-10-20T01:00:00.000Z",
+  });
+
+  const occurrence = calculateCurrentOrNextRecurringOccurrence({
+    weekday: "tue",
+    professorTimeHHMM: "21:00",
+    professorTimeZone: "America/Cuiaba",
+    leadTimeZone: "America/New_York",
+    leadTimeHHMM: "21:00",
+    fromDate,
+  });
+
+  assert.equal(occurrence?.professorDate, "2026-10-20");
+  assert.equal(occurrence?.professorStartAt, "2026-10-21T01:00:00.000Z");
 });
 
 test("calculateDisplayRecurringOccurrence pula a proxima semana com horario local recalculado para o aluno", () => {

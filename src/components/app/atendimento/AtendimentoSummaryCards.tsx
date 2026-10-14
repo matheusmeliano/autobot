@@ -39,6 +39,7 @@ import {
   experimentalClassBookingDisplayStatusLabel,
   calculateDisplayRecurringOccurrence,
   calculatePastRecurringOccurrences,
+  resolveRecurringOccurrenceSearchFromDate,
 } from "@/lib/atendimento/experimentalClass";
 import type { AtendimentoLeadListItem, AtendimentoSummary } from "@/lib/atendimento/types";
 import { atendimentoStageLabel, atendimentoStatusLabel, formatAtendimentoDate, formatAtendimentoDateTime, formatAtendimentoLocationName, leadMatchesSearchQuery, suggestClosestName } from "@/lib/atendimento/utils";
@@ -1777,6 +1778,9 @@ function BookingDetails({
           professorTimeZone: ATENDIMENTO_PROFESSOR_TIME_ZONE,
           leadTimeZone: lead.timezone || null,
           leadTimeHHMM: recurringLeadTimeRaw || recurringProfessorTime,
+          fromDate: resolveRecurringOccurrenceSearchFromDate({
+            firstClassAt: String((lead as any)?.recurring_class_first_class_at ?? "").trim() || null,
+          }),
           lastNotifiedOccurrenceStartAt: String(
             (lead as any)?.recurring_class_last_notified_occurrence_start_at ?? "",
           ).trim(),

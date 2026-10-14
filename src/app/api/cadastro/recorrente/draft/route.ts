@@ -126,6 +126,8 @@ type DraftPayload = {
   weekdayLabel?: string | null;
   professorTime?: string | null;
   leadTime?: string | null;
+  professorDate?: string | null;
+  professorStartAt?: string | null;
   step?: 0 | 1 | 2 | 3 | 4 | 5 | 6 | null;
   password?: string | null;
   state?: string | null;
@@ -408,7 +410,7 @@ export async function PATCH(req: NextRequest) {
     if (!rawBody || typeof rawBody !== "object") {
       return NextResponse.json({ ok: false, error: "Corpo inválido." }, { status: 400 });
     }
-    const { telefone, nome, weekday, weekdayLabel, professorTime, leadTime, step, password, state, city, country, timezone, leadId, lead_id } =
+    const { telefone, nome, weekday, weekdayLabel, professorTime, leadTime, professorDate, professorStartAt, step, password, state, city, country, timezone, leadId, lead_id } =
       rawBody as DraftPayload;
 
     const safePhoneDigits = String(telefone ?? "").replace(/\D/g, "").trim();
@@ -430,6 +432,8 @@ export async function PATCH(req: NextRequest) {
 
     const safeProfessorTime = String(professorTime ?? "").trim();
     const safeLeadTime = String(leadTime ?? "").trim();
+    const safeProfessorDate = String(professorDate ?? "").trim();
+    const safeProfessorStartAt = String(professorStartAt ?? "").trim();
     const hasAnyTime = Boolean(safeProfessorTime || safeLeadTime);
 
     const safeStepRaw =
@@ -441,6 +445,8 @@ export async function PATCH(req: NextRequest) {
     const hasAnyPayload =
       Boolean(validWeekday) ||
       hasAnyTime ||
+      Boolean(safeProfessorDate) ||
+      Boolean(safeProfessorStartAt) ||
       Boolean(safeNome) ||
       safeStepRaw !== null ||
       Boolean(safePassword) ||
@@ -612,6 +618,8 @@ export async function PATCH(req: NextRequest) {
     else if (safeProfessorTime && !String((lead as any)?.recurring_class_lead_time ?? "").trim()) {
       patch.recurring_class_lead_time = safeProfessorTime;
     }
+    if (safeProfessorDate) patch.recurring_class_professor_date = safeProfessorDate;
+    if (safeProfessorStartAt) patch.recurring_class_first_class_at = safeProfessorStartAt;
 
     if (safeNome) {
       patch.full_name = safeNome;
@@ -876,6 +884,8 @@ export async function PATCH(req: NextRequest) {
           weekday_label: patch.recurring_class_weekday_label || null,
           professor_time: safeProfessorTime || null,
           lead_time: (patch.recurring_class_lead_time as string) || null,
+          professor_date: safeProfessorDate || null,
+          professor_start_at: safeProfessorStartAt || null,
           source: "cadastro_recorrente_plataforma_draft",
         },
         actorType: "lead",

@@ -1163,6 +1163,19 @@ export type RecurringWeekdayTimeOption = {
   professorStartAtIso: string;
 };
 
+export function resolveRecurringOccurrenceSearchFromDate(params: {
+  now?: Date;
+  firstClassAt?: string | null;
+}): Date {
+  const now = params.now ?? new Date();
+  const firstClassAt = String(params.firstClassAt ?? "").trim();
+  if (!firstClassAt) return now;
+  const firstMs = new Date(firstClassAt).getTime();
+  if (!Number.isFinite(firstMs)) return now;
+  if (firstMs <= now.getTime()) return now;
+  return new Date(firstMs - 1_000);
+}
+
 function firstOnlyNameForRecurring(full: string | null | undefined): string {
   const safe = String(full ?? "").trim();
   return safe.split(/\s+/)[0] || "";
