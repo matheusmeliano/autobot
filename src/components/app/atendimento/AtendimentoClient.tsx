@@ -428,14 +428,36 @@ function weekdayShortFromLocalDate(localDate: string, timeZone: string): string 
 function buildRecurringNextOccurrenceNiceLabel(
   lead: AtendimentoLeadListItem
 ): { weekdayWithDate: string; time: string } | null {
-  const storedNextLocal = String(
+  const formatRecurringCardTime = (raw: unknown): string => {
+    const value = String(raw ?? "").trim();
+    if (!value) return "";
+    if (/h$/i.test(value)) return value;
+    return `${value.replace(/h$/i, "").trim()}h`;
+  };
+  const storedNextLeadLocal = String(
     (lead as any)?.recurring_class_next_lead_date ??
-      (lead as any)?.recurring_class_next_professor_date ??
+      "",
+  ).trim();
+  const storedNextProfessorLocal = String(
+    (lead as any)?.recurring_class_next_professor_date ??
+      "",
+  ).trim();
+  const storedNextLocal = String(
+    storedNextLeadLocal ||
+      storedNextProfessorLocal ||
+      "",
+  ).trim();
+  const storedNextLeadTime = String(
+    (lead as any)?.recurring_class_next_lead_time ??
+      "",
+  ).trim();
+  const storedNextProfessorTime = String(
+    (lead as any)?.recurring_class_next_professor_time ??
       "",
   ).trim();
   const storedNextTime = String(
-    (lead as any)?.recurring_class_next_lead_time ??
-      (lead as any)?.recurring_class_next_professor_time ??
+    storedNextLeadTime ||
+      storedNextProfessorTime ||
       "",
   ).trim();
   const storedWeekdayLabel = String(
@@ -445,9 +467,7 @@ function buildRecurringNextOccurrenceNiceLabel(
     const [, mm, dd] = storedNextLocal.split("-");
     const shortDm = mm && dd ? `${dd}/${mm}` : storedNextLocal;
     const wdWithDate = storedWeekdayLabel ? `${storedWeekdayLabel} (${shortDm})` : "";
-    const cleanTime = storedNextTime
-      ? `${storedNextTime.replace(/h$/i, "").trim()}h`
-      : "";
+    const cleanTime = formatRecurringCardTime(storedNextTime);
     return { weekdayWithDate: wdWithDate, time: cleanTime };
   }
 
@@ -510,14 +530,58 @@ function buildRecurringNextOccurrenceNiceLabel(
   })();
   const wdWithDate = cleanWdLabel ? `${cleanWdLabel} (${shortDm})` : "";
 
-  const cleanTime = (() => {
-    const t = String(displayOccurrence?.leadTime ?? tmRaw).trim();
-    if (!t) return "";
-    if (/h$/i.test(t)) return t;
-    return `${t.replace(/h$/i, "")}h`;
-  })();
+  const cleanTime = formatRecurringCardTime(displayOccurrence?.leadTime ?? tmRaw);
 
   return { weekdayWithDate: wdWithDate, time: cleanTime };
+}
+
+function renderRecurringScheduleTimeDetails(lead: AtendimentoLeadListItem) {
+  const formatRecurringCardTime = (raw: unknown): string => {
+    const value = String(raw ?? "").trim();
+    if (!value) return "";
+    if (/h$/i.test(value)) return value;
+    return `${value.replace(/h$/i, "").trim()}h`;
+  };
+
+  const leadTime = formatRecurringCardTime(
+    String(
+      (lead as any)?.recurring_class_next_lead_time ??
+        (lead as any)?.recurring_class_lead_time ??
+        (lead as any)?.recurring_class_professor_time ??
+        "",
+    ).trim(),
+  );
+  const professorTime = formatRecurringCardTime(
+    String(
+      (lead as any)?.recurring_class_next_professor_time ??
+        (lead as any)?.recurring_class_professor_time ??
+        (lead as any)?.recurring_class_lead_time ??
+        "",
+    ).trim(),
+  );
+
+  if (!leadTime && !professorTime) return null;
+
+  return (
+    <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
+      <div className="rounded-lg border border-[#2563eb]/20 bg-white/45 px-3 py-2">
+        <div className="text-[10px] font-bold uppercase tracking-[0.16em] text-[#1d4ed8]/70">
+          Horário do aluno
+        </div>
+        <div className="mt-1 text-[13px] font-semibold text-[#1e3a8a]">
+          {leadTime || "—"}
+        </div>
+      </div>
+      <div className="rounded-lg border border-[#2563eb]/20 bg-white/45 px-3 py-2">
+        <div className="text-[10px] font-bold uppercase tracking-[0.16em] text-[#1d4ed8]/70">
+          Horário do professor
+        </div>
+        <div className="mt-1 text-[13px] font-semibold text-[#1e3a8a]">
+          {professorTime || "—"}
+        </div>
+      </div>
+    </div>
+  );
 }
 
 function buildRecurringScheduleCardLabel(lead: AtendimentoLeadListItem): string {
@@ -5886,6 +5950,7 @@ export function AtendimentoClient() {
                                     <div className="mt-0.5 text-[13px] text-[#1d4ed8]/80">
                                       Aulas recorrentes semanais para este aluno.
                                     </div>
+                                    {renderRecurringScheduleTimeDetails(selectedLead)}
                                   </div>
                                 </div>
                               );
@@ -5929,6 +5994,7 @@ export function AtendimentoClient() {
                                     <div className="mt-0.5 text-[13px] text-[#1d4ed8]/80">
                                       Aguarde a definição das aulas recorrentes.
                                     </div>
+                                    {renderRecurringScheduleTimeDetails(selectedLead)}
                                   </div>
                                 </div>
                               );
@@ -7420,6 +7486,7 @@ export function AtendimentoClient() {
                                   <div className="mt-0.5 text-[13px] text-[#1d4ed8]/80">
                                     Matrícula confirmada. Aulas recorrentes semanais para este aluno.
                                   </div>
+                                  {renderRecurringScheduleTimeDetails(selectedLead)}
                                 </div>
                               </div>
                             );
@@ -7463,6 +7530,7 @@ export function AtendimentoClient() {
                                   <div className="mt-0.5 text-[13px] text-[#1d4ed8]/80">
                                     Aguarde a definição das aulas recorrentes.
                                   </div>
+                                  {renderRecurringScheduleTimeDetails(selectedLead)}
                                 </div>
                               </div>
                             );
