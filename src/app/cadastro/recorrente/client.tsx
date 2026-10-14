@@ -805,6 +805,8 @@ export default function CadastroRecorrenteBody() {
     weekdayLabel?: string | null;
     professorTime?: string | null;
     leadTime?: string | null;
+    professorDate?: string | null;
+    professorStartAt?: string | null;
     step?: 0 | 1 | 2 | 3 | 4 | 5 | 6 | null;
     nomeOverride?: string | null;
     password?: string | null;
@@ -839,6 +841,8 @@ export default function CadastroRecorrenteBody() {
           weekdayLabel: payload.weekdayLabel ?? null,
           professorTime: payload.professorTime ?? null,
           leadTime: payload.leadTime ?? null,
+          professorDate: payload.professorDate ?? null,
+          professorStartAt: payload.professorStartAt ?? null,
           step: finalStep,
           password: safePassword,
           state: payload.state ?? null,
@@ -1429,6 +1433,13 @@ export default function CadastroRecorrenteBody() {
             resolvedSelectedTimeOpt?.leadTime ||
             resolvedSelectedTimeOpt?.displayLabel ||
             null,
+          professorDate:
+            selectedDayOption?.professorDate ||
+            resolvedSelectedTimeOpt?.professorDate ||
+            null,
+          professorStartAt:
+            resolvedSelectedTimeOpt?.professorStartAtIso ||
+            null,
           state: st,
           city: ct,
           country: inferredCountry,
@@ -1597,6 +1608,7 @@ export default function CadastroRecorrenteBody() {
           step: 3,
           weekday: selectedWeekday,
           weekdayLabel: opt?.displayLabel || opt?.label || null,
+          professorDate: opt?.professorDate || null,
         });
       } finally {
         setDraftSaving(null);
@@ -1620,6 +1632,11 @@ export default function CadastroRecorrenteBody() {
           professorTime: resolvedSelectedTimeOpt.professorTime,
           leadTime:
             resolvedSelectedTimeOpt.leadTime || resolvedSelectedTimeOpt.displayLabel,
+          professorDate:
+            selectedDayOption?.professorDate ||
+            resolvedSelectedTimeOpt.professorDate ||
+            null,
+          professorStartAt: resolvedSelectedTimeOpt.professorStartAtIso || null,
         });
       } finally {
         setDraftSaving(null);

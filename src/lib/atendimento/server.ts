@@ -4037,6 +4037,7 @@ export async function resolveRecurringDisplayOccurrenceMap(params: {
 }): Promise<Map<string, ReturnType<typeof calculateDisplayRecurringOccurrence>>> {
   const resolveDisplayAnchorIso = (lead: Record<string, unknown>): string | null => {
     const candidates: number[] = [];
+    const now = params.now ?? new Date();
 
     const firstClassAt = String((lead as any)?.recurring_class_first_class_at ?? "").trim();
     if (firstClassAt) {
@@ -4044,7 +4045,27 @@ export async function resolveRecurringDisplayOccurrenceMap(params: {
       if (Number.isFinite(firstMs)) candidates.push(firstMs);
     }
 
-    const professorDate = String((lead as any)?.recurring_class_professor_date ?? "").trim();
+    const weekdayLabelRaw = String((lead as any)?.recurring_class_weekday_label ?? "").trim();
+    const fallbackProfessorDate = (() => {
+      const match = weekdayLabelRaw.match(/\(\s*(\d{1,2})\s*[\/-]\s*(\d{1,2})\s*\)/);
+      if (!match) return "";
+      const dd = String(match[1] ?? "").padStart(2, "0");
+      const mm = String(match[2] ?? "").padStart(2, "0");
+      const firstYear = Number.isFinite(new Date(firstClassAt).getTime())
+        ? new Date(firstClassAt).getUTCFullYear()
+        : now.getUTCFullYear();
+      const buildLocal = (year: number) => `${year}-${mm}-${dd}`;
+      const candidate = buildLocal(firstYear);
+      const candidateMs = new Date(`${candidate}T12:00:00.000Z`).getTime();
+      if (!Number.isFinite(candidateMs)) return "";
+      const sixMonthsMs = 183 * 24 * 60 * 60 * 1000;
+      if (candidateMs < now.getTime() - sixMonthsMs) return buildLocal(firstYear + 1);
+      if (candidateMs > now.getTime() + sixMonthsMs) return buildLocal(firstYear - 1);
+      return candidate;
+    })();
+    const professorDate =
+      String((lead as any)?.recurring_class_professor_date ?? "").trim() ||
+      fallbackProfessorDate;
     const professorTime = /^\d{2}:\d{2}$/.test(String((lead as any)?.recurring_class_professor_time ?? ""))
       ? String((lead as any)?.recurring_class_professor_time ?? "").trim()
       : /^\d{2}:\d{2}$/.test(String((lead as any)?.recurring_class_lead_time ?? ""))
