@@ -155,7 +155,7 @@ export async function GET(req: Request) {
   // Fazer 2 selects separados SEMPRE (bookings + leads WHERE lead_id IN (...) — método que sempre funcionou.
   const bookings: Array<Record<string, unknown>> = [];
   const baseSelect =
-    "id, lead_id, conversation_id, status, professor_date, professor_time, professor_start_at, lead_date, lead_time, lead_timezone, professor_timezone, assigned_professor_name, assigned_professor_phone, created_at, updated_at";
+    "id, lead_id, conversation_id, status, attendance_status, attendance_checked_at, post_attendance_message_sent_at, professor_date, professor_time, professor_start_at, lead_date, lead_time, lead_timezone, professor_timezone, assigned_professor_name, assigned_professor_phone, created_at, updated_at";
 
   // ========== CONSTANTES REST (SUPABASE SERVICE ROLE) - DECLARADAS Cedo pois passo 1.2 precisa ==========
   // IMPORTANTE sobre como buscar: SDK admin.from("atendimento_leads") estava silenciosamente
@@ -223,7 +223,8 @@ export async function GET(req: Request) {
       "experimental_class_professor_timezone","experimental_class_professor_name","experimental_class_professor_phone",
       "experimental_class_lead_date","experimental_class_lead_time","experimental_class_lead_timezone",
       "experimental_class_lead_start_at","experimental_class_professor_start_at","experimental_class_link",
-      "experimental_class_booking_id",
+      "experimental_class_booking_id","experimental_class_attendance_status",
+      "experimental_class_attendance_checked_at","experimental_class_post_attendance_message_sent_at",
     ].join(",");
     const res = await fetch(
       `${SUPABASE_URL}/rest/v1/atendimento_leads?or=(experimental_class_professor_date.not.is.null,experimental_class_status.not.is.null,experimental_class_professor_name.not.is.null,experimental_class_lead_date.not.is.null)&select=${selFlat}`,
@@ -276,6 +277,10 @@ export async function GET(req: Request) {
             professor_timezone: (r as any).experimental_class_professor_timezone ?? null,
             assigned_professor_name: pName || null,
             assigned_professor_phone: pPhone || null,
+            attendance_status: (r as any).experimental_class_attendance_status ?? null,
+            attendance_checked_at: (r as any).experimental_class_attendance_checked_at ?? null,
+            post_attendance_message_sent_at:
+              (r as any).experimental_class_post_attendance_message_sent_at ?? null,
             __noProfessor: !flatHasProf,
             link: (r as any).experimental_class_link ?? null,
             __type: "experimental_flat",
@@ -776,10 +781,23 @@ export async function GET(req: Request) {
       else if (active) slotStatus = "ocupado";
       else if (s.isPast || isPastByTime) slotStatus = "passado";
 
-      // No modal da programação diária, a ocorrência só deve aparecer como concluída
-      // depois que o horário dela realmente passou. O avanço automático da recorrência
-      // não pode marcar uma aula futura como concluída.
-      const activeIsCompleted = Boolean(isPastByTime || s.isPast);
+      const activeAttendanceStatus = String(
+        (active as any)?.attendance_status ?? "",
+      )
+        .trim()
+        .toLowerCase();
+      const activePostAttendanceSentAt = String(
+        (active as any)?.post_attendance_message_sent_at ?? "",
+      ).trim();
+      // No modal da programação diária, a aula experimental deve refletir comparecimento
+      // assim que ele for marcado, sem esperar o horário passar. Para recorrentes, segue
+      // valendo apenas a ocorrência realmente passada.
+      const activeIsCompleted = isRecurringActive
+        ? Boolean(isPastByTime || s.isPast)
+        : activeAttendanceStatus === "attended" ||
+          bookingStatus === "completed" ||
+          Boolean(activePostAttendanceSentAt) ||
+          Boolean(isPastByTime || s.isPast);
 
       if (active && !isCancelled) {
         totalBookings += 1;
