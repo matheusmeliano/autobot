@@ -20,11 +20,13 @@ function toErrorMessage(raw: unknown, fallback = "Erro desconhecido."): string {
   if (raw === null || raw === undefined) return fallback;
   if (typeof raw === "string") {
     const s = raw.trim();
-    return s || fallback;
+    if (!s || s === "[object Object]") return fallback;
+    return s;
   }
   if (raw instanceof Error) {
     const m = raw.message?.trim();
-    return m || fallback;
+    if (!m || m === "[object Object]") return fallback;
+    return m;
   }
   if (typeof raw === "object") {
     const any = raw as Record<string, unknown>;
