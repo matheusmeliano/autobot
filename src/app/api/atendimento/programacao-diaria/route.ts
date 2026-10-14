@@ -6,7 +6,6 @@ import {
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import {
   requireAtendimentoUser,
-  resolveRecurringDisplayOccurrenceMap,
 } from "@/lib/atendimento/server";
 // ====================================================================
 // LÓGICA SINCRONIZADA — TUDO que define "contar aulas no dia X" está
@@ -553,64 +552,6 @@ export async function GET(req: Request) {
     const lid = String(b.lead_id ?? "").trim();
     if (lid && !leadIds.includes(lid)) leadIds.push(lid);
   }
-  const recurringNotificationMetaByLeadId = new Map<string, string | null>();
-  const recurringLeadIds = recurringBookings
-    .map((booking) => String(booking.lead_id ?? "").trim())
-    .filter(Boolean);
-  if (recurringLeadIds.length > 0) {
-    try {
-      const res = await fetch(
-        `${SUPABASE_URL}/rest/v1/atendimento_history_events?lead_id=in.(${Array.from(new Set(recurringLeadIds)).map((id) => `"${id}"`).join(",")})&select=lead_id,event_type,created_at,details&event_type=in.(recurring_class_attendant_start_notification_sent,recurring_class_student_start_notification_sent,recurring_class_registered_attendant_start_notification_sent,recurring_class_attendant_start_notification_sent_manual,recurring_class_student_start_notification_sent_manual,recurring_class_registered_attendant_start_notification_sent_manual)&order=created_at.desc`,
-        {
-          method: "GET",
-          headers: restHeaders,
-          cache: "no-store",
-        },
-      );
-      if (res.ok) {
-        const arr = (await res.json()) as Array<Record<string, unknown>> | null;
-        if (Array.isArray(arr)) {
-          for (const event of arr) {
-            const lid = String(event?.lead_id ?? "").trim();
-            if (!lid || recurringNotificationMetaByLeadId.has(lid)) continue;
-            const startAt = String(((event as any)?.details ?? {})?.start_at ?? "").trim();
-            if (startAt) recurringNotificationMetaByLeadId.set(lid, startAt);
-          }
-        }
-      }
-    } catch {}
-  }
-  for (const booking of recurringBookings) {
-    const lid = String(booking.lead_id ?? "").trim();
-    if (!lid) continue;
-    (booking as any).recurring_class_last_notified_occurrence_start_at =
-      recurringNotificationMetaByLeadId.get(lid) ?? null;
-  }
-  const resolvedRecurringOccurrenceByLeadId = await resolveRecurringDisplayOccurrenceMap({
-    admin,
-    leads: recurringBookings.map((booking) => ({
-      id: String((booking as any)?.lead_id ?? "").trim(),
-      phone: String((booking as any)?.phone ?? "").trim() || null,
-      recurring_class_weekday: String((booking as any)?.recurring_class_weekday ?? "").trim() || null,
-      recurring_class_professor_time: String((booking as any)?.professor_time ?? "").trim() || null,
-      recurring_class_lead_time: String((booking as any)?.lead_time ?? "").trim() || null,
-      recurring_class_professor_timezone: String((booking as any)?.professor_timezone ?? "").trim() || null,
-      recurring_class_lead_timezone: String((booking as any)?.lead_timezone ?? "").trim() || null,
-      recurring_class_professor_phone: String((booking as any)?.assigned_professor_phone ?? "").trim() || null,
-      recurring_class_professor_name: String((booking as any)?.assigned_professor_name ?? "").trim() || null,
-      recurring_class_last_notified_occurrence_start_at: String(
-        (booking as any)?.recurring_class_last_notified_occurrence_start_at ?? "",
-      ).trim() || null,
-      recurring_class_student_start_notification_sent_at: String(
-        (booking as any)?.recurring_class_student_start_notification_sent_at ?? "",
-      ).trim() || null,
-      recurring_class_attendant_start_notification_sent_at: String(
-        (booking as any)?.recurring_class_attendant_start_notification_sent_at ?? "",
-      ).trim() || null,
-    })),
-    now: new Date(nowUtc),
-    lookAheadWeeks: 24,
-  });
   // JUNTAR AS DUAS LISTAS (experimentais + recorrentes). Mesma estrutura, mesmo código slot abaixo.
   if (recurringBookings.length > 0) {
     for (const rb of recurringBookings) bookings.push(rb);
@@ -835,44 +776,10 @@ export async function GET(req: Request) {
       else if (active) slotStatus = "ocupado";
       else if (s.isPast || isPastByTime) slotStatus = "passado";
 
-      let activeIsCompleted = Boolean(isPastByTime || s.isPast);
-      if (!activeIsCompleted && active && !isCancelled) {
-        if (isRecurringActive) {
-          const currentProfessorStartRaw = String(
-            (active as any)?.professor_start_at ?? iso ?? "",
-          ).trim();
-          const currentProfessorStartMs = currentProfessorStartRaw
-            ? new Date(currentProfessorStartRaw).getTime()
-            : NaN;
-          const lastNotifiedOccurrenceStartRaw = String(
-            (active as any)?.recurring_class_last_notified_occurrence_start_at ?? "",
-          ).trim();
-          const lastNotifiedOccurrenceStartMs = lastNotifiedOccurrenceStartRaw
-            ? new Date(lastNotifiedOccurrenceStartRaw).getTime()
-            : NaN;
-          if (
-            Number.isFinite(currentProfessorStartMs) &&
-            Number.isFinite(lastNotifiedOccurrenceStartMs) &&
-            currentProfessorStartMs <= lastNotifiedOccurrenceStartMs
-          ) {
-            activeIsCompleted = true;
-          }
-
-          const displayOccurrence =
-            resolvedRecurringOccurrenceByLeadId.get(
-              String((active as any)?.lead_id ?? "").trim(),
-            ) ?? null;
-          if (!activeIsCompleted && displayOccurrence) {
-            const nextProfessorDate = String(
-              displayOccurrence?.professorDate ?? displayOccurrence?.leadDate ?? "",
-            ).trim();
-            const currentProfessorDate = String((active as any)?.professor_date ?? "").trim();
-            if (nextProfessorDate && currentProfessorDate && currentProfessorDate < nextProfessorDate) {
-              activeIsCompleted = true;
-            }
-          }
-        }
-      }
+      // No modal da programação diária, a ocorrência só deve aparecer como concluída
+      // depois que o horário dela realmente passou. O avanço automático da recorrência
+      // não pode marcar uma aula futura como concluída.
+      const activeIsCompleted = Boolean(isPastByTime || s.isPast);
 
       if (active && !isCancelled) {
         totalBookings += 1;
