@@ -627,7 +627,14 @@ export default function CadastroRecorrenteBody() {
         body: JSON.stringify(payload),
       });
       const j = (await res.json().catch(() => null)) as any;
-      if (!res.ok || !j || !j.ok) throw new Error(String(j?.error ?? "Não foi possível salvar. Tente novamente."));
+      if (!res.ok || !j || !j.ok) {
+        throw new Error(
+          toErrorMessage(
+            j?.error ?? j,
+            "Não foi possível salvar. Tente novamente.",
+          ),
+        );
+      }
       setAlunoLeadFull((prev: any) => {
         if (!prev) return prev;
         return {
@@ -652,8 +659,13 @@ export default function CadastroRecorrenteBody() {
       });
       await refreshAlunoLeadNow({ phoneDigits: tel, leadId: lid || null });
       closeAlunoSched();
+      if (typeof window !== "undefined") {
+        window.location.reload();
+      }
     } catch (e) {
-      setAlunoSchedSaveError(e instanceof Error ? e.message : String(e ?? "Erro desconhecido."));
+      setAlunoSchedSaveError(
+        toErrorMessage(e, "Não foi possível salvar a alteração. Tente novamente."),
+      );
     } finally {
       setAlunoSchedSaving(false);
     }
