@@ -199,6 +199,96 @@ function buildAlunoRecurringScheduleLabel(lead: Record<string, unknown> | null |
   return weekdayLabelFallback || leadTimeRaw || "—";
 }
 
+function buildAlunoRecurringRestoreSeed(
+  lead: Record<string, unknown> | null | undefined,
+): {
+  weekday: RecurringWeekdayKey | null;
+  weekdayLabel: string;
+  professorDate: string;
+  professorTime: string;
+  leadTime: string;
+} {
+  const weekdayRaw = String(lead?.recurring_class_weekday ?? "").trim().toLowerCase();
+  const weekday =
+    ["mon", "tue", "wed", "thu", "fri", "sat"].includes(weekdayRaw)
+      ? (weekdayRaw as RecurringWeekdayKey)
+      : null;
+
+  return {
+    weekday,
+    weekdayLabel: String(
+      lead?.recurring_class_next_weekday_label ??
+        lead?.recurring_class_weekday_label ??
+        "",
+    ).trim(),
+    professorDate: String(
+      lead?.recurring_class_next_professor_date ??
+        lead?.recurring_class_next_lead_date ??
+        lead?.recurring_class_professor_date ??
+        "",
+    ).trim(),
+    professorTime: String(
+      lead?.recurring_class_next_professor_time ??
+        lead?.recurring_class_professor_time ??
+        lead?.recurring_class_next_lead_time ??
+        lead?.recurring_class_lead_time ??
+        "",
+    ).trim(),
+    leadTime: String(
+      lead?.recurring_class_next_lead_time ??
+        lead?.recurring_class_lead_time ??
+        lead?.recurring_class_next_professor_time ??
+        lead?.recurring_class_professor_time ??
+        "",
+    ).trim(),
+  };
+}
+
+function restoreAlunoRecurringSelection(params: {
+  dates: RecurringWeekdayOption[];
+  slotsByWeekdayDate: Record<string, RecurringWeekdayTimeOption[]>;
+  seed: ReturnType<typeof buildAlunoRecurringRestoreSeed>;
+}): {
+  dayId: string | null;
+  timeOpt: RecurringWeekdayTimeOption | null;
+} {
+  const { dates, slotsByWeekdayDate, seed } = params;
+  if (!seed.weekday) {
+    return { dayId: null, timeOpt: null };
+  }
+
+  const dayCandidates = dates.filter((d) => d.weekday === seed.weekday);
+  let dayId: string | null = null;
+  if (dayCandidates.length === 1) {
+    dayId = dayCandidates[0]?.id ?? null;
+  } else if (dayCandidates.length > 1) {
+    const matchingByDate = seed.professorDate
+      ? dayCandidates.find((d) => String(d.professorDate ?? "").trim() === seed.professorDate) ?? null
+      : null;
+    const matchingByLabel = seed.weekdayLabel
+      ? dayCandidates.find(
+          (d) =>
+            String(d.displayLabel ?? "").trim() === seed.weekdayLabel ||
+            String(d.label ?? "").trim() === seed.weekdayLabel,
+        ) ?? null
+      : null;
+    dayId = (matchingByDate ?? matchingByLabel ?? dayCandidates[0])?.id ?? null;
+  }
+
+  const daySlots = dayId ? slotsByWeekdayDate[dayId] ?? [] : [];
+  const timeOpt =
+    (seed.professorTime
+      ? daySlots.find(
+          (opt) =>
+            String(opt.professorTime ?? "").trim() === seed.professorTime ||
+            String(opt.leadTime ?? "").trim() === seed.leadTime ||
+            String(opt.displayLabel ?? "").trim() === seed.leadTime,
+        ) ?? null
+      : null) ?? null;
+
+  return { dayId, timeOpt };
+}
+
 export default function CadastroRecorrenteBody() {
   const sp = useSearchParams();
   const initialNameParam = decodeURIComponent(String(sp.get("nome") ?? "").trim()) || "";
@@ -538,50 +628,14 @@ export default function CadastroRecorrenteBody() {
       for (const [k, v] of Object.entries(slotsMap)) slotsByWeekdayDate[k] = Array.isArray(v) ? v : [];
       setAlunoSchedAvail({ dates, slotsByWeekdayDate, timeZone: String(j.timeZone ?? tzUse) });
 
-      const savedWeekdayRaw = String(alunoLeadFull?.recurring_class_weekday ?? "").trim().toLowerCase();
-      const savedWeekdayLabel = String(alunoLeadFull?.recurring_class_weekday_label ?? "").trim();
-      const savedProfessorTime = String(alunoLeadFull?.recurring_class_professor_time ?? "").trim();
-      const savedLeadTime = String(alunoLeadFull?.recurring_class_lead_time ?? "").trim();
-      const savedProfessorDate = String(
-        alunoLeadFull?.recurring_class_professor_date ?? "",
-      ).trim();
+      const restoredSelection = restoreAlunoRecurringSelection({
+        dates,
+        slotsByWeekdayDate,
+        seed: buildAlunoRecurringRestoreSeed(alunoLeadFull),
+      });
 
-      let restoredDayId: string | null = null;
-      if (savedWeekdayRaw) {
-        const dayCandidates = dates.filter((d) => d.weekday === savedWeekdayRaw);
-        if (dayCandidates.length === 1) {
-          restoredDayId = dayCandidates[0]?.id ?? null;
-        } else if (dayCandidates.length > 1) {
-          const matchingByLabel =
-            savedWeekdayLabel
-              ? dayCandidates.find(
-                  (d) =>
-                    String(d.displayLabel ?? "").trim() === savedWeekdayLabel ||
-                    String(d.label ?? "").trim() === savedWeekdayLabel,
-                ) ?? null
-              : null;
-          const matchingByDate = savedProfessorDate
-            ? dayCandidates.find((d) => String(d.professorDate ?? "").trim() === savedProfessorDate) ?? null
-            : null;
-          restoredDayId = (matchingByLabel ?? matchingByDate ?? dayCandidates[0])?.id ?? null;
-        }
-      }
-
-      setAlunoSchedDayId(restoredDayId);
-
-      if (restoredDayId && savedProfessorTime) {
-        const restoredTimes = slotsByWeekdayDate[restoredDayId] ?? [];
-        const restoredTime =
-          restoredTimes.find(
-            (opt) =>
-              String(opt.professorTime ?? "").trim() === savedProfessorTime ||
-              String(opt.leadTime ?? "").trim() === savedLeadTime ||
-              String(opt.displayLabel ?? "").trim() === savedLeadTime,
-          ) ?? null;
-        setAlunoSchedTimeOpt(restoredTime);
-      } else {
-        setAlunoSchedTimeOpt(null);
-      }
+      setAlunoSchedDayId(restoredSelection.dayId);
+      setAlunoSchedTimeOpt(restoredSelection.timeOpt);
     } catch (e) {
       setAlunoSchedError(toErrorMessage(e, "Erro ao carregar disponibilidade."));
       setAlunoSchedAvail(null);
@@ -1798,34 +1852,17 @@ export default function CadastroRecorrenteBody() {
                 if (r.ok && j?.ok) {
                   setAvailability(j);
                   const slotsMap = j.slotsByWeekdayDate ?? j.slotsByWeekday ?? {};
-                  const dayCandidates = (j.dates ?? []).filter((d) => d.weekday === resolvedWeekday);
-                  let targetDayId: string | null = null;
-                  if (dayCandidates.length === 1) {
-                    targetDayId = dayCandidates[0].id;
-                  } else if (dayCandidates.length > 1) {
-                    const matchingByLabel = dayCandidates.find(
-                      (d) =>
-                        (savedWeekdayLabel &&
-                          (d.displayLabel === savedWeekdayLabel || d.label === savedWeekdayLabel)) ||
-                        false,
-                    );
-                    targetDayId = (matchingByLabel ?? dayCandidates[0])?.id ?? null;
-                  }
+                  const restoreSeed = buildAlunoRecurringRestoreSeed(leadData);
+                  const restoredSelection = restoreAlunoRecurringSelection({
+                    dates: j.dates ?? [],
+                    slotsByWeekdayDate: slotsMap,
+                    seed: restoreSeed,
+                  });
+                  const targetDayId = restoredSelection.dayId;
                   if (targetDayId) setSelectedDayId(targetDayId);
-                  const arr: RecurringWeekdayTimeOption[] = targetDayId
-                    ? slotsMap[targetDayId] ?? []
-                    : [];
-                  const targetTime = savedProfessorTime;
-                  const targetLeadT = savedLeadTime;
-                  const opt =
-                    (targetTime
-                      ? arr.find(
-                          (s: any) =>
-                            String(s.professorTime ?? "").trim() === targetTime ||
-                            String(s.leadTime ?? "").trim() === targetLeadT ||
-                            String(s.displayLabel ?? "").trim() === targetLeadT,
-                        )
-                      : null) || null;
+                  const targetTime = restoreSeed.professorTime || savedProfessorTime;
+                  const targetLeadT = restoreSeed.leadTime || savedLeadTime;
+                  const opt = restoredSelection.timeOpt;
                   if (opt) {
                     setSelectedTimeOpt(opt as any);
                     if (stepNum >= 4) {
