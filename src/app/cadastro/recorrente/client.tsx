@@ -628,15 +628,8 @@ export default function CadastroRecorrenteBody() {
       const slotsByWeekdayDate: Record<string, RecurringWeekdayTimeOption[]> = {};
       for (const [k, v] of Object.entries(slotsMap)) slotsByWeekdayDate[k] = Array.isArray(v) ? v : [];
       setAlunoSchedAvail({ dates, slotsByWeekdayDate, timeZone: String(j.timeZone ?? tzUse) });
-
-      const restoredSelection = restoreAlunoRecurringSelection({
-        dates,
-        slotsByWeekdayDate,
-        seed: buildAlunoRecurringRestoreSeed(alunoLeadFull),
-      });
-
-      setAlunoSchedDayId(restoredSelection.dayId);
-      setAlunoSchedTimeOpt(restoredSelection.timeOpt);
+      setAlunoSchedDayId(null);
+      setAlunoSchedTimeOpt(null);
     } catch (e) {
       setAlunoSchedError(toErrorMessage(e, "Erro ao carregar disponibilidade."));
       setAlunoSchedAvail(null);
