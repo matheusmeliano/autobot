@@ -327,6 +327,56 @@ function isExperimentalClassPast(lead: AtendimentoLeadListItem | null | undefine
   return bestMs < nowMs;
 }
 
+function hasActiveExperimentalDisplaySignal(lead: AtendimentoLeadListItem | null | undefined): boolean {
+  if (!lead) return false;
+
+  const futureBooking = (lead as any)?.future_experimental_class_booking as any;
+  if (futureBooking) {
+    const status = String(futureBooking?.status ?? "").trim().toLowerCase();
+    if (status !== "cancelled") return true;
+  }
+
+  const bestBooking =
+    ((lead as any)?.latest_experimental_class_booking as any) ??
+    ((lead as any)?.experimental_class_booking as any);
+  if (bestBooking) {
+    const status = String(bestBooking?.status ?? "").trim().toLowerCase();
+    if (status && status !== "cancelled") return true;
+  }
+
+  const flatStatus = String(
+    (lead as any)?.experimental_class_booking_status ??
+      (lead as any)?.experimental_class_status ??
+      "",
+  )
+    .trim()
+    .toLowerCase();
+  const hasFlatExperimentalData = Boolean(
+    String((lead as any)?.experimental_class_booking_id ?? "").trim() ||
+      String((lead as any)?.experimental_class_lead_date ?? "").trim() ||
+      String((lead as any)?.experimental_class_lead_time ?? "").trim() ||
+      String((lead as any)?.experimental_class_professor_date ?? "").trim() ||
+      String((lead as any)?.experimental_class_professor_time ?? "").trim() ||
+      String((lead as any)?.experimental_class_lead_start_at ?? "").trim() ||
+      String((lead as any)?.experimental_class_professor_start_at ?? "").trim(),
+  );
+  if (hasFlatExperimentalData && flatStatus !== "cancelled") return true;
+
+  const latestCancelled =
+    Boolean(String((lead as any)?.latest_experimental_class_cancelled_at ?? "").trim()) ||
+    String((lead as any)?.latest_experimental_class_event ?? "")
+      .trim()
+      .toLowerCase() === "experimental_class_cancelled";
+  if (latestCancelled) return false;
+
+  const stage = String(lead.funnel_stage ?? "").trim().toLowerCase();
+  return [
+    "aula_experimental_convidada",
+    "pre_cadastro_concluido",
+    "aula_experimental_agendada",
+  ].includes(stage);
+}
+
 function applyPhoneMask(input: string): string {
   const digits = String(input ?? "").replace(/\D/g, "");
   if (!digits) return "";
@@ -5808,12 +5858,7 @@ export function AtendimentoClient() {
                               String((lead as any).signup_password_raw_temp).trim().length >= 4;
                             const cadastroOuConcluido = hasStep || hasRecurringPass || hasLegacyTempPass || isRecurringConcluded;
 
-                            const hasExp = Boolean(
-                              lead?.future_experimental_class_booking ||
-                                lead?.experimental_class_booking ||
-                                String(lead?.experimental_class_lead_date ?? "").trim() ||
-                                String(lead?.experimental_class_lead_time ?? "").trim()
-                            );
+                            const hasExp = hasActiveExperimentalDisplaySignal(lead);
                             const weekdayRaw = String(lead?.recurring_weekday ?? "").trim();
                             const timeRaw = String(lead?.recurring_start_time ?? "").trim();
                             const freqRaw = String(lead?.recurring_frequency ?? "").trim();
@@ -5993,8 +6038,21 @@ export function AtendimentoClient() {
                           }
 
                           // ================== FLUXO EXPERIMENTAL (sem cadastro recorrente iniciado) ==================
-                          const bk = (selectedLead as any)?.experimental_class_booking;
-                          const cancelled = String(bk?.status ?? "").trim().toLowerCase() === "cancelled";
+                          const expBestBooking =
+                            (selectedLead as any)?.latest_experimental_class_booking ??
+                            (selectedLead as any)?.experimental_class_booking ??
+                            (selectedLead as any)?.future_experimental_class_booking;
+                          const expBk = expBestBooking as any;
+                          const expEffectiveStatus =
+                            String(
+                              expBk?.status ??
+                                (selectedLead as any)?.experimental_class_booking_status ??
+                                (selectedLead as any)?.experimental_class_status ??
+                                "",
+                            )
+                              .trim()
+                              .toLowerCase();
+                          const cancelled = expEffectiveStatus === "cancelled";
                           if (cancelled) {
                             return (
                               <>
@@ -6018,23 +6076,12 @@ export function AtendimentoClient() {
                                     </div>
                                   </div>
                                 </div>
-                                <div className="mt-4 flex justify-end gap-2">
-                                  <button
-                                    type="button"
-                                    onClick={() => handleOpenExpInfo(selectedLead)}
-                                    className="inline-flex h-10 items-center justify-center gap-2 rounded-full border border-[var(--app-border)] bg-[var(--app-solid-surface)] px-4 text-[13px] font-semibold text-[var(--app-text-85)] hover:bg-[var(--app-hover)] disabled:cursor-not-allowed disabled:opacity-55"
-                                    disabled
-                                    title="Agendamento cancelado."
-                                  >
-                                    <Info className="h-4 w-4" />
-                                    Mais informações
-                                  </button>
+                                <div className="mt-4 flex justify-end">
                                   <button
                                     type="button"
                                     onClick={() => handleOpenExperimentalBooking(selectedLead)}
-                                    className="inline-flex h-10 items-center justify-center gap-2 rounded-full border border-[var(--app-border)] bg-[var(--app-solid-surface)] px-4 text-[13px] font-semibold text-[var(--app-text-85)] hover:bg-[var(--app-hover)] disabled:cursor-not-allowed disabled:opacity-55"
-                                    disabled
-                                    title="Agendamento cancelado. Não é possível reagendar."
+                                    className="inline-flex h-10 items-center justify-center gap-2 rounded-full border border-[var(--app-border)] bg-[var(--app-solid-surface)] px-4 text-[13px] font-semibold text-[var(--app-text-85)] hover:bg-[var(--app-hover)]"
+                                    title="Reagendar esta aula experimental."
                                   >
                                     <Plus className="h-4 w-4" />
                                     Reagendar
@@ -6046,46 +6093,71 @@ export function AtendimentoClient() {
 
                           if (expMeta.tone === "success") {
                             const sl = selectedLead;
-                            const expBestBooking =
-                              (sl as any).latest_experimental_class_booking ??
-                              (sl as any).experimental_class_booking ??
-                              (sl as any).future_experimental_class_booking;
                             const bk2 = expBestBooking as any;
                             const expEffectiveStatus =
-                              String(bk2?.status ?? (sl as any).experimental_class_booking_status ?? (sl as any).experimental_class_status ?? "").trim().toLowerCase();
+                              String(
+                                bk2?.status ??
+                                  (sl as any).experimental_class_booking_status ??
+                                  (sl as any).experimental_class_status ??
+                                  "",
+                              )
+                                .trim()
+                                .toLowerCase();
                             const cancelled2 = expEffectiveStatus === "cancelled";
                             return (
                               <>
-                                <div className="mt-4 flex items-start gap-3 rounded-xl border border-emerald-500/35 bg-emerald-500/10 px-4 py-3">
-                                  <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-emerald-500/20 text-emerald-700">
-                                    <CalendarIcon className="h-5 w-5" />
-                                  </div>
-                                  <div className="min-w-0">
-                                    <div className="font-semibold text-emerald-800 truncate">
-                                      {expMeta.label}
+                                {cancelled2 ? (
+                                  <div className="mt-4 flex items-start gap-3 rounded-xl border border-red-500/35 bg-red-500/10 px-4 py-3">
+                                    <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-red-500/20 text-red-700">
+                                      <CalendarIcon className="h-5 w-5" />
                                     </div>
-                                    <div className="mt-0.5 text-[13px] text-emerald-700/80">
-                                      Horário confirmado para o registro.
+                                    <div className="min-w-0">
+                                      <div className="font-semibold text-red-800 truncate">
+                                        {(() => {
+                                          const label = String(expMeta.label ?? "").trim();
+                                          if (!label) return "Aula cancelada";
+                                          if (label.toLowerCase().startsWith("aula em:")) {
+                                            return "Aula cancelada em:" + label.slice("aula em:".length);
+                                          }
+                                          return label.replace(/^Aula em:\s*/i, "Aula cancelada em: ");
+                                        })()}
+                                      </div>
+                                      <div className="mt-0.5 text-[13px] text-red-700/80">
+                                        Horário cancelado.
+                                      </div>
                                     </div>
                                   </div>
-                                </div>
+                                ) : (
+                                  <div className="mt-4 flex items-start gap-3 rounded-xl border border-emerald-500/35 bg-emerald-500/10 px-4 py-3">
+                                    <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-emerald-500/20 text-emerald-700">
+                                      <CalendarIcon className="h-5 w-5" />
+                                    </div>
+                                    <div className="min-w-0">
+                                      <div className="font-semibold text-emerald-800 truncate">
+                                        {expMeta.label}
+                                      </div>
+                                      <div className="mt-0.5 text-[13px] text-emerald-700/80">
+                                        Horário confirmado para o registro.
+                                      </div>
+                                    </div>
+                                  </div>
+                                )}
                                 <div className="mt-4 flex justify-end gap-2">
-                                  <button
-                                    type="button"
-                                    onClick={() => handleOpenExpInfo(selectedLead)}
-                                    className="inline-flex h-10 items-center justify-center gap-2 rounded-full border border-[var(--app-border)] bg-[var(--app-solid-surface)] px-4 text-[13px] font-semibold text-[var(--app-text-85)] hover:bg-[var(--app-hover)] disabled:cursor-not-allowed disabled:opacity-55"
-                                    disabled={cancelled2}
-                                    title={cancelled2 ? "Agendamento cancelado." : undefined}
-                                  >
-                                    <Info className="h-4 w-4" />
-                                    Mais informações
-                                  </button>
+                                  {!cancelled2 ? (
+                                    <button
+                                      type="button"
+                                      onClick={() => handleOpenExpInfo(selectedLead)}
+                                      className="inline-flex h-10 items-center justify-center gap-2 rounded-full border border-[var(--app-border)] bg-[var(--app-solid-surface)] px-4 text-[13px] font-semibold text-[var(--app-text-85)] hover:bg-[var(--app-hover)]"
+                                    >
+                                      <Info className="h-4 w-4" />
+                                      Mais informações
+                                    </button>
+                                  ) : null}
                                   <button
                                     type="button"
                                     onClick={() => handleOpenExperimentalBooking(selectedLead)}
-                                    className="inline-flex h-10 items-center justify-center gap-2 rounded-full border border-[var(--app-border)] bg-[var(--app-solid-surface)] px-4 text-[13px] font-semibold text-[var(--app-text-85)] hover:bg-[var(--app-hover)] disabled:cursor-not-allowed disabled:opacity-55"
-                                    disabled={cancelled2}
-                                    title={cancelled2 ? "Agendamento cancelado. Não é possível reagendar." : undefined}
+                                    className="inline-flex h-10 items-center justify-center gap-2 rounded-full border border-[var(--app-border)] bg-[var(--app-solid-surface)] px-4 text-[13px] font-semibold text-[var(--app-text-85)] hover:bg-[var(--app-hover)]"
+                                    title="Reagendar esta aula experimental."
                                   >
                                     <Plus className="h-4 w-4" />
                                     Reagendar
@@ -7322,12 +7394,7 @@ export function AtendimentoClient() {
                             String((lead as any).signup_password_raw_temp).trim().length >= 4;
                           const cadastroOuConcluido = hasStep || hasRecurringPass || hasLegacyTempPass || isRecurringConcluded;
 
-                          const hasExp = Boolean(
-                            lead?.future_experimental_class_booking ||
-                              lead?.experimental_class_booking ||
-                              String(lead?.experimental_class_lead_date ?? "").trim() ||
-                              String(lead?.experimental_class_lead_time ?? "").trim()
-                          );
+                          const hasExp = hasActiveExperimentalDisplaySignal(lead);
                           const weekdayRaw = String(lead?.recurring_weekday ?? "").trim();
                           const timeRaw = String(lead?.recurring_start_time ?? "").trim();
                           const freqRaw = String(lead?.recurring_frequency ?? "").trim();
@@ -7507,63 +7574,78 @@ export function AtendimentoClient() {
                         }
 
                         // ================== FLUXO EXPERIMENTAL (sem cadastro recorrente iniciado) ==================
-                        if (expMeta.tone === "success") {
-                          const bk = (selectedLead as any)?.experimental_class_booking;
-                          const cancelled = String(bk?.status ?? "").trim().toLowerCase() === "cancelled";
-                          const sl = selectedLead;
-                          const expBestBooking =
-                            (sl as any).latest_experimental_class_booking ??
-                            (sl as any).experimental_class_booking ??
-                            (sl as any).future_experimental_class_booking;
-                          const expBk = expBestBooking as any;
-                          const expEffectiveStatus =
-                            String(expBk?.status ?? (sl as any).experimental_class_booking_status ?? (sl as any).experimental_class_status ?? "").trim().toLowerCase();
-                          const expCancelled = expEffectiveStatus === "cancelled";
+                        const expBestBooking =
+                          (selectedLead as any)?.latest_experimental_class_booking ??
+                          (selectedLead as any)?.experimental_class_booking ??
+                          (selectedLead as any)?.future_experimental_class_booking;
+                        const expEffectiveStatus = String(
+                          (expBestBooking as any)?.status ??
+                            (selectedLead as any)?.experimental_class_booking_status ??
+                            (selectedLead as any)?.experimental_class_status ??
+                            "",
+                        )
+                          .trim()
+                          .toLowerCase();
+                        const expCancelled = expEffectiveStatus === "cancelled";
+                        if (expCancelled) {
                           return (
                             <>
-                              {cancelled ? (
-                                <div className="mt-4 flex items-start gap-3 rounded-xl border border-red-500/35 bg-red-500/10 px-4 py-3">
-                                  <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-red-500/20 text-red-700">
-                                    <CalendarIcon className="h-5 w-5" />
+                              <div className="mt-4 flex items-start gap-3 rounded-xl border border-red-500/35 bg-red-500/10 px-4 py-3">
+                                <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-red-500/20 text-red-700">
+                                  <CalendarIcon className="h-5 w-5" />
+                                </div>
+                                <div className="min-w-0">
+                                  <div className="font-semibold text-red-800 truncate">
+                                    {(() => {
+                                      const label = String(expMeta.label ?? "").trim();
+                                      if (!label) return "Aula cancelada";
+                                      if (label.toLowerCase().startsWith("aula em:")) {
+                                        return "Aula cancelada em:" + label.slice("aula em:".length);
+                                      }
+                                      return label.replace(/^Aula em:\s*/i, "Aula cancelada em: ");
+                                    })()}
                                   </div>
-                                  <div className="min-w-0">
-                                    <div className="font-semibold text-red-800 truncate">
-                                      {(() => {
-                                        const label = String(expMeta.label ?? "").trim();
-                                        if (!label) return "Aula cancelada";
-                                        if (label.toLowerCase().startsWith("aula em:")) {
-                                          return "Aula cancelada em:" + label.slice("aula em:".length);
-                                        }
-                                        return label.replace(/^Aula em:\s*/i, "Aula cancelada em: ");
-                                      })()}
-                                    </div>
-                                    <div className="mt-0.5 text-[13px] text-red-700/80">
-                                      Horário cancelado.
-                                    </div>
+                                  <div className="mt-0.5 text-[13px] text-red-700/80">
+                                    Horário cancelado.
                                   </div>
                                 </div>
-                              ) : (
-                                <div className="mt-4 flex items-start gap-3 rounded-xl border border-emerald-500/35 bg-emerald-500/10 px-4 py-3">
-                                  <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-emerald-500/20 text-emerald-700">
-                                    <CalendarIcon className="h-5 w-5" />
+                              </div>
+                              <div className="mt-4 flex justify-end">
+                                <button
+                                  type="button"
+                                  onClick={() => handleOpenExperimentalBooking(selectedLead)}
+                                  className="inline-flex h-10 items-center justify-center gap-2 rounded-full border border-[var(--app-border)] bg-[var(--app-solid-surface)] px-4 text-[13px] font-semibold text-[var(--app-text-85)] hover:bg-[var(--app-hover)]"
+                                  title="Reagendar esta aula experimental."
+                                >
+                                  <Plus className="h-4 w-4" />
+                                  Reagendar
+                                </button>
+                              </div>
+                            </>
+                          );
+                        }
+                        if (expMeta.tone === "success") {
+                          const sl = selectedLead;
+                          return (
+                            <>
+                              <div className="mt-4 flex items-start gap-3 rounded-xl border border-emerald-500/35 bg-emerald-500/10 px-4 py-3">
+                                <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-emerald-500/20 text-emerald-700">
+                                  <CalendarIcon className="h-5 w-5" />
+                                </div>
+                                <div className="min-w-0">
+                                  <div className="font-semibold text-emerald-800 truncate">
+                                    {expMeta.label}
                                   </div>
-                                  <div className="min-w-0">
-                                    <div className="font-semibold text-emerald-800 truncate">
-                                      {expMeta.label}
-                                    </div>
-                                    <div className="mt-0.5 text-[13px] text-emerald-700/80">
-                                      Horário confirmado para o registro.
-                                    </div>
+                                  <div className="mt-0.5 text-[13px] text-emerald-700/80">
+                                    Horário confirmado para o registro.
                                   </div>
                                 </div>
-                              )}
+                              </div>
                               <div className="mt-4 flex justify-end gap-2">
                                 <button
                                   type="button"
                                   onClick={() => handleOpenExpInfo(selectedLead)}
-                                  className="inline-flex h-10 items-center justify-center gap-2 rounded-full border border-[var(--app-border)] bg-[var(--app-solid-surface)] px-4 text-[13px] font-semibold text-[var(--app-text-85)] hover:bg-[var(--app-hover)] disabled:cursor-not-allowed disabled:opacity-55"
-                                  disabled={expCancelled}
-                                  title={expCancelled ? "Agendamento cancelado." : undefined}
+                                  className="inline-flex h-10 items-center justify-center gap-2 rounded-full border border-[var(--app-border)] bg-[var(--app-solid-surface)] px-4 text-[13px] font-semibold text-[var(--app-text-85)] hover:bg-[var(--app-hover)]"
                                 >
                                   <Info className="h-4 w-4" />
                                   Mais informações
@@ -7571,9 +7653,8 @@ export function AtendimentoClient() {
                                 <button
                                   type="button"
                                   onClick={() => handleOpenExperimentalBooking(selectedLead)}
-                                  className="inline-flex h-10 items-center justify-center gap-2 rounded-full border border-[var(--app-border)] bg-[var(--app-solid-surface)] px-4 text-[13px] font-semibold text-[var(--app-text-85)] hover:bg-[var(--app-hover)] disabled:cursor-not-allowed disabled:opacity-55"
-                                  disabled={expCancelled}
-                                  title={expCancelled ? "Agendamento cancelado. Não é possível reagendar." : undefined}
+                                  className="inline-flex h-10 items-center justify-center gap-2 rounded-full border border-[var(--app-border)] bg-[var(--app-solid-surface)] px-4 text-[13px] font-semibold text-[var(--app-text-85)] hover:bg-[var(--app-hover)]"
+                                  title="Reagendar esta aula experimental."
                                 >
                                   <Plus className="h-4 w-4" />
                                   Reagendar
@@ -7890,16 +7971,7 @@ export function AtendimentoClient() {
                                   <button
                                     type="button"
                                     onClick={() => handleOpenExperimentalBooking(sl)}
-                                    disabled={(() => {
-                                        if (expBookingIsCancelled) return true;
-                                        return false;
-                                      })()}
-                                      title={(() => {
-                                        if (expBookingIsCancelled) {
-                                          return "Aula experimental cancelada. Não é possível reagendar.";
-                                        }
-                                        return "Reagendar esta aula experimental.";
-                                      })()}
+                                      title="Reagendar esta aula experimental."
                                     className="inline-flex h-10 w-full items-center justify-center gap-2 rounded-full border border-[var(--app-border)] bg-[var(--app-solid-surface)] px-4 text-[13px] font-semibold text-[var(--app-text-85)] hover:bg-[var(--app-hover)] disabled:cursor-not-allowed disabled:opacity-55 sm:w-auto"
                                   >
                                     <Plus className="h-4 w-4" />
