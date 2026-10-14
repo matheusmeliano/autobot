@@ -496,10 +496,46 @@ export async function GET(req: Request) {
     if (res.ok) {
       const arr = (await res.json()) as Array<Record<string, unknown>> | null;
       if (Array.isArray(arr) && arr.length > 0) {
+        const recurringNotificationMetaByLeadId = new Map<string, string | null>();
+        const recurringLeadIds = arr
+          .map((row) => String(row?.id ?? "").trim())
+          .filter(Boolean);
+        if (recurringLeadIds.length > 0) {
+          try {
+            const { data: recurringHistoryEvents } = await admin
+              .from("atendimento_history_events")
+              .select("lead_id, event_type, created_at, details")
+              .in("lead_id", recurringLeadIds)
+              .in("event_type", [
+                "recurring_class_attendant_start_notification_sent",
+                "recurring_class_student_start_notification_sent",
+                "recurring_class_registered_attendant_start_notification_sent",
+                "recurring_class_attendant_start_notification_sent_manual",
+                "recurring_class_student_start_notification_sent_manual",
+                "recurring_class_registered_attendant_start_notification_sent_manual",
+              ])
+              .order("created_at", { ascending: false });
+            for (const event of recurringHistoryEvents ?? []) {
+              const leadId = String((event as any)?.lead_id ?? "").trim();
+              if (!leadId || recurringNotificationMetaByLeadId.has(leadId)) continue;
+              const details = ((event as any)?.details ?? {}) as Record<string, unknown>;
+              const startAt = String(details?.start_at ?? "").trim() || null;
+              if (startAt) recurringNotificationMetaByLeadId.set(leadId, startAt);
+            }
+          } catch {}
+        }
+        const recurringRowsForResolver = arr.map(
+          (row) =>
+            ({
+              ...row,
+              recurring_class_last_notified_occurrence_start_at:
+                recurringNotificationMetaByLeadId.get(String(row?.id ?? "").trim()) ?? null,
+            }) as Record<string, unknown>,
+        );
         const resolvedRecurringOccurrenceByLeadId =
           await resolveRecurringDisplayOccurrenceMap({
             admin,
-            leads: arr,
+            leads: recurringRowsForResolver,
             now: new Date(nowUtc),
             lookAheadWeeks: 24,
           });
@@ -508,7 +544,7 @@ export async function GET(req: Request) {
             const [y, mo, d] = targetDate.split("-").map((n) => Number(n));
             return Date.UTC(y, mo - 1, d, 12, 0, 0, 0);
           })();
-        for (const r of arr) {
+        for (const r of recurringRowsForResolver) {
           // STATUS — SINCRONIZADO com /badges: recorrente válido OU stRec vazio + funnel válido.
           const stRec = String((r as any).recurring_class_status ?? "").trim().toLowerCase();
           const stFunnel = String((r as any).funnel_stage ?? "").trim().toLowerCase();
