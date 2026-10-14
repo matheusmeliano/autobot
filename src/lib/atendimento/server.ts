@@ -23,7 +23,6 @@ import {
   buildExperimentalClassStudentLessonReadyWhatsAppMessage,
   buildExperimentalClassStudentWhatsAppMessages,
   buildRecurringClassAttendantStartReminderWhatsAppMessage,
-  buildRecurringClassRegisteredAttendantStartReminderWhatsAppMessage,
   buildRecurringClassPostEnrollmentRegisteredAttendantNotification,
   buildRecurringClassStudentLessonReadyWhatsAppMessage,
   buildRecurringPaymentConfirmedStudentWelcomeMessage,
@@ -1916,9 +1915,6 @@ export async function sendRecurringClassStartNotifications(now = new Date()) {
   let studentFailed = 0;
   let attendantSent = 0;
   let attendantFailed = 0;
-  let registeredAttendantSent = 0;
-  let registeredAttendantFailed = 0;
-  let missingLessonLink = 0;
   let missingStudentPhone = 0;
   let missingRecurringMeta = 0;
   let missingRequiredDestinations = 0;
@@ -1939,10 +1935,8 @@ export async function sendRecurringClassStartNotifications(now = new Date()) {
         .in("event_type", [
           "recurring_class_attendant_start_notification_sent",
           "recurring_class_student_start_notification_sent",
-          "recurring_class_registered_attendant_start_notification_sent",
           "recurring_class_attendant_start_notification_sent_manual",
           "recurring_class_student_start_notification_sent_manual",
-          "recurring_class_registered_attendant_start_notification_sent_manual",
         ])
         .order("created_at", { ascending: false })
         .limit(2000);
@@ -2017,12 +2011,6 @@ export async function sendRecurringClassStartNotifications(now = new Date()) {
     const leadPhone = String(row?.phone ?? "").trim();
     const leadFirstName = getLeadFirstName(row?.full_name);
     const leadFullName = getLeadFullName(row?.full_name);
-    const lessonLink = String(row?.recurring_class_link ?? "").trim() || "";
-
-    if (!lessonLink) {
-      missingLessonLink += 1;
-      continue;
-    }
 
     const resolvedRecurringProfessor = resolveRecurringClassAssignedProfessorPhone({
       flatAssignedPhone: String(row?.recurring_class_professor_phone ?? "").trim(),
@@ -2052,13 +2040,9 @@ export async function sendRecurringClassStartNotifications(now = new Date()) {
     const attendantOccurrenceAlreadySent = existingSentSet.has(
       `recurring_class_attendant_start_notification_sent|${thisProfessorOccurrenceKey}`,
     );
-    const registeredAttendantOccurrenceAlreadySent = existingSentSet.has(
-      `recurring_class_registered_attendant_start_notification_sent|${thisProfessorOccurrenceKey}`,
-    );
 
     const cachedStudentSent = studentOccurrenceAlreadySent;
     const cachedAttendantSent = attendantOccurrenceAlreadySent;
-    const cachedRegisteredAttendantSent = registeredAttendantOccurrenceAlreadySent;
 
     const RECURRING_CRON_GRACE_MS = 2 * 60 * 1000;
     const RECURRING_CRON_LATE_RECOVERY_MS = 4 * 60 * 60 * 1000;
@@ -2073,15 +2057,11 @@ export async function sendRecurringClassStartNotifications(now = new Date()) {
       !cachedAttendantSent &&
       nowMs >= attendantFireMs &&
       nowMs <= attendantLateWindowEndMs;
-    const registeredAttendantDue =
-      !cachedRegisteredAttendantSent &&
-      nowMs >= attendantFireMs &&
-      nowMs <= attendantLateWindowEndMs;
     const studentDue =
       !cachedStudentSent &&
       nowMs >= studentFireMs &&
       nowMs <= studentLateWindowEndMs;
-    if (process.env.NODE_ENV !== "production" || attendantDue || registeredAttendantDue || studentDue) {
+    if (process.env.NODE_ENV !== "production" || attendantDue || studentDue) {
       const profDate = new Date(professorStartAtMsFinal);
       const studDate = new Date(studentFireMs);
       const fireProf = new Date(attendantFireMs);
@@ -2090,7 +2070,7 @@ export async function sendRecurringClassStartNotifications(now = new Date()) {
       const studentWinEnd = new Date(studentWindowEndMs);
       const studentWinLateEnd = new Date(studentLateWindowEndMs);
       console.log(
-        `[cron-recurring-class] lead=${leadId} now=${new Date(nowMs).toISOString()} profStart=${profDate.toISOString()} leadFire(student)=${studDate.toISOString()} profFire(H-5)=${fireProf.toISOString()} profWin=[${fireProf.toISOString()}~${fireWinEnd.toISOString()}|lateUntil=${fireWinLateEnd.toISOString()}] studentWin=[${studDate.toISOString()}~${studentWinEnd.toISOString()}|lateUntil=${studentWinLateEnd.toISOString()}] attendantDue=${String(attendantDue)} regAttDue=${String(registeredAttendantDue)} studentDue=${String(studentDue)} cachedSent(att/reg/stud)=${String(cachedAttendantSent)}/${String(cachedRegisteredAttendantSent)}/${String(cachedStudentSent)} weekday=${weekdayRaw} profTime=${professorTimeHHMM}`,
+        `[cron-recurring-class] lead=${leadId} now=${new Date(nowMs).toISOString()} profStart=${profDate.toISOString()} leadFire(student)=${studDate.toISOString()} profFire(H-5)=${fireProf.toISOString()} profWin=[${fireProf.toISOString()}~${fireWinEnd.toISOString()}|lateUntil=${fireWinLateEnd.toISOString()}] studentWin=[${studDate.toISOString()}~${studentWinEnd.toISOString()}|lateUntil=${studentWinLateEnd.toISOString()}] professorDue=${String(attendantDue)} studentDue=${String(studentDue)} cachedSent(prof/stud)=${String(cachedAttendantSent)}/${String(cachedStudentSent)} weekday=${weekdayRaw} profTime=${professorTimeHHMM}`,
       );
     }
 
@@ -2099,7 +2079,6 @@ export async function sendRecurringClassStartNotifications(now = new Date()) {
       weekdayRaw.toUpperCase();
 
     let thisLeadAttendantOk = cachedAttendantSent;
-    let thisLeadRegisteredOk = cachedRegisteredAttendantSent;
     let thisLeadStudentOk = cachedStudentSent;
 
     if (attendantDue && !cachedAttendantSent) {
@@ -2107,11 +2086,7 @@ export async function sendRecurringClassStartNotifications(now = new Date()) {
       try {
         await sendAtendimentoWhatsAppText({
           phone: assignedRecurringProfessorPhone,
-          message: buildRecurringClassAttendantStartReminderWhatsAppMessage(
-            leadFullName,
-            weekdayLabel,
-            lessonLink,
-          ),
+          message: buildRecurringClassAttendantStartReminderWhatsAppMessage(leadFullName),
         });
         try {
           await admin
@@ -2127,10 +2102,9 @@ export async function sendRecurringClassStartNotifications(now = new Date()) {
           leadId,
           conversationId: null,
           eventType: "recurring_class_attendant_start_notification_sent",
-          title: "Lembrete de inicio da aula recorrente enviado ao atendente",
+          title: "Lembrete de inicio da aula recorrente enviado ao professor",
           details: {
             phone: assignedRecurringProfessorPhone,
-            lesson_link: lessonLink,
             start_at: occurrence.professorStartAt,
             weekday: weekdayRaw,
             professor_time: professorTimeHHMM,
@@ -2149,55 +2123,9 @@ export async function sendRecurringClassStartNotifications(now = new Date()) {
           leadId,
           conversationId: null,
           eventType: "recurring_class_attendant_start_notification_failed",
-          title: "Falha ao enviar lembrete de inicio da aula recorrente ao atendente",
+          title: "Falha ao enviar lembrete de inicio da aula recorrente ao professor",
           details: {
             phone: assignedRecurringProfessorPhone,
-            lesson_link: lessonLink,
-            start_at: occurrence.professorStartAt,
-            error: error instanceof Error ? error.message : String(error),
-          },
-          actorType: "system",
-        });
-      }
-    }
-
-    if (registeredAttendantDue && !cachedRegisteredAttendantSent) {
-      try {
-        await sendAtendimentoWhatsAppText({
-          phone: EXPERIMENTAL_CLASS_REGISTERED_ATTENDANT_NOTIFICATION_PHONE,
-          message: buildRecurringClassRegisteredAttendantStartReminderWhatsAppMessage(
-            leadFullName,
-            weekdayLabel,
-            lessonLink,
-          ),
-        });
-        await appendHistoryEvent({
-          leadId,
-          conversationId: null,
-          eventType: "recurring_class_registered_attendant_start_notification_sent",
-          title: "Lembrete de inicio da aula recorrente enviado ao atendente cadastrado",
-          details: {
-            phone: EXPERIMENTAL_CLASS_REGISTERED_ATTENDANT_NOTIFICATION_PHONE,
-            lesson_link: lessonLink,
-            start_at: occurrence.professorStartAt,
-            weekday: weekdayRaw,
-            professor_time: professorTimeHHMM,
-            source: "cron_recurring_class",
-          },
-          actorType: "system",
-        });
-        registeredAttendantSent += 1;
-        thisLeadRegisteredOk = true;
-      } catch (error) {
-        registeredAttendantFailed += 1;
-        await appendHistoryEvent({
-          leadId,
-          conversationId: null,
-          eventType: "recurring_class_registered_attendant_start_notification_failed",
-          title: "Falha ao enviar lembrete de inicio da aula recorrente ao atendente cadastrado",
-          details: {
-            phone: EXPERIMENTAL_CLASS_REGISTERED_ATTENDANT_NOTIFICATION_PHONE,
-            lesson_link: lessonLink,
             start_at: occurrence.professorStartAt,
             error: error instanceof Error ? error.message : String(error),
           },
@@ -2213,7 +2141,7 @@ export async function sendRecurringClassStartNotifications(now = new Date()) {
         try {
           await sendAtendimentoWhatsAppText({
             phone: leadPhone,
-            message: buildRecurringClassStudentLessonReadyWhatsAppMessage(leadFirstName, lessonLink),
+            message: buildRecurringClassStudentLessonReadyWhatsAppMessage(leadFirstName),
             admin,
             conversationId: conversationIdByLeadId.get(leadId) ?? null,
             allowNoInbound: true,
@@ -2231,10 +2159,9 @@ export async function sendRecurringClassStartNotifications(now = new Date()) {
             leadId,
             conversationId: null,
             eventType: "recurring_class_student_start_notification_sent",
-            title: "Link da aula recorrente enviado ao aluno no inicio da aula",
+            title: "Notificação de aula recorrente enviada ao aluno no inicio da aula",
             details: {
               phone: leadPhone,
-              lesson_link: lessonLink,
               start_at: occurrence.leadStartAt || occurrence.professorStartAt,
               weekday: weekdayRaw,
               professor_time: professorTimeHHMM,
@@ -2250,10 +2177,9 @@ export async function sendRecurringClassStartNotifications(now = new Date()) {
             leadId,
             conversationId: null,
             eventType: "recurring_class_student_start_notification_failed",
-            title: "Falha ao enviar link da aula recorrente ao aluno",
+            title: "Falha ao enviar notificação da aula recorrente ao aluno",
             details: {
               phone: leadPhone,
-              lesson_link: lessonLink,
               start_at: occurrence.leadStartAt || occurrence.professorStartAt,
               error: error instanceof Error ? error.message : String(error),
             },
@@ -2280,9 +2206,6 @@ export async function sendRecurringClassStartNotifications(now = new Date()) {
     studentFailed,
     attendantSent,
     attendantFailed,
-    registeredAttendantSent,
-    registeredAttendantFailed,
-    missingLessonLink,
     missingStudentPhone,
     missingRecurringMeta,
     missingRequiredDestinations,

@@ -7,11 +7,9 @@ import {
 } from "@/lib/atendimento/server";
 import {
   buildRecurringClassAttendantStartReminderWhatsAppMessage,
-  buildRecurringClassRegisteredAttendantStartReminderWhatsAppMessage,
   buildRecurringClassStudentLessonReadyWhatsAppMessage,
   calculateDisplayRecurringOccurrence,
   EXPERIMENTAL_CLASS_ATTENDANT_NOTIFICATION_PHONE,
-  EXPERIMENTAL_CLASS_REGISTERED_ATTENDANT_NOTIFICATION_PHONE,
   RECURRING_WEEKDAY_LABELS_PT_BR,
   resolveRecurringOccurrenceSearchFromDate,
   resolveRecurringClassAssignedProfessorPhone,
@@ -54,8 +52,6 @@ export async function POST(req: Request, { params }: { params: Promise<{ leadId:
   }
   const leadName = String((lead as any)?.full_name ?? "").trim();
   const leadPhone = String((lead as any)?.phone ?? "").trim();
-  const lessonLink = String((lead as any)?.recurring_class_link ?? "").trim();
-  if (!lessonLink) return Response.json({ ok: false, error: "missing_lesson_link" }, { status: 409 });
   const rp = resolveRecurringClassAssignedProfessorPhone({
     flatAssignedPhone: String((lead as any)?.recurring_class_professor_phone ?? "").trim(),
     flatAssignedName: String((lead as any)?.recurring_class_professor_name ?? "").trim(),
@@ -116,26 +112,20 @@ export async function POST(req: Request, { params }: { params: Promise<{ leadId:
       .limit(1);
     if (convs?.[0]?.id) resolvedConversationId = String(convs[0].id).trim();
   } catch {}
-  let sok = false, aok = false, rok = false;
-  let serr: string|null = null, aerr: string|null = null, rerr: string|null = null;
+  let sok = false, aok = false;
+  let serr: string|null = null, aerr: string|null = null;
 
   try {
-    await sendAtendimentoWhatsAppText({ phone: leadPhone, message: buildRecurringClassStudentLessonReadyWhatsAppMessage(fn(leadName), lessonLink), admin, conversationId: resolvedConversationId, allowNoInbound: true });
+    await sendAtendimentoWhatsAppText({ phone: leadPhone, message: buildRecurringClassStudentLessonReadyWhatsAppMessage(fn(leadName)), admin, conversationId: resolvedConversationId, allowNoInbound: true });
     sok = true;
-    await appendHistoryEvent({ leadId: lid, conversationId: null, eventType: "recurring_class_student_start_notification_sent_manual", title: "Link aula recorrente disparado manualmente ao aluno", details: { phone: leadPhone, lesson_link: lessonLink, weekday: wr, weekday_label: weekdayLabel, manually_triggered: true, source: "manual_trigger_button", start_at: targetOccurrenceStartAt || null, sent_at: nowIso }, actorType: "attendant", actorEmail: auth.user.email });
-  } catch (e) { serr = e instanceof Error ? e.message : String(e); await appendHistoryEvent({ leadId: lid, conversationId: null, eventType: "recurring_class_student_start_notification_failed_manual", title: "Falha disparo manual aula recorrente ao aluno", details: { phone: leadPhone, lesson_link: lessonLink, manually_triggered: true, error: serr }, actorType: "attendant", actorEmail: auth.user.email }); }
+    await appendHistoryEvent({ leadId: lid, conversationId: null, eventType: "recurring_class_student_start_notification_sent_manual", title: "Notificação de aula recorrente disparada manualmente ao aluno", details: { phone: leadPhone, weekday: wr, weekday_label: weekdayLabel, manually_triggered: true, source: "manual_trigger_button", start_at: targetOccurrenceStartAt || null, sent_at: nowIso }, actorType: "attendant", actorEmail: auth.user.email });
+  } catch (e) { serr = e instanceof Error ? e.message : String(e); await appendHistoryEvent({ leadId: lid, conversationId: null, eventType: "recurring_class_student_start_notification_failed_manual", title: "Falha no disparo manual da aula recorrente ao aluno", details: { phone: leadPhone, manually_triggered: true, error: serr }, actorType: "attendant", actorEmail: auth.user.email }); }
 
   try {
-    await sendAtendimentoWhatsAppText({ phone: profPhone, message: buildRecurringClassAttendantStartReminderWhatsAppMessage(fl(leadName), weekdayLabel, lessonLink) });
+    await sendAtendimentoWhatsAppText({ phone: profPhone, message: buildRecurringClassAttendantStartReminderWhatsAppMessage(fl(leadName)) });
     aok = true;
-    await appendHistoryEvent({ leadId: lid, conversationId: null, eventType: "recurring_class_attendant_start_notification_sent_manual", title: "Lembrete aula recorrente disparado manualmente ao professor", details: { phone: profPhone, lesson_link: lessonLink, weekday: wr, weekday_label: weekdayLabel, manually_triggered: true, resolved_professor: rp ? `${rp.name} (${rp.phone})` : null, start_at: targetOccurrenceStartAt || null, sent_at: nowIso }, actorType: "attendant", actorEmail: auth.user.email });
-  } catch (e) { aerr = e instanceof Error ? e.message : String(e); await appendHistoryEvent({ leadId: lid, conversationId: null, eventType: "recurring_class_attendant_start_notification_failed_manual", title: "Falha disparo manual lembrete aula recorrente professor", details: { phone: profPhone, lesson_link: lessonLink, manually_triggered: true, error: aerr }, actorType: "attendant", actorEmail: auth.user.email }); }
-
-  try {
-    await sendAtendimentoWhatsAppText({ phone: EXPERIMENTAL_CLASS_REGISTERED_ATTENDANT_NOTIFICATION_PHONE, message: buildRecurringClassRegisteredAttendantStartReminderWhatsAppMessage(fl(leadName), weekdayLabel, lessonLink) });
-    rok = true;
-    await appendHistoryEvent({ leadId: lid, conversationId: null, eventType: "recurring_class_registered_attendant_start_notification_sent_manual", title: "Lembrete aula recorrente disparado manualmente atendente cadastrado", details: { phone: EXPERIMENTAL_CLASS_REGISTERED_ATTENDANT_NOTIFICATION_PHONE, lesson_link: lessonLink, weekday: wr, weekday_label: weekdayLabel, manually_triggered: true, start_at: targetOccurrenceStartAt || null, sent_at: nowIso }, actorType: "attendant", actorEmail: auth.user.email });
-  } catch (e) { rerr = e instanceof Error ? e.message : String(e); await appendHistoryEvent({ leadId: lid, conversationId: null, eventType: "recurring_class_registered_attendant_start_notification_failed_manual", title: "Falha disparo manual lembrete aula recorrente atendente cadastrado", details: { phone: EXPERIMENTAL_CLASS_REGISTERED_ATTENDANT_NOTIFICATION_PHONE, lesson_link: lessonLink, manually_triggered: true, error: rerr }, actorType: "attendant", actorEmail: auth.user.email }); }
+    await appendHistoryEvent({ leadId: lid, conversationId: null, eventType: "recurring_class_attendant_start_notification_sent_manual", title: "Lembrete de aula recorrente disparado manualmente ao professor", details: { phone: profPhone, weekday: wr, weekday_label: weekdayLabel, manually_triggered: true, resolved_professor: rp ? `${rp.name} (${rp.phone})` : null, start_at: targetOccurrenceStartAt || null, sent_at: nowIso }, actorType: "attendant", actorEmail: auth.user.email });
+  } catch (e) { aerr = e instanceof Error ? e.message : String(e); await appendHistoryEvent({ leadId: lid, conversationId: null, eventType: "recurring_class_attendant_start_notification_failed_manual", title: "Falha no disparo manual do lembrete da aula recorrente ao professor", details: { phone: profPhone, manually_triggered: true, error: aerr }, actorType: "attendant", actorEmail: auth.user.email }); }
 
   try {
     const updateData: Record<string, unknown> = { updated_at: nowIso };
@@ -144,6 +134,6 @@ export async function POST(req: Request, { params }: { params: Promise<{ leadId:
     await admin.from("atendimento_leads").update(updateData as any).eq("id", lid);
   } catch(_){}
   const allOk = sok && aok;
-  const errMsg = allOk ? null : [serr?`aluno: ${serr}`:null, aerr?`atendente: ${aerr}`:null, rerr?`atendente cadastrado: ${rerr}`:null].filter(Boolean).join(" | ") || "Algum destinatário obrigatório não recebeu.";
-  return Response.json({ ok: allOk, all_mandatory_sent: allOk, student_notification_sent: sok, student_notification_error: serr, attendant_notification_sent: aok, attendant_notification_error: aerr, registered_attendant_notification_sent: rok, registered_attendant_notification_error: rerr, error: errMsg }, { status: allOk ? 200 : 502 });
+  const errMsg = allOk ? null : [serr?`aluno: ${serr}`:null, aerr?`professor: ${aerr}`:null].filter(Boolean).join(" | ") || "Algum destinatário obrigatório não recebeu.";
+  return Response.json({ ok: allOk, all_mandatory_sent: allOk, student_notification_sent: sok, student_notification_error: serr, attendant_notification_sent: aok, attendant_notification_error: aerr, error: errMsg }, { status: allOk ? 200 : 502 });
 }

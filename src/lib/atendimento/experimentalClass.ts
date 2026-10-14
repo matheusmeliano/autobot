@@ -589,41 +589,22 @@ Link da aula: ${safeLessonLink}
 Acompanhe o atendimento e certifique-se de que tudo ocorra bem.`;
 }
 
-export function buildRecurringClassStudentLessonReadyWhatsAppMessage(name: string | null | undefined, lessonLink: string | null | undefined) {
-  const safeLessonLink = String(lessonLink ?? "").trim();
+export function buildRecurringClassStudentLessonReadyWhatsAppMessage(name: string | null | undefined) {
   const safeFull = String(name ?? "").trim();
   const safeFirst = safeFull.split(/\s+/)[0] || "Aluno";
   return `${safeFirst}, sua aula recorrente já está disponível.
-
-Link da aula: ${safeLessonLink}
 
 O professor já está te aguardando.
 
 Lembrando que ele aguardará por até 10 minutos. Após esse período, a aula será encerrada para dar continuidade aos demais agendamentos.`;
 }
 
-export function buildRecurringClassAttendantStartReminderWhatsAppMessage(name: string | null | undefined, weekdayLabel: string | null | undefined, lessonLink: string | null | undefined) {
-  const safeLessonLink = String(lessonLink ?? "").trim();
+export function buildRecurringClassAttendantStartReminderWhatsAppMessage(name: string | null | undefined) {
   const safeFull = String(name ?? "").trim();
-  const safeFirst = safeFull.split(/\s+/)[0] || "o aluno";
-  const safeWeekday = String(weekdayLabel ?? "").trim() || "hoje";
-  return `Aviso: aula recorrente de ${safeFirst} (${safeWeekday}) inicia em 5 minutos.
+  const safeName = safeFull || "Aluno";
+  return `Aviso: a aula recorrente de ${safeName} inicia em 5 minutos.
 
-Link da aula: ${safeLessonLink}
-
-Entre na sala e aguarde a entrada do aluno.`;
-}
-
-export function buildRecurringClassRegisteredAttendantStartReminderWhatsAppMessage(name: string | null | undefined, weekdayLabel: string | null | undefined, lessonLink: string | null | undefined) {
-  const safeLessonLink = String(lessonLink ?? "").trim();
-  const safeFull = String(name ?? "").trim();
-  const safeFirst = safeFull.split(/\s+/)[0] || "Aluno";
-  const safeWeekday = String(weekdayLabel ?? "").trim() || "hoje";
-  return `Aviso: aula recorrente de ${safeFirst} (${safeWeekday}) inicia em 5 minutos.
-
-Link da aula: ${safeLessonLink}
-
-Acompanhe o atendimento e certifique-se de que tudo ocorra bem.`;
+Gere o link da aula e envie ao seu aluno.`;
 }
 
 export function buildRecurringClassPostEnrollmentAttendantNotification(name: string | null | undefined, weekdayLabel: string | null | undefined, timeLabel: string | null | undefined) {

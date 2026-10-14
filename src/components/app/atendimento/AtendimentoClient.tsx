@@ -1554,24 +1554,12 @@ export function AtendimentoClient() {
   // ---- Controladores do card "Aulas recorrentes" (aba Agendamentos) para quem REALMENTE passou do cadastro inicial ----
   const [recAssignProfDropdownOpen, setRecAssignProfDropdownOpen] = useState<boolean>(false);
   const [recAssigningProfessor, setRecAssigningProfessor] = useState<boolean>(false);
-  const [recSavingLessonLink, setRecSavingLessonLink] = useState<boolean>(false);
   const [recSendingNotification, setRecSendingNotification] = useState<boolean>(false);
   const [confirmingPayment, setConfirmingPayment] = useState<boolean>(false);
-  const [recLessonLinkDraftByLeadId, setRecLessonLinkDraftByLeadId] = useState<Record<string, string>>({});
-
-  const recurringLessonLinkDraft = useMemo<string>(() => {
-    const current = recLessonLinkDraftByLeadId[selectedLead?.id ?? ""];
-    if (typeof current === "string") return current;
-    return String((selectedLead as any)?.recurring_class_link ?? "").trim();
-  }, [recLessonLinkDraftByLeadId, selectedLead]);
 
   useEffect(() => {
     if (!selectedLead?.id) return;
     setRecAssignProfDropdownOpen(false);
-    setRecLessonLinkDraftByLeadId((prev) => {
-      if (typeof prev[selectedLead.id] === "string") return prev;
-      return { ...prev, [selectedLead.id]: String((selectedLead as any)?.recurring_class_link ?? "").trim() };
-    });
   }, [selectedLead?.id]);
 
   function recurringAssignedProfessorForLead(lead: AtendimentoLeadListItem | null): { name: string; phone: string } | null {
@@ -1622,50 +1610,6 @@ export function AtendimentoClient() {
     }
   }
 
-  async function handleSaveLessonLinkRecurring(lead: AtendimentoLeadListItem) {
-    if (recSavingLessonLink) return;
-    const saved = String((lead as any)?.recurring_class_link ?? "").trim();
-    const draft = recurringLessonLinkDraft.trim();
-    if (!draft && !saved) {
-      modalToast.warning("Informe o link fixo da aula recorrente antes de salvar.");
-      return;
-    }
-    if (draft === saved) {
-      modalToast.info("Nenhuma alteração no link fixo da aula recorrente.");
-      return;
-    }
-    setRecSavingLessonLink(true);
-    try {
-      const res = await fetch(`/api/atendimento/leads/${encodeURIComponent(lead.id)}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ recurring_class_link: draft || null }),
-      });
-      const payload = (await res.json().catch(() => null)) as { ok?: boolean; error?: string } | null;
-      if (!res.ok || !payload?.ok) {
-        modalToast.error(payload?.error ?? "Falha ao atualizar link fixo da aula recorrente.");
-        return;
-      }
-      setPanelLeads((cur) =>
-        cur.map((l) =>
-          l.id === lead.id
-            ? ({ ...l, recurring_class_link: draft || null } as AtendimentoLeadListItem)
-            : l,
-        ),
-      );
-      setRecLessonLinkDraftByLeadId((prev) => ({ ...prev, [lead.id]: draft || "" }));
-      const fresh = await fetch(`/api/atendimento/leads/${encodeURIComponent(lead.id)}?skipEvents=1`, { cache: "no-store" })
-        .then(async (r) => (r.ok ? r.json().catch(() => null) : null))
-        .catch(() => null) as { ok?: boolean; lead?: Record<string, unknown> | null } | null;
-      if (fresh?.ok && fresh.lead?.id) {
-        setPanelLeads((cur) => cur.map((l) => (l.id === lead.id ? ({ ...l, ...fresh.lead } as AtendimentoLeadListItem) : l)));
-      }
-      modalToast.success("Link fixo da aula recorrente atualizado.");
-    } finally {
-      setRecSavingLessonLink(false);
-    }
-  }
-
   async function handleSendRecurringDisparo(lead: AtendimentoLeadListItem) {
     if (recSendingNotification) return;
     if (!hasLeadConfirmedPaymentForRecurringNotificationsClient(lead)) {
@@ -1680,11 +1624,6 @@ export function AtendimentoClient() {
     const recProf = recurringAssignedProfessorForLead(lead);
     if (!recProf) {
       modalToast.warning("Selecione o professor das aulas recorrentes antes de disparar.");
-      return;
-    }
-    const recLink = String((lead as any)?.recurring_class_link ?? "").trim();
-    if (!recLink) {
-      modalToast.warning("Adicione o link fixo da aula recorrente antes de disparar.");
       return;
     }
     setRecSendingNotification(true);
@@ -6194,7 +6133,6 @@ export function AtendimentoClient() {
                       {(() => {
                         if (showRecurringCard) {
                           const recAssigned = recurringAssignedProfessorForLead(sl);
-                          const recSavedLink = String((sl as any).recurring_class_link ?? "").trim();
                           const recHasPhone = Boolean(String(sl?.phone ?? "").trim());
                           const recWdRaw = String((sl as any).recurring_class_weekday ?? (sl as any).recurring_class_weekday_label ?? "").trim().toLowerCase();
                           const recWdOk = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"].includes(
@@ -6212,14 +6150,7 @@ export function AtendimentoClient() {
                           const recTimeOk = Boolean(recProfTimeRaw) || Boolean(recLeadTimeRaw);
                           const recSchedOk = recWdOk && recTimeOk;
                           const recPaymentConfirmed = hasLeadConfirmedPaymentForRecurringNotificationsClient(sl);
-                          const recCanSendDisparo = Boolean(recPaymentConfirmed && recAssigned && recSavedLink && recHasPhone && !recSendingNotification);
-                          const recLessonLinkSaveDisabled = (() => {
-                            const d = recurringLessonLinkDraft.trim();
-                            if (!d && !recSavedLink) return true;
-                            if (d === recSavedLink) return true;
-                            if (recSavingLessonLink) return true;
-                            return false;
-                          })();
+                          const recCanSendDisparo = Boolean(recPaymentConfirmed && recAssigned && recHasPhone && !recSendingNotification);
                           const recHorarioLabel = buildRecurringScheduleCardLabel(sl);
                           return (
                             <div className="relative overflow-hidden rounded-2xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] p-5 shadow-none">
@@ -6238,8 +6169,6 @@ export function AtendimentoClient() {
                                       disabled={!recCanSendDisparo}
                                       title={(() => {
                                         if (!recPaymentConfirmed) return "Confirme o pagamento pelo painel antes de disparar.";
-                                        if (!recSavedLink && !recAssigned) return "Adicione o link fixo da aula recorrente e selecione o professor antes de disparar.";
-                                        if (!recSavedLink) return "Adicione o link fixo da aula recorrente antes de disparar.";
                                         if (!recAssigned) return "Selecione o professor das aulas recorrentes antes de disparar.";
                                         if (!recHasPhone) return "Registro não possui telefone cadastrado para receber a notificação.";
                                         return "Disparar lembretes recorrentes agora.";
@@ -6347,47 +6276,6 @@ export function AtendimentoClient() {
                                   </div>
                                 </div>
                               )}
-                              <div className="mt-5">
-                                <div className="flex flex-col items-stretch gap-3 min-[600px]:flex-row min-[600px]:items-end">
-                                  <div className="min-w-0 flex-1">
-                                    <label className="mb-1.5 block text-[12px] font-semibold text-[var(--app-text-70)]">
-                                      Link fixo da aula recorrente
-                                    </label>
-                                    <input
-                                      type="url"
-                                      inputMode="url"
-                                      placeholder="https://meet.google.com/..."
-                                      value={recurringLessonLinkDraft}
-                                      onChange={(e) =>
-                                        setRecLessonLinkDraftByLeadId((prev) => ({
-                                          ...prev,
-                                          [sl.id]: e.target.value,
-                                        }))
-                                      }
-                                      className="w-full min-w-0 rounded-xl border border-[var(--app-border)] bg-[var(--app-solid-surface-2)] px-4 py-3 text-[13px] font-semibold text-[var(--app-text-85)] placeholder:text-[var(--app-text-45)] transition focus:border-[var(--app-border-strong)] focus:outline-none disabled:cursor-not-allowed disabled:opacity-55"
-                                      disabled={recSavingLessonLink}
-                                    />
-                                  </div>
-                                  <button
-                                    type="button"
-                                    onClick={() => void handleSaveLessonLinkRecurring(sl)}
-                                    disabled={recLessonLinkSaveDisabled}
-                                    className="inline-flex h-[46px] w-full items-center justify-center gap-2 rounded-xl border border-[var(--app-border)] bg-[var(--app-solid-surface-2)] px-4 text-[13px] font-semibold text-[var(--app-text-85)] transition hover:bg-[var(--app-hover)] min-[600px]:w-auto disabled:cursor-not-allowed disabled:opacity-55"
-                                  >
-                                    {recSavingLessonLink ? (
-                                      <>
-                                        <Loader2 className="h-4 w-4 shrink-0 animate-spin" />
-                                        Salvando...
-                                      </>
-                                    ) : (
-                                      <>
-                                        <Save className="h-4 w-4 shrink-0" />
-                                        {recSavedLink ? "Atualizar" : "Salvar"}
-                                      </>
-                                    )}
-                                  </button>
-                                </div>
-                              </div>
                             </div>
                           );
                         }
@@ -7732,7 +7620,6 @@ export function AtendimentoClient() {
                     {(() => {
                       if (showRecurringCard) {
                         const recAssigned = recurringAssignedProfessorForLead(sl);
-                        const recSavedLink = String((sl as any).recurring_class_link ?? "").trim();
                         const recHasPhone = Boolean(String(sl?.phone ?? "").trim());
                         const recWdRaw = String((sl as any).recurring_class_weekday ?? (sl as any).recurring_class_weekday_label ?? "").trim().toLowerCase();
                         const recWdOk = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"].includes(
@@ -7750,14 +7637,7 @@ export function AtendimentoClient() {
                         const recTimeOk = Boolean(recProfTimeRaw) || Boolean(recLeadTimeRaw);
                         const recSchedOk = recWdOk && recTimeOk;
                         const recPaymentConfirmed = hasLeadConfirmedPaymentForRecurringNotificationsClient(sl);
-                        const recCanSendDisparo = Boolean(recPaymentConfirmed && recAssigned && recSavedLink && recHasPhone && !recSendingNotification);
-                        const recLessonLinkSaveDisabled = (() => {
-                          const d = recurringLessonLinkDraft.trim();
-                          if (!d && !recSavedLink) return true;
-                          if (d === recSavedLink) return true;
-                          if (recSavingLessonLink) return true;
-                          return false;
-                        })();
+                        const recCanSendDisparo = Boolean(recPaymentConfirmed && recAssigned && recHasPhone && !recSendingNotification);
                         const recHorarioLabel = buildRecurringScheduleCardLabel(sl);
                         return (
                           <div className="relative overflow-hidden rounded-2xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] p-5 shadow-none">
@@ -7776,8 +7656,6 @@ export function AtendimentoClient() {
                                     disabled={!recCanSendDisparo}
                                     title={(() => {
                                       if (!recPaymentConfirmed) return "Confirme o pagamento pelo painel antes de disparar.";
-                                      if (!recSavedLink && !recAssigned) return "Adicione o link fixo da aula recorrente e selecione o professor antes de disparar.";
-                                      if (!recSavedLink) return "Adicione o link fixo da aula recorrente antes de disparar.";
                                       if (!recAssigned) return "Selecione o professor das aulas recorrentes antes de disparar.";
                                       if (!recHasPhone) return "Registro não possui telefone cadastrado para receber a notificação.";
                                       return "Disparar lembretes recorrentes agora.";
@@ -7885,47 +7763,6 @@ export function AtendimentoClient() {
                                 </div>
                               </div>
                             )}
-                            <div className="mt-5">
-                              <div className="flex flex-col items-stretch gap-3 min-[600px]:flex-row min-[600px]:items-end">
-                                <div className="min-w-0 flex-1">
-                                  <label className="mb-1.5 block text-[12px] font-semibold text-[var(--app-text-70)]">
-                                    Link fixo da aula recorrente
-                                  </label>
-                                  <input
-                                    type="url"
-                                    inputMode="url"
-                                    placeholder="https://meet.google.com/..."
-                                    value={recurringLessonLinkDraft}
-                                    onChange={(e) =>
-                                      setRecLessonLinkDraftByLeadId((prev) => ({
-                                        ...prev,
-                                        [sl.id]: e.target.value,
-                                      }))
-                                    }
-                                    className="w-full min-w-0 rounded-xl border border-[var(--app-border)] bg-[var(--app-solid-surface-2)] px-4 py-3 text-[13px] font-semibold text-[var(--app-text-85)] placeholder:text-[var(--app-text-45)] transition focus:border-[var(--app-border-strong)] focus:outline-none disabled:cursor-not-allowed disabled:opacity-55"
-                                    disabled={recSavingLessonLink}
-                                  />
-                                </div>
-                                <button
-                                  type="button"
-                                  onClick={() => void handleSaveLessonLinkRecurring(sl)}
-                                  disabled={recLessonLinkSaveDisabled}
-                                  className="inline-flex h-[46px] w-full items-center justify-center gap-2 rounded-xl border border-[var(--app-border)] bg-[var(--app-solid-surface-2)] px-4 text-[13px] font-semibold text-[var(--app-text-85)] transition hover:bg-[var(--app-hover)] min-[600px]:w-auto disabled:cursor-not-allowed disabled:opacity-55"
-                                >
-                                  {recSavingLessonLink ? (
-                                    <>
-                                      <Loader2 className="h-4 w-4 shrink-0 animate-spin" />
-                                      Salvando...
-                                    </>
-                                  ) : (
-                                    <>
-                                      <Save className="h-4 w-4 shrink-0" />
-                                      {recSavedLink ? "Atualizar" : "Salvar"}
-                                    </>
-                                  )}
-                                </button>
-                              </div>
-                            </div>
                           </div>
                         );
                       }
