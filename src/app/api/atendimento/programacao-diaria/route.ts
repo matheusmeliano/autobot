@@ -475,8 +475,6 @@ export async function GET(req: Request) {
       "recurring_class_weekday_label",
       "recurring_class_professor_name",
       "recurring_class_professor_phone",
-      "recurring_class_first_class_at",
-      "recurring_class_professor_date",
       "recurring_class_professor_time",
       "recurring_class_professor_timezone",
       "recurring_class_lead_time",
@@ -592,6 +590,16 @@ export async function GET(req: Request) {
           const resolvedNextProfessorDate = String(
             resolvedRecurringOccurrence?.professorDate ?? "",
           ).trim();
+          const lastNotifiedOccurrenceStartAt = String(
+            (r as any)?.recurring_class_last_notified_occurrence_start_at ?? "",
+          ).trim();
+          const recurringProfessorTimeZone =
+            String((r as any).recurring_class_professor_timezone ?? "").trim() ||
+            ATENDIMENTO_PROFESSOR_TIME_ZONE;
+          const recurringLastNotifiedMatchesTargetDate =
+            Boolean(lastNotifiedOccurrenceStartAt) &&
+            localDateInTimeZone(lastNotifiedOccurrenceStartAt, recurringProfessorTimeZone) ===
+              targetDate;
           const recurringAdvancedPastTargetDate =
             Boolean(resolvedNextProfessorDate) &&
             resolvedNextProfessorDate > targetDate;
@@ -629,6 +637,8 @@ export async function GET(req: Request) {
               String((r as any).recurring_class_attendant_start_notification_sent_at ?? "").trim() ||
               null,
             recurring_resolved_next_professor_date: resolvedNextProfessorDate || null,
+            recurring_last_notified_matches_target_date:
+              recurringLastNotifiedMatchesTargetDate,
             recurring_has_advanced_past_target_date: recurringAdvancedPastTargetDate,
             __noProfessor: !hasProfessor,
             __type: "recurring",
@@ -880,6 +890,7 @@ export async function GET(req: Request) {
       // valendo apenas a ocorrência realmente passada.
       const activeIsCompleted = isRecurringActive
         ? Boolean(
+            Boolean((active as any)?.recurring_last_notified_matches_target_date) ||
             Boolean((active as any)?.recurring_has_advanced_past_target_date) ||
               isPastByTime ||
               s.isPast,
