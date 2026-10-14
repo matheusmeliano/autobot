@@ -6,6 +6,7 @@ import {
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import {
   requireAtendimentoUser,
+  resolveRecurringDisplayOccurrenceMap,
 } from "@/lib/atendimento/server";
 // ====================================================================
 // LÓGICA SINCRONIZADA — TUDO que define "contar aulas no dia X" está
@@ -495,6 +496,13 @@ export async function GET(req: Request) {
     if (res.ok) {
       const arr = (await res.json()) as Array<Record<string, unknown>> | null;
       if (Array.isArray(arr) && arr.length > 0) {
+        const resolvedRecurringOccurrenceByLeadId =
+          await resolveRecurringDisplayOccurrenceMap({
+            admin,
+            leads: arr,
+            now: new Date(nowUtc),
+            lookAheadWeeks: 24,
+          });
         const targetMsLocalNoon =
           (() => {
             const [y, mo, d] = targetDate.split("-").map((n) => Number(n));
@@ -539,6 +547,16 @@ export async function GET(req: Request) {
           const pName = String((r as any).recurring_class_professor_name ?? "").trim();
           const pPhone = String((r as any).recurring_class_professor_phone ?? "").trim();
           const hasProfessor = Boolean(pName || pPhone);
+          const leadId = String(r.id ?? "").trim();
+          const resolvedRecurringOccurrence = leadId
+            ? resolvedRecurringOccurrenceByLeadId.get(leadId) ?? null
+            : null;
+          const resolvedNextProfessorDate = String(
+            resolvedRecurringOccurrence?.professorDate ?? "",
+          ).trim();
+          const recurringAdvancedPastTargetDate =
+            Boolean(resolvedNextProfessorDate) &&
+            resolvedNextProfessorDate > targetDate;
           let startIso = "";
           try {
             startIso = zonedDateTimeToUtcIso({
@@ -550,8 +568,8 @@ export async function GET(req: Request) {
             });
           } catch {}
           const entry: Record<string, unknown> = {
-            id: `recurring-${String(r.id ?? "")}`,
-            lead_id: String(r.id ?? ""),
+            id: `recurring-${leadId}`,
+            lead_id: leadId,
             phone: String(r.phone ?? "").trim() || null,
             status: stRec || "scheduled",
             professor_date: targetDate,
@@ -572,6 +590,8 @@ export async function GET(req: Request) {
             recurring_class_attendant_start_notification_sent_at:
               String((r as any).recurring_class_attendant_start_notification_sent_at ?? "").trim() ||
               null,
+            recurring_resolved_next_professor_date: resolvedNextProfessorDate || null,
+            recurring_has_advanced_past_target_date: recurringAdvancedPastTargetDate,
             __noProfessor: !hasProfessor,
             __type: "recurring",
           };
@@ -821,7 +841,11 @@ export async function GET(req: Request) {
       // assim que ele for marcado, sem esperar o horário passar. Para recorrentes, segue
       // valendo apenas a ocorrência realmente passada.
       const activeIsCompleted = isRecurringActive
-        ? Boolean(isPastByTime || s.isPast)
+        ? Boolean(
+            Boolean((active as any)?.recurring_has_advanced_past_target_date) ||
+              isPastByTime ||
+              s.isPast,
+          )
         : activeAttendanceStatus === "attended" ||
           bookingStatus === "completed" ||
           Boolean(activePostAttendanceSentAt) ||
