@@ -1353,6 +1353,38 @@ export default function CadastroRecorrenteBody() {
 
   const selectedWeekday = selectedDayOption?.weekday ?? null;
   const selectedWeekdayLabel = selectedDayOption?.displayLabel || selectedDayOption?.label || "";
+  const resolvedSelectedTimeOpt = useMemo<RecurringWeekdayTimeOption | null>(() => {
+    if (!selectedTimeOpt || !selectedDayOption) return null;
+    const selectedProfessorDate = String(selectedDayOption.professorDate ?? "").trim();
+    return (
+      availableTimesForSelected.find((opt) => {
+        const sameId =
+          String(opt.id ?? "").trim() !== "" &&
+          String(opt.id ?? "").trim() === String(selectedTimeOpt.id ?? "").trim();
+        const sameProfessorStartAt =
+          String(opt.professorStartAtIso ?? "").trim() !== "" &&
+          String(opt.professorStartAtIso ?? "").trim() ===
+            String(selectedTimeOpt.professorStartAtIso ?? "").trim();
+        const sameProfessorDateAndTime =
+          selectedProfessorDate !== "" &&
+          String(opt.professorDate ?? "").trim() === selectedProfessorDate &&
+          String(opt.professorTime ?? "").trim() ===
+            String(selectedTimeOpt.professorTime ?? "").trim();
+        return sameId || sameProfessorStartAt || sameProfessorDateAndTime;
+      }) ?? null
+    );
+  }, [availableTimesForSelected, selectedDayOption, selectedTimeOpt]);
+
+  useEffect(() => {
+    if (!selectedTimeOpt) return;
+    if (resolvedSelectedTimeOpt) {
+      if (resolvedSelectedTimeOpt !== selectedTimeOpt) {
+        setSelectedTimeOpt(resolvedSelectedTimeOpt);
+      }
+      return;
+    }
+    setSelectedTimeOpt(null);
+  }, [resolvedSelectedTimeOpt, selectedTimeOpt]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -1392,8 +1424,11 @@ export default function CadastroRecorrenteBody() {
           password: senha.trim() || null,
           weekday: selectedWeekday || null,
           weekdayLabel: weekdayLabelComputed || null,
-          professorTime: selectedTimeOpt?.professorTime || null,
-          leadTime: selectedTimeOpt?.leadTime || selectedTimeOpt?.displayLabel || null,
+          professorTime: resolvedSelectedTimeOpt?.professorTime || null,
+          leadTime:
+            resolvedSelectedTimeOpt?.leadTime ||
+            resolvedSelectedTimeOpt?.displayLabel ||
+            null,
           state: st,
           city: ct,
           country: inferredCountry,
@@ -1426,7 +1461,7 @@ export default function CadastroRecorrenteBody() {
     senha,
     selectedWeekday,
     availability,
-    selectedTimeOpt,
+    resolvedSelectedTimeOpt,
     stateField,
     cityField,
     leadTimezone,
@@ -1571,7 +1606,7 @@ export default function CadastroRecorrenteBody() {
   }
 
   async function handleSubmitFinal() {
-    if (!selectedDayId || !selectedWeekday || !selectedTimeOpt) return;
+    if (!selectedDayId || !selectedWeekday || !resolvedSelectedTimeOpt) return;
     setSubmitLoading(true);
     setSubmitError("");
     try {
@@ -1582,8 +1617,9 @@ export default function CadastroRecorrenteBody() {
           step: 4,
           weekday: selectedWeekday,
           weekdayLabel: opt?.displayLabel || opt?.label || selectedWeekdayLabel || null,
-          professorTime: selectedTimeOpt.professorTime,
-          leadTime: selectedTimeOpt.leadTime || selectedTimeOpt.displayLabel,
+          professorTime: resolvedSelectedTimeOpt.professorTime,
+          leadTime:
+            resolvedSelectedTimeOpt.leadTime || resolvedSelectedTimeOpt.displayLabel,
         });
       } finally {
         setDraftSaving(null);
@@ -1597,10 +1633,11 @@ export default function CadastroRecorrenteBody() {
           senha: senha.trim() || null,
           weekday: selectedWeekday,
           weekdayLabel: selectedWeekdayLabel || null,
-          professorTime: selectedTimeOpt.professorTime,
-          leadTime: selectedTimeOpt.leadTime || selectedTimeOpt.displayLabel,
+          professorTime: resolvedSelectedTimeOpt.professorTime,
+          leadTime:
+            resolvedSelectedTimeOpt.leadTime || resolvedSelectedTimeOpt.displayLabel,
           professorDate: selectedDayOption?.professorDate || null,
-          professorStartAt: selectedTimeOpt.professorStartAtIso || null,
+          professorStartAt: resolvedSelectedTimeOpt.professorStartAtIso || null,
         }),
       });
       const json = (await res.json().catch(() => null)) as

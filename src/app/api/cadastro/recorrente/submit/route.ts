@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { appendHistoryEvent, findLeadByPhone, ensureStudentAuthUserCreatedForLead } from "@/lib/atendimento/server";
 import { RECURRING_WEEKDAY_LABELS_PT_BR } from "@/lib/atendimento/experimentalClass";
+import { zonedDateTimeToUtcIso } from "@/lib/timezone";
+import { ATENDIMENTO_PROFESSOR_TIME_ZONE } from "@/lib/atendimento/constants";
 
 function toErrorMessage(raw: unknown, fallback = "Erro desconhecido."): string {
   if (raw === null || raw === undefined) return fallback;
@@ -173,9 +175,21 @@ export async function POST(req: NextRequest) {
     const safeProfessorDate = /^\d{4}-\d{2}-\d{2}$/.test(String(professorDate ?? "").trim())
       ? String(professorDate!).trim()
       : null;
-    const safeProfessorStartAt = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/.test(String(professorStartAt ?? "").trim())
+    const rawProfessorStartAt = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/.test(String(professorStartAt ?? "").trim())
       ? String(professorStartAt!).trim()
       : null;
+    let safeProfessorStartAt = rawProfessorStartAt;
+    if (safeProfessorDate && /^\d{2}:\d{2}$/.test(String(professorTime ?? "").trim())) {
+      try {
+        safeProfessorStartAt = zonedDateTimeToUtcIso({
+          date: safeProfessorDate,
+          time: String(professorTime ?? "").trim(),
+          timeZone: ATENDIMENTO_PROFESSOR_TIME_ZONE,
+        });
+      } catch {
+        safeProfessorStartAt = rawProfessorStartAt;
+      }
+    }
 
     const patchFull: Record<string, unknown> = {
       recurring_class_status: "confirmado",
