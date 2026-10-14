@@ -477,7 +477,6 @@ export async function GET(req: Request) {
       "recurring_class_professor_phone",
       "recurring_class_first_class_at",
       "recurring_class_professor_date",
-      "recurring_class_lead_date",
       "recurring_class_professor_time",
       "recurring_class_professor_timezone",
       "recurring_class_lead_time",
