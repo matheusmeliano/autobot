@@ -613,6 +613,7 @@ export default function CadastroRecorrenteBody() {
       const qs = new URLSearchParams();
       qs.set("lead_timezone", tzUse);
       if (tzBrowser) qs.set("timezone", tzBrowser);
+      qs.set("look_ahead_weeks", "3");
       const leadId = String(alunoLeadFull?.id ?? "").trim();
       const phoneDigits = String(alunoLeadFull?.phone ?? phoneField ?? "").replace(/\D/g, "").trim();
       if (leadId) qs.set("lead_id", leadId);

@@ -41,6 +41,11 @@ export async function GET(req: NextRequest) {
     const tzBrowser = String(searchParams.get("timezone") ?? "").trim();
     const leadId = String(searchParams.get("lead_id") ?? "").trim();
     const leadPhone = String(searchParams.get("phone") ?? "").trim();
+    const lookAheadWeeksRaw = Number(String(searchParams.get("look_ahead_weeks") ?? "").trim());
+    const lookAheadWeeks =
+      Number.isFinite(lookAheadWeeksRaw) && lookAheadWeeksRaw >= 2
+        ? Math.min(Math.trunc(lookAheadWeeksRaw), 6)
+        : 2;
     const tzRaw = tzLead || tzBrowser || ATENDIMENTO_PROFESSOR_TIME_ZONE;
     const admin = createSupabaseAdminClient();
     const now = new Date();
@@ -110,7 +115,7 @@ export async function GET(req: NextRequest) {
       now,
       leadTimeZone: tzRaw,
       occupiedIntervals: relevantIntervals,
-      lookAheadWeeks: 2,
+      lookAheadWeeks,
     });
 
     const slotsMap = (result.slotsByWeekdayDate ?? result.slotsByWeekday ?? {}) as Record<string, unknown>;
