@@ -604,6 +604,42 @@ function getValidStoredNextRecurringOccurrence(lead: AtendimentoLeadListItem): {
   };
 }
 
+function resolveRecurringOccurrenceSearchFromLead(
+  lead: AtendimentoLeadListItem,
+): Date {
+  const effectiveLeadTz = deriveLeadEffectiveTimeZone(lead);
+  const candidateMs = [
+    resolveRecurringOccurrenceComparableMs({
+      startAt: (lead as any)?.recurring_class_first_class_at,
+      timeZone: ATENDIMENTO_PROFESSOR_TIME_ZONE,
+    }),
+    resolveRecurringOccurrenceComparableMs({
+      localDate: (lead as any)?.recurring_class_professor_date,
+      time:
+        (lead as any)?.recurring_class_professor_time ??
+        (lead as any)?.recurring_class_lead_time,
+      timeZone: ATENDIMENTO_PROFESSOR_TIME_ZONE,
+    }),
+    resolveRecurringOccurrenceComparableMs({
+      localDate:
+        (lead as any)?.recurring_class_lead_date ??
+        (lead as any)?.recurring_class_professor_date,
+      time:
+        (lead as any)?.recurring_class_lead_time ??
+        (lead as any)?.recurring_class_professor_time,
+      timeZone: effectiveLeadTz,
+    }),
+  ].filter((value): value is number => Number.isFinite(value));
+
+  const bestAnchorMs =
+    candidateMs.length > 0 ? Math.max(...candidateMs) : null;
+
+  return resolveRecurringOccurrenceSearchFromDate({
+    firstClassAt:
+      bestAnchorMs != null ? new Date(bestAnchorMs).toISOString() : null,
+  });
+}
+
 function buildRecurringScheduleDisplayInfo(
   lead: AtendimentoLeadListItem
 ): {
@@ -651,9 +687,7 @@ function buildRecurringScheduleDisplayInfo(
   const normalizedWeekday = normalizeRecurringWeekdayToken(wdRaw || wdLabelRaw);
   if (!["mon", "tue", "wed", "thu", "fri", "sat", "sun"].includes(normalizedWeekday)) return null;
 
-  const displayFromDate = resolveRecurringOccurrenceSearchFromDate({
-    firstClassAt: String((lead as any)?.recurring_class_first_class_at ?? "").trim() || null,
-  });
+  const displayFromDate = resolveRecurringOccurrenceSearchFromLead(lead);
   const displayOccurrence = calculateDisplayRecurringOccurrence({
     weekday: normalizedWeekday as "mon" | "tue" | "wed" | "thu" | "fri" | "sat" | "sun",
     professorTimeHHMM:
@@ -915,9 +949,7 @@ function buildExperimentalMetaForList(lead: AtendimentoLeadListItem): { label: s
             professorTimeZone: ATENDIMENTO_PROFESSOR_TIME_ZONE,
             leadTimeZone: leadEffectiveTz,
             leadTimeHHMM: normalizeScheduleTimeForComparison(gRecurringLeadTimeRaw),
-            fromDate: resolveRecurringOccurrenceSearchFromDate({
-              firstClassAt: String((lead as any)?.recurring_class_first_class_at ?? "").trim() || null,
-            }),
+            fromDate: resolveRecurringOccurrenceSearchFromLead(lead),
             lastNotifiedOccurrenceStartAt: String(
               (lead as any)?.recurring_class_last_notified_occurrence_start_at ?? "",
             ).trim(),
