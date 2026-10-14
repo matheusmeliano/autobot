@@ -592,11 +592,13 @@ Acompanhe o atendimento e certifique-se de que tudo ocorra bem.`;
 export function buildRecurringClassStudentLessonReadyWhatsAppMessage(name: string | null | undefined) {
   const safeFull = String(name ?? "").trim();
   const safeFirst = safeFull.split(/\s+/)[0] || "Aluno";
-  return `${safeFirst}, sua aula recorrente já está disponível.
+  return `Olá, ${safeFirst}! Sua aula começa agora. 😊
 
-O professor já está te aguardando.
+Caso ainda não tenha recebido o link da aula enviado pelo seu professor, entre em contato conosco pelo número: (65) 9949-5594.
 
-Lembrando que ele aguardará por até 10 minutos. Após esse período, a aula será encerrada para dar continuidade aos demais agendamentos.`;
+Lembramos que o professor ficará disponível por até 10 minutos após o horário de início da aula. Após esse período, a aula será encerrada para que ele possa dar continuidade aos próximos agendamentos.
+
+Desejamos uma ótima aula!`;
 }
 
 export function buildRecurringClassAttendantStartReminderWhatsAppMessage(name: string | null | undefined) {
