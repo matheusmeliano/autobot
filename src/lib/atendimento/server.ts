@@ -4035,6 +4035,44 @@ export async function resolveRecurringDisplayOccurrenceMap(params: {
   now?: Date;
   lookAheadWeeks?: number;
 }): Promise<Map<string, ReturnType<typeof calculateDisplayRecurringOccurrence>>> {
+  const resolveDisplayAnchorIso = (lead: Record<string, unknown>): string | null => {
+    const candidates: number[] = [];
+
+    const firstClassAt = String((lead as any)?.recurring_class_first_class_at ?? "").trim();
+    if (firstClassAt) {
+      const firstMs = new Date(firstClassAt).getTime();
+      if (Number.isFinite(firstMs)) candidates.push(firstMs);
+    }
+
+    const professorDate = String((lead as any)?.recurring_class_professor_date ?? "").trim();
+    const professorTime = /^\d{2}:\d{2}$/.test(String((lead as any)?.recurring_class_professor_time ?? ""))
+      ? String((lead as any)?.recurring_class_professor_time ?? "").trim()
+      : /^\d{2}:\d{2}$/.test(String((lead as any)?.recurring_class_lead_time ?? ""))
+        ? String((lead as any)?.recurring_class_lead_time ?? "").trim()
+        : "";
+    const professorTimeZone =
+      String((lead as any)?.recurring_class_professor_timezone ?? "").trim() ||
+      process.env.EXPERIMENTAL_CLASS_PROFESSOR_TIME_ZONE ||
+      process.env.ATENDIMENTO_PROFESSOR_TIME_ZONE ||
+      "America/Sao_Paulo";
+
+    if (/^\d{4}-\d{2}-\d{2}$/.test(professorDate) && professorTime) {
+      try {
+        const professorAnchorMs = new Date(
+          zonedDateTimeToUtcIso({
+            date: professorDate,
+            time: professorTime,
+            timeZone: professorTimeZone,
+          }),
+        ).getTime();
+        if (Number.isFinite(professorAnchorMs)) candidates.push(professorAnchorMs);
+      } catch {}
+    }
+
+    if (!candidates.length) return null;
+    return new Date(Math.max(...candidates)).toISOString();
+  };
+
   const now = params.now ?? new Date();
   const lookAheadWeeks = Number.isFinite(Number(params.lookAheadWeeks))
     ? Math.max(6, Number(params.lookAheadWeeks))
@@ -4095,7 +4133,7 @@ export async function resolveRecurringDisplayOccurrenceMap(params: {
 
     const occurrenceSearchFromDate = resolveRecurringOccurrenceSearchFromDate({
       now,
-      firstClassAt: String((lead as any)?.recurring_class_first_class_at ?? "").trim() || null,
+      firstClassAt: resolveDisplayAnchorIso(lead),
     });
     const occurrence = calculateDisplayRecurringOccurrence({
       weekday: weekdayRaw as RecurringWeekdayKey,
