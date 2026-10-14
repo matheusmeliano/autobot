@@ -425,15 +425,23 @@ function weekdayShortFromLocalDate(localDate: string, timeZone: string): string 
   }
 }
 
-function buildRecurringNextOccurrenceNiceLabel(
+function formatRecurringCardTime(raw: unknown): string {
+  const value = String(raw ?? "").trim();
+  if (!value) return "";
+  if (/h$/i.test(value)) return value;
+  return `${value.replace(/h$/i, "").trim()}h`;
+}
+
+function buildRecurringScheduleDisplayInfo(
   lead: AtendimentoLeadListItem
-): { weekdayWithDate: string; time: string } | null {
-  const formatRecurringCardTime = (raw: unknown): string => {
-    const value = String(raw ?? "").trim();
-    if (!value) return "";
-    if (/h$/i.test(value)) return value;
-    return `${value.replace(/h$/i, "").trim()}h`;
-  };
+): {
+  weekdayWithDate: string;
+  time: string;
+  leadDateRaw: string;
+  leadTimeRaw: string;
+  professorDateRaw: string;
+  professorTimeRaw: string;
+} | null {
   const storedNextLeadLocal = String(
     (lead as any)?.recurring_class_next_lead_date ??
       "",
@@ -463,18 +471,31 @@ function buildRecurringNextOccurrenceNiceLabel(
   const storedWeekdayLabel = String(
     (lead as any)?.recurring_class_next_weekday_label ?? "",
   ).trim();
+  const baseProfessorTimeRaw = String(
+    (lead as any)?.recurring_class_professor_time ?? (lead as any)?.recurring_class_lead_time ?? "",
+  ).trim();
+  const baseLeadTimeRaw = String(
+    (lead as any)?.recurring_class_lead_time ?? (lead as any)?.recurring_class_professor_time ?? "",
+  ).trim();
   if (storedNextLocal) {
     const [, mm, dd] = storedNextLocal.split("-");
     const shortDm = mm && dd ? `${dd}/${mm}` : storedNextLocal;
     const wdWithDate = storedWeekdayLabel ? `${storedWeekdayLabel} (${shortDm})` : "";
-    const cleanTime = formatRecurringCardTime(storedNextTime);
-    return { weekdayWithDate: wdWithDate, time: cleanTime };
+    const cleanTime = formatRecurringCardTime(storedNextLeadTime || storedNextTime || baseLeadTimeRaw);
+    return {
+      weekdayWithDate: wdWithDate,
+      time: cleanTime,
+      leadDateRaw: storedNextLeadLocal || storedNextProfessorLocal,
+      leadTimeRaw: storedNextLeadTime || baseLeadTimeRaw || storedNextProfessorTime,
+      professorDateRaw: storedNextProfessorLocal || storedNextLeadLocal,
+      professorTimeRaw: storedNextProfessorTime || baseProfessorTimeRaw || storedNextLeadTime,
+    };
   }
 
   // Campos da recorrência
   const wdRaw = String((lead as any)?.recurring_class_weekday ?? "").trim();
   const wdLabelRaw = String((lead as any)?.recurring_class_weekday_label ?? "").trim();
-  const tmRaw = String((lead as any)?.recurring_class_lead_time ?? (lead as any)?.recurring_class_professor_time ?? "").trim();
+  const tmRaw = baseLeadTimeRaw;
   const tz = deriveLeadEffectiveTimeZone(lead);
   const normalizedWeekday = normalizeRecurringWeekdayToken(wdRaw || wdLabelRaw);
   if (!["mon", "tue", "wed", "thu", "fri", "sat", "sun"].includes(normalizedWeekday)) return null;
@@ -532,56 +553,30 @@ function buildRecurringNextOccurrenceNiceLabel(
 
   const cleanTime = formatRecurringCardTime(displayOccurrence?.leadTime ?? tmRaw);
 
-  return { weekdayWithDate: wdWithDate, time: cleanTime };
+  return {
+    weekdayWithDate: wdWithDate,
+    time: cleanTime,
+    leadDateRaw: String(displayOccurrence?.leadDate ?? displayOccurrence?.professorDate ?? "").trim(),
+    leadTimeRaw: String(displayOccurrence?.leadTime ?? tmRaw).trim(),
+    professorDateRaw: String(displayOccurrence?.professorDate ?? displayOccurrence?.leadDate ?? "").trim(),
+    professorTimeRaw: String(
+      displayOccurrence?.professorTime ??
+        (lead as any)?.recurring_class_professor_time ??
+        (lead as any)?.recurring_class_lead_time ??
+        "",
+    ).trim(),
+  };
 }
 
-function renderRecurringScheduleTimeDetails(lead: AtendimentoLeadListItem) {
-  const formatRecurringCardTime = (raw: unknown): string => {
-    const value = String(raw ?? "").trim();
-    if (!value) return "";
-    if (/h$/i.test(value)) return value;
-    return `${value.replace(/h$/i, "").trim()}h`;
+function buildRecurringNextOccurrenceNiceLabel(
+  lead: AtendimentoLeadListItem
+): { weekdayWithDate: string; time: string } | null {
+  const recurringInfo = buildRecurringScheduleDisplayInfo(lead);
+  if (!recurringInfo) return null;
+  return {
+    weekdayWithDate: recurringInfo.weekdayWithDate,
+    time: recurringInfo.time,
   };
-
-  const leadTime = formatRecurringCardTime(
-    String(
-      (lead as any)?.recurring_class_next_lead_time ??
-        (lead as any)?.recurring_class_lead_time ??
-        (lead as any)?.recurring_class_professor_time ??
-        "",
-    ).trim(),
-  );
-  const professorTime = formatRecurringCardTime(
-    String(
-      (lead as any)?.recurring_class_next_professor_time ??
-        (lead as any)?.recurring_class_professor_time ??
-        (lead as any)?.recurring_class_lead_time ??
-        "",
-    ).trim(),
-  );
-
-  if (!leadTime && !professorTime) return null;
-
-  return (
-    <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
-      <div className="rounded-lg border border-[#2563eb]/20 bg-white/45 px-3 py-2">
-        <div className="text-[10px] font-bold uppercase tracking-[0.16em] text-[#1d4ed8]/70">
-          Horário do aluno
-        </div>
-        <div className="mt-1 text-[13px] font-semibold text-[#1e3a8a]">
-          {leadTime || "—"}
-        </div>
-      </div>
-      <div className="rounded-lg border border-[#2563eb]/20 bg-white/45 px-3 py-2">
-        <div className="text-[10px] font-bold uppercase tracking-[0.16em] text-[#1d4ed8]/70">
-          Horário do professor
-        </div>
-        <div className="mt-1 text-[13px] font-semibold text-[#1e3a8a]">
-          {professorTime || "—"}
-        </div>
-      </div>
-    </div>
-  );
 }
 
 function buildRecurringScheduleCardLabel(lead: AtendimentoLeadListItem): string {
@@ -1220,6 +1215,8 @@ export function AtendimentoClient() {
 
   const [isExpInfoOpen, setIsExpInfoOpen] = useState(false);
   const [expInfoLead, setExpInfoLead] = useState<AtendimentoLeadListItem | null>(null);
+  const [isRecurringInfoOpen, setIsRecurringInfoOpen] = useState(false);
+  const [recurringInfoLead, setRecurringInfoLead] = useState<AtendimentoLeadListItem | null>(null);
 
   const [isEditSenhaOpen, setIsEditSenhaOpen] = useState(false);
   const [editSenhaValue, setEditSenhaValue] = useState("");
@@ -3482,6 +3479,17 @@ export function AtendimentoClient() {
   function handleCloseExpInfo() {
     setIsExpInfoOpen(false);
     setExpInfoLead(null);
+  }
+
+  function handleOpenRecurringInfo(lead: AtendimentoLeadListItem | null) {
+    if (!lead) return;
+    setRecurringInfoLead(lead);
+    setIsRecurringInfoOpen(true);
+  }
+
+  function handleCloseRecurringInfo() {
+    setIsRecurringInfoOpen(false);
+    setRecurringInfoLead(null);
   }
 
   function handleOpenEditSenha() {
@@ -5928,8 +5936,12 @@ export function AtendimentoClient() {
                             const nextOcc = (() => {
                               try { return buildRecurringNextOccurrenceNiceLabel(selectedLead); } catch { return null; }
                             })();
+                          const recurringInfo = (() => {
+                            try { return buildRecurringScheduleDisplayInfo(selectedLead); } catch { return null; }
+                          })();
                             if (isConcluded) {
                               return (
+                              <>
                                 <div className="mt-4 flex items-start gap-3 rounded-xl border border-[#2563eb]/35 bg-[rgba(37,99,235,0.12)] px-4 py-3">
                                   <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[#2563eb]/20 text-[#1d4ed8]">
                                     <RefreshCw className="h-5 w-5" />
@@ -5950,9 +5962,21 @@ export function AtendimentoClient() {
                                     <div className="mt-0.5 text-[13px] text-[#1d4ed8]/80">
                                       Aulas recorrentes semanais para este aluno.
                                     </div>
-                                    {renderRecurringScheduleTimeDetails(selectedLead)}
                                   </div>
                                 </div>
+                                <div className="mt-4 flex justify-end gap-2">
+                                  <button
+                                    type="button"
+                                    onClick={() => handleOpenRecurringInfo(selectedLead)}
+                                    className="inline-flex h-10 items-center justify-center gap-2 rounded-full border border-[var(--app-border)] bg-[var(--app-solid-surface)] px-4 text-[13px] font-semibold text-[var(--app-text-85)] hover:bg-[var(--app-hover)] disabled:cursor-not-allowed disabled:opacity-55"
+                                    disabled={!recurringInfo}
+                                    title={!recurringInfo ? "Dados do horário recorrente indisponíveis." : undefined}
+                                  >
+                                    <Info className="h-4 w-4" />
+                                    Mais informações
+                                  </button>
+                                </div>
+                              </>
                               );
                             }
                             if (hasAny) {
@@ -5974,29 +5998,42 @@ export function AtendimentoClient() {
                                 );
                               }
                               return (
-                                <div className="mt-4 flex items-start gap-3 rounded-xl border border-[#2563eb]/35 bg-[rgba(37,99,235,0.12)] px-4 py-3">
-                                  <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[#2563eb]/20 text-[#1d4ed8]">
-                                    <RefreshCw className="h-5 w-5" />
-                                  </div>
-                                  <div className="min-w-0">
-                                    <div className="font-semibold text-[#1e3a8a] truncate">
-                                      {(() => {
-                                        const parts: string[] = [];
-                                        if (nextOcc?.weekdayWithDate) parts.push(`${nextOcc.weekdayWithDate}`);
-                                        else if (wd) parts.push(`${wd}`);
-                                        if (nextOcc?.time) parts.push(`às ${nextOcc.time.replace(/h$/i, "")}`);
-                                        else if (tm) parts.push(`às ${tm}`);
-                                        if (parts.length === 0 && st) parts.push(`${rcsLabelFn(st)}`);
-                                        if (parts.length === 0) return "Aula recorrente cadastrada.";
-                                        return parts.join(" ");
-                                      })()}
+                                <>
+                                  <div className="mt-4 flex items-start gap-3 rounded-xl border border-[#2563eb]/35 bg-[rgba(37,99,235,0.12)] px-4 py-3">
+                                    <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[#2563eb]/20 text-[#1d4ed8]">
+                                      <RefreshCw className="h-5 w-5" />
                                     </div>
-                                    <div className="mt-0.5 text-[13px] text-[#1d4ed8]/80">
-                                      Aguarde a definição das aulas recorrentes.
+                                    <div className="min-w-0">
+                                      <div className="font-semibold text-[#1e3a8a] truncate">
+                                        {(() => {
+                                          const parts: string[] = [];
+                                          if (nextOcc?.weekdayWithDate) parts.push(`${nextOcc.weekdayWithDate}`);
+                                          else if (wd) parts.push(`${wd}`);
+                                          if (nextOcc?.time) parts.push(`às ${nextOcc.time.replace(/h$/i, "")}`);
+                                          else if (tm) parts.push(`às ${tm}`);
+                                          if (parts.length === 0 && st) parts.push(`${rcsLabelFn(st)}`);
+                                          if (parts.length === 0) return "Aula recorrente cadastrada.";
+                                          return parts.join(" ");
+                                        })()}
+                                      </div>
+                                      <div className="mt-0.5 text-[13px] text-[#1d4ed8]/80">
+                                        Aguarde a definição das aulas recorrentes.
+                                      </div>
                                     </div>
-                                    {renderRecurringScheduleTimeDetails(selectedLead)}
                                   </div>
-                                </div>
+                                  <div className="mt-4 flex justify-end gap-2">
+                                    <button
+                                      type="button"
+                                      onClick={() => handleOpenRecurringInfo(selectedLead)}
+                                      className="inline-flex h-10 items-center justify-center gap-2 rounded-full border border-[var(--app-border)] bg-[var(--app-solid-surface)] px-4 text-[13px] font-semibold text-[var(--app-text-85)] hover:bg-[var(--app-hover)] disabled:cursor-not-allowed disabled:opacity-55"
+                                      disabled={!recurringInfo}
+                                      title={!recurringInfo ? "Dados do horário recorrente indisponíveis." : undefined}
+                                    >
+                                      <Info className="h-4 w-4" />
+                                      Mais informações
+                                    </button>
+                                  </div>
+                                </>
                               );
                             }
                             return (
@@ -7464,31 +7501,47 @@ export function AtendimentoClient() {
                           const nextOcc = (() => {
                             try { return buildRecurringNextOccurrenceNiceLabel(selectedLead); } catch { return null; }
                           })();
+                          const recurringInfo = (() => {
+                            try { return buildRecurringScheduleDisplayInfo(selectedLead); } catch { return null; }
+                          })();
                           if (isConcluded) {
                             return (
-                              <div className="mt-4 flex items-start gap-3 rounded-xl border border-[#2563eb]/35 bg-[rgba(37,99,235,0.12)] px-4 py-3">
-                                <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[#2563eb]/20 text-[#1d4ed8]">
-                                  <RefreshCw className="h-5 w-5" />
-                                </div>
-                                <div className="min-w-0">
-                                  <div className="font-semibold text-[#1e3a8a] truncate">
-                                    {(() => {
-                                      const parts: string[] = [];
-                                      if (nextOcc?.weekdayWithDate) parts.push(`${nextOcc.weekdayWithDate}`);
-                                      else if (wd) parts.push(`${wd}`);
-                                      if (nextOcc?.time) parts.push(`às ${nextOcc.time.replace(/h$/i, "")}`);
-                                      else if (tm) parts.push(`às ${tm}`);
-                                      if (parts.length === 0 && st) parts.push(`${rcsLabelFn(st)}`);
-                                      if (parts.length === 0) return "Aulas recorrentes ativas.";
-                                      return `${parts.join(" ")} (semanal)`;
-                                    })()}
+                              <>
+                                <div className="mt-4 flex items-start gap-3 rounded-xl border border-[#2563eb]/35 bg-[rgba(37,99,235,0.12)] px-4 py-3">
+                                  <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[#2563eb]/20 text-[#1d4ed8]">
+                                    <RefreshCw className="h-5 w-5" />
                                   </div>
-                                  <div className="mt-0.5 text-[13px] text-[#1d4ed8]/80">
-                                    Matrícula confirmada. Aulas recorrentes semanais para este aluno.
+                                  <div className="min-w-0">
+                                    <div className="font-semibold text-[#1e3a8a] truncate">
+                                      {(() => {
+                                        const parts: string[] = [];
+                                        if (nextOcc?.weekdayWithDate) parts.push(`${nextOcc.weekdayWithDate}`);
+                                        else if (wd) parts.push(`${wd}`);
+                                        if (nextOcc?.time) parts.push(`às ${nextOcc.time.replace(/h$/i, "")}`);
+                                        else if (tm) parts.push(`às ${tm}`);
+                                        if (parts.length === 0 && st) parts.push(`${rcsLabelFn(st)}`);
+                                        if (parts.length === 0) return "Aulas recorrentes ativas.";
+                                        return `${parts.join(" ")} (semanal)`;
+                                      })()}
+                                    </div>
+                                    <div className="mt-0.5 text-[13px] text-[#1d4ed8]/80">
+                                      Matrícula confirmada. Aulas recorrentes semanais para este aluno.
+                                    </div>
                                   </div>
-                                  {renderRecurringScheduleTimeDetails(selectedLead)}
                                 </div>
-                              </div>
+                                <div className="mt-4 flex justify-end gap-2">
+                                  <button
+                                    type="button"
+                                    onClick={() => handleOpenRecurringInfo(selectedLead)}
+                                    className="inline-flex h-10 items-center justify-center gap-2 rounded-full border border-[var(--app-border)] bg-[var(--app-solid-surface)] px-4 text-[13px] font-semibold text-[var(--app-text-85)] hover:bg-[var(--app-hover)] disabled:cursor-not-allowed disabled:opacity-55"
+                                    disabled={!recurringInfo}
+                                    title={!recurringInfo ? "Dados do horário recorrente indisponíveis." : undefined}
+                                  >
+                                    <Info className="h-4 w-4" />
+                                    Mais informações
+                                  </button>
+                                </div>
+                              </>
                             );
                           }
                           if (hasAny) {
@@ -7510,29 +7563,42 @@ export function AtendimentoClient() {
                               );
                             }
                             return (
-                              <div className="mt-4 flex items-start gap-3 rounded-xl border border-[#2563eb]/35 bg-[rgba(37,99,235,0.12)] px-4 py-3">
-                                <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[#2563eb]/20 text-[#1d4ed8]">
-                                  <RefreshCw className="h-5 w-5" />
-                                </div>
-                                <div className="min-w-0">
-                                  <div className="font-semibold text-[#1e3a8a] truncate">
-                                    {(() => {
-                                      const parts: string[] = [];
-                                      if (nextOcc?.weekdayWithDate) parts.push(`${nextOcc.weekdayWithDate}`);
-                                      else if (wd) parts.push(`${wd}`);
-                                      if (nextOcc?.time) parts.push(`às ${nextOcc.time.replace(/h$/i, "")}`);
-                                      else if (tm) parts.push(`às ${tm}`);
-                                      if (parts.length === 0 && st) parts.push(`${rcsLabelFn(st)}`);
-                                      if (parts.length === 0) return "Aula recorrente cadastrada.";
-                                      return parts.join(" ");
-                                    })()}
+                              <>
+                                <div className="mt-4 flex items-start gap-3 rounded-xl border border-[#2563eb]/35 bg-[rgba(37,99,235,0.12)] px-4 py-3">
+                                  <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[#2563eb]/20 text-[#1d4ed8]">
+                                    <RefreshCw className="h-5 w-5" />
                                   </div>
-                                  <div className="mt-0.5 text-[13px] text-[#1d4ed8]/80">
-                                    Aguarde a definição das aulas recorrentes.
+                                  <div className="min-w-0">
+                                    <div className="font-semibold text-[#1e3a8a] truncate">
+                                      {(() => {
+                                        const parts: string[] = [];
+                                        if (nextOcc?.weekdayWithDate) parts.push(`${nextOcc.weekdayWithDate}`);
+                                        else if (wd) parts.push(`${wd}`);
+                                        if (nextOcc?.time) parts.push(`às ${nextOcc.time.replace(/h$/i, "")}`);
+                                        else if (tm) parts.push(`às ${tm}`);
+                                        if (parts.length === 0 && st) parts.push(`${rcsLabelFn(st)}`);
+                                        if (parts.length === 0) return "Aula recorrente cadastrada.";
+                                        return parts.join(" ");
+                                      })()}
+                                    </div>
+                                    <div className="mt-0.5 text-[13px] text-[#1d4ed8]/80">
+                                      Aguarde a definição das aulas recorrentes.
+                                    </div>
                                   </div>
-                                  {renderRecurringScheduleTimeDetails(selectedLead)}
                                 </div>
-                              </div>
+                                <div className="mt-4 flex justify-end gap-2">
+                                  <button
+                                    type="button"
+                                    onClick={() => handleOpenRecurringInfo(selectedLead)}
+                                    className="inline-flex h-10 items-center justify-center gap-2 rounded-full border border-[var(--app-border)] bg-[var(--app-solid-surface)] px-4 text-[13px] font-semibold text-[var(--app-text-85)] hover:bg-[var(--app-hover)] disabled:cursor-not-allowed disabled:opacity-55"
+                                    disabled={!recurringInfo}
+                                    title={!recurringInfo ? "Dados do horário recorrente indisponíveis." : undefined}
+                                  >
+                                    <Info className="h-4 w-4" />
+                                    Mais informações
+                                  </button>
+                                </div>
+                              </>
                             );
                           }
                           return (
@@ -8945,6 +9011,111 @@ export function AtendimentoClient() {
               <button
                 type="button"
                 onClick={handleCloseExpInfo}
+                className="inline-flex min-h-[44px] items-center justify-center gap-1.5 rounded-xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] px-5 text-[13px] font-semibold text-[var(--app-text-85)] hover:bg-[var(--app-hover)] disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                Fechar
+              </button>
+            </div>
+          </div>
+        </div>
+      </AppModal>
+
+      <AppModal
+        open={isRecurringInfoOpen}
+        onClose={handleCloseRecurringInfo}
+        size="md"
+        position="center"
+        zIndexClass="z-[400]"
+        fullScreenOnMobile={false}
+        closeOnBackdrop={true}
+        closeOnEscape={true}
+      >
+        <div className="flex w-full flex-col gap-0">
+          <div className="flex shrink-0 items-center justify-between gap-3 pb-1">
+            <div className="flex items-center gap-3 min-w-0">
+              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-[rgba(37,99,235,0.15)]">
+                <Info className="h-5 w-5 text-[#1d4ed8]" aria-hidden="true" />
+              </div>
+              <div className="min-w-0">
+                <h3 className="truncate text-[18px] font-bold leading-tight text-[var(--app-text-85)]">
+                  Agendamento da aula
+                </h3>
+                <div className="mt-0.5 text-[12px] text-[var(--app-text-55)]">
+                  Resumo completo do horário marcado para a aula.
+                </div>
+              </div>
+            </div>
+            <button
+              type="button"
+              aria-label="Fechar"
+              onClick={handleCloseRecurringInfo}
+              className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-[var(--app-border)] bg-[var(--app-solid-surface)] text-[var(--app-text-70)] hover:bg-[var(--app-hover)] disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+
+          <div className="mt-5 space-y-4">
+            {(() => {
+              const lead = recurringInfoLead ?? selectedLead;
+              const recurringInfo = lead ? buildRecurringScheduleDisplayInfo(lead) : null;
+              const formatTime = (raw: string) => {
+                const formatted = formatRecurringCardTime(raw);
+                return formatted || "—";
+              };
+
+              if (!lead || !recurringInfo) {
+                return (
+                  <div className="rounded-2xl border border-[var(--app-border)] bg-[var(--app-solid-surface-2)] px-4 py-6 text-[13px] text-[var(--app-text-55)]">
+                    Dados indisponíveis no momento.
+                  </div>
+                );
+              }
+
+              return (
+                <div className="overflow-hidden rounded-2xl border border-[var(--app-border)] bg-[var(--app-solid-surface-2)] p-4 space-y-3">
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                    <div className="rounded-xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] px-4 py-3 space-y-1">
+                      <div className="text-[11px] font-bold uppercase tracking-wide text-[var(--app-text-50)]">
+                        Dia (aluno)
+                      </div>
+                      <div className="text-[15px] font-semibold text-[var(--app-text-88)]">
+                        {recurringInfo.leadDateRaw ? formatAtendimentoDate(recurringInfo.leadDateRaw) : "—"}
+                      </div>
+                    </div>
+                    <div className="rounded-xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] px-4 py-3 space-y-1">
+                      <div className="text-[11px] font-bold uppercase tracking-wide text-[var(--app-text-50)]">
+                        Horário (aluno)
+                      </div>
+                      <div className="text-[15px] font-semibold text-[var(--app-text-88)]">
+                        {formatTime(recurringInfo.leadTimeRaw)}
+                      </div>
+                    </div>
+                    <div className="rounded-xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] px-4 py-3 space-y-1">
+                      <div className="text-[11px] font-bold uppercase tracking-wide text-[var(--app-text-50)]">
+                        Dia (professor)
+                      </div>
+                      <div className="text-[15px] font-semibold text-[var(--app-text-88)]">
+                        {recurringInfo.professorDateRaw ? formatAtendimentoDate(recurringInfo.professorDateRaw) : "—"}
+                      </div>
+                    </div>
+                    <div className="rounded-xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] px-4 py-3 space-y-1">
+                      <div className="text-[11px] font-bold uppercase tracking-wide text-[var(--app-text-50)]">
+                        Horário (professor)
+                      </div>
+                      <div className="text-[15px] font-semibold text-[var(--app-text-88)]">
+                        {formatTime(recurringInfo.professorTimeRaw)}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              );
+            })()}
+
+            <div className="mt-2 flex shrink-0 flex-col-reverse gap-2 sm:flex-row sm:items-center sm:justify-end">
+              <button
+                type="button"
+                onClick={handleCloseRecurringInfo}
                 className="inline-flex min-h-[44px] items-center justify-center gap-1.5 rounded-xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] px-5 text-[13px] font-semibold text-[var(--app-text-85)] hover:bg-[var(--app-hover)] disabled:cursor-not-allowed disabled:opacity-60"
               >
                 Fechar
