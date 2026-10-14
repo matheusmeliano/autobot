@@ -537,6 +537,53 @@ export default function CadastroRecorrenteBody() {
       const slotsByWeekdayDate: Record<string, RecurringWeekdayTimeOption[]> = {};
       for (const [k, v] of Object.entries(slotsMap)) slotsByWeekdayDate[k] = Array.isArray(v) ? v : [];
       setAlunoSchedAvail({ dates, slotsByWeekdayDate, timeZone: String(j.timeZone ?? tzUse) });
+
+      const savedWeekdayRaw = String(alunoLeadFull?.recurring_class_weekday ?? "").trim().toLowerCase();
+      const savedWeekdayLabel = String(alunoLeadFull?.recurring_class_weekday_label ?? "").trim();
+      const savedProfessorTime = String(alunoLeadFull?.recurring_class_professor_time ?? "").trim();
+      const savedLeadTime = String(alunoLeadFull?.recurring_class_lead_time ?? "").trim();
+      const savedProfessorDate = String(
+        alunoLeadFull?.recurring_class_professor_date ??
+          alunoLeadFull?.recurring_class_next_professor_date ??
+          "",
+      ).trim();
+
+      let restoredDayId: string | null = null;
+      if (savedWeekdayRaw) {
+        const dayCandidates = dates.filter((d) => d.weekday === savedWeekdayRaw);
+        if (dayCandidates.length === 1) {
+          restoredDayId = dayCandidates[0]?.id ?? null;
+        } else if (dayCandidates.length > 1) {
+          const matchingByDate = savedProfessorDate
+            ? dayCandidates.find((d) => String(d.professorDate ?? "").trim() === savedProfessorDate) ?? null
+            : null;
+          const matchingByLabel =
+            savedWeekdayLabel
+              ? dayCandidates.find(
+                  (d) =>
+                    String(d.displayLabel ?? "").trim() === savedWeekdayLabel ||
+                    String(d.label ?? "").trim() === savedWeekdayLabel,
+                ) ?? null
+              : null;
+          restoredDayId = (matchingByDate ?? matchingByLabel ?? dayCandidates[0])?.id ?? null;
+        }
+      }
+
+      setAlunoSchedDayId(restoredDayId);
+
+      if (restoredDayId && savedProfessorTime) {
+        const restoredTimes = slotsByWeekdayDate[restoredDayId] ?? [];
+        const restoredTime =
+          restoredTimes.find(
+            (opt) =>
+              String(opt.professorTime ?? "").trim() === savedProfessorTime ||
+              String(opt.leadTime ?? "").trim() === savedLeadTime ||
+              String(opt.displayLabel ?? "").trim() === savedLeadTime,
+          ) ?? null;
+        setAlunoSchedTimeOpt(restoredTime);
+      } else {
+        setAlunoSchedTimeOpt(null);
+      }
     } catch (e) {
       setAlunoSchedError(toErrorMessage(e, "Erro ao carregar disponibilidade."));
       setAlunoSchedAvail(null);
