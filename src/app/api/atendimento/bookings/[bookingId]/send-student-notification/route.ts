@@ -354,6 +354,7 @@ export async function POST(
           booking_id: normalizedBookingId,
           phone: leadPhone,
           lesson_link: lessonLink,
+          start_at: professorStartAtRaw || null,
           manually_triggered: true,
           was_already_sent: studentNotificationAlreadySent,
         },
@@ -371,6 +372,7 @@ export async function POST(
           booking_id: normalizedBookingId,
           phone: leadPhone,
           lesson_link: lessonLink,
+          start_at: professorStartAtRaw || null,
           manually_triggered: true,
           was_already_sent: studentNotificationAlreadySent,
           error: studentSendFailedError,
@@ -532,6 +534,27 @@ export async function POST(
         );
       }
     }
+  }
+
+  try {
+    const patchLead: Record<string, any> = { updated_at: sentAtIso };
+    if (studentNotificationOk) {
+      patchLead.experimental_class_student_notification_sent_at = sentAtIso;
+    }
+    if (attendantNotificationOk) {
+      patchLead.experimental_class_attendant_notification_sent_at = sentAtIso;
+    }
+    if (registeredAttendantNotificationOk) {
+      patchLead.experimental_class_registered_attendant_notification_sent_at = sentAtIso;
+    }
+    if (Object.keys(patchLead).length > 1) {
+      await admin
+        .from("atendimento_leads")
+        .update(patchLead)
+        .eq("id", leadId);
+    }
+  } catch (_e) {
+    void _e;
   }
 
   const finalStudentSentAt = studentNotificationOk ? sentAtIso : (String((resolvedBooking as any)?.student_start_notification_sent_at ?? "").trim() || null);

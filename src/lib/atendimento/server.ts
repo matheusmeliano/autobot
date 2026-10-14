@@ -1320,7 +1320,7 @@ export async function sendExperimentalClassStartNotifications(now = new Date()) 
   try {
     const leadsQ = await admin
       .from("atendimento_leads")
-      .select("id, full_name, phone, status, funnel_stage, experimental_class_professor_date, experimental_class_lead_date, experimental_class_professor_time, experimental_class_lead_time, experimental_class_professor_start_at, experimental_class_lead_start_at, experimental_class_professor_name, experimental_class_professor_phone, cpf, city, state, country, timezone, origin")
+      .select("id, full_name, phone, status, funnel_stage, experimental_class_professor_date, experimental_class_lead_date, experimental_class_professor_time, experimental_class_lead_time, experimental_class_professor_start_at, experimental_class_lead_start_at, experimental_class_professor_name, experimental_class_professor_phone, experimental_class_student_notification_sent_at, experimental_class_attendant_notification_sent_at, experimental_class_registered_attendant_notification_sent_at, cpf, city, state, country, timezone, origin")
       .gte("experimental_class_professor_start_at", candidateWindowStartIso)
       .lte("experimental_class_professor_start_at", candidateWindowEndIso);
     if (!leadsQ.error && Array.isArray(leadsQ.data)) {
@@ -1340,7 +1340,7 @@ export async function sendExperimentalClassStartNotifications(now = new Date()) 
     try {
       const r = await admin
         .from("atendimento_leads")
-        .select("id, full_name, phone, status, funnel_stage, experimental_class_professor_date, experimental_class_lead_date, experimental_class_professor_time, experimental_class_lead_time, experimental_class_professor_start_at, experimental_class_lead_start_at, experimental_class_status, experimental_class_professor_name, experimental_class_professor_phone, cpf, city, state, country, timezone, origin")
+        .select("id, full_name, phone, status, funnel_stage, experimental_class_professor_date, experimental_class_lead_date, experimental_class_professor_time, experimental_class_lead_time, experimental_class_professor_start_at, experimental_class_lead_start_at, experimental_class_status, experimental_class_professor_name, experimental_class_professor_phone, experimental_class_student_notification_sent_at, experimental_class_attendant_notification_sent_at, experimental_class_registered_attendant_notification_sent_at, cpf, city, state, country, timezone, origin")
         .in("id", allLeadIds);
       if (!r.error) fullLeads = (r.data as any[]) ?? [];
     } catch (_e) {
@@ -1502,8 +1502,9 @@ export async function sendExperimentalClassStartNotifications(now = new Date()) 
       conversation_id: null,
       status: "scheduled",
       lesson_link: latestLessonLinkByLeadId.get(leadId) || null,
-      student_start_notification_sent_at: null,
-      attendant_start_notification_sent_at: null,
+      student_start_notification_sent_at: String(row?.experimental_class_student_notification_sent_at ?? "").trim() || null,
+      attendant_start_notification_sent_at: String(row?.experimental_class_attendant_notification_sent_at ?? "").trim() || null,
+      registered_attendant_start_notification_sent_at: String(row?.experimental_class_registered_attendant_notification_sent_at ?? "").trim() || null,
       attendance_status: null,
       attendance_checked_at: null,
       professor_timezone: PROF_TZ,
@@ -1635,6 +1636,7 @@ export async function sendExperimentalClassStartNotifications(now = new Date()) 
       sentCompositeKeys.has(`${leadId}|${professorStartAtRaw}|attendant`);
     const cachedRegisteredAttendantSent =
       sentRegisteredAttendantBookingIds.has(bookingId) ||
+      Boolean(String((booking as any)?.registered_attendant_start_notification_sent_at ?? "").trim()) ||
       sentCompositeKeys.has(`${leadId}|${professorStartAtRaw}|registeredAttendant`);
 
     if (
@@ -1844,6 +1846,29 @@ export async function sendExperimentalClassStartNotifications(now = new Date()) 
             },
             actorType: "system",
           });
+        }
+      }
+    }
+
+    if (!cachedStudentSent || !cachedAttendantSent || !cachedRegisteredAttendantSent) {
+      const leadPatch: Record<string, string> = { updated_at: nowIso };
+      if (thisBookingStudentOk && !cachedStudentSent) {
+        leadPatch.experimental_class_student_notification_sent_at = nowIso;
+      }
+      if (thisBookingAttendantOk && !cachedAttendantSent) {
+        leadPatch.experimental_class_attendant_notification_sent_at = nowIso;
+      }
+      if (thisBookingRegisteredAttendantOk && !cachedRegisteredAttendantSent) {
+        leadPatch.experimental_class_registered_attendant_notification_sent_at = nowIso;
+      }
+      if (Object.keys(leadPatch).length > 1) {
+        try {
+          await admin
+            .from("atendimento_leads")
+            .update(leadPatch as any)
+            .eq("id", leadId);
+        } catch (_leadPatchError) {
+          void _leadPatchError;
         }
       }
     }
