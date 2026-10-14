@@ -342,6 +342,7 @@ function hasActiveExperimentalDisplaySignal(lead: AtendimentoLeadListItem | null
   if (bestBooking) {
     const status = String(bestBooking?.status ?? "").trim().toLowerCase();
     if (status && status !== "cancelled") return true;
+    if (status === "cancelled") return false;
   }
 
   const flatStatus = String(
@@ -360,6 +361,7 @@ function hasActiveExperimentalDisplaySignal(lead: AtendimentoLeadListItem | null
       String((lead as any)?.experimental_class_lead_start_at ?? "").trim() ||
       String((lead as any)?.experimental_class_professor_start_at ?? "").trim(),
   );
+  if (flatStatus === "cancelled") return false;
   if (hasFlatExperimentalData && flatStatus !== "cancelled") return true;
 
   const latestCancelled =
