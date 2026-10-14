@@ -250,17 +250,44 @@ export default function CadastroRecorrenteBody() {
     }
     if (typeof raw === "object") {
       const any = raw as Record<string, unknown>;
-      const candidates = [any.message, any.error, any.error_message, any.msg, any.detail];
+      const candidates = [
+        any.message,
+        any.error,
+        any.error_message,
+        any.msg,
+        any.detail,
+        any.details,
+        any.description,
+        any.cause,
+      ];
       for (const c of candidates) {
-        if (typeof c === "string" && c.trim()) return c.trim();
+        const nested = toErrorMessage(c, "");
+        if (nested) return nested;
+      }
+      if (Array.isArray(raw)) {
+        for (const item of raw) {
+          const nested = toErrorMessage(item, "");
+          if (nested) return nested;
+        }
       }
       try {
-        return JSON.stringify(raw);
+        const serialized = JSON.stringify(raw);
+        if (
+          serialized &&
+          serialized !== "{}" &&
+          serialized !== "[]" &&
+          serialized !== "\"[object Object]\""
+        ) {
+          return serialized;
+        }
       } catch {
-        return String(raw) || fallback;
+        return fallback;
       }
+      return fallback;
     }
-    return String(raw) || fallback;
+    const asString = String(raw ?? "").trim();
+    if (!asString || asString === "[object Object]") return fallback;
+    return asString;
   }
 
   function toNomeESobrenome(raw: string | null | undefined): string {
@@ -499,14 +526,16 @@ export default function CadastroRecorrenteBody() {
       if (phoneDigits) qs.set("phone", phoneDigits);
       const res = await fetch(`/api/cadastro/recorrente/availability?${qs.toString()}`);
       const j = (await res.json().catch(() => null)) as any;
-      if (!res.ok || !j || !j.ok) throw new Error(String(j?.error ?? "Falha ao carregar horários."));
+      if (!res.ok || !j || !j.ok) {
+        throw new Error(toErrorMessage(j?.error ?? j, "Falha ao carregar horários."));
+      }
       const dates = Array.isArray(j.dates) ? (j.dates as RecurringWeekdayOption[]) : [];
       const slotsMap = (j.slotsByWeekdayDate ?? j.slotsByWeekday ?? {}) as Record<string, RecurringWeekdayTimeOption[]>;
       const slotsByWeekdayDate: Record<string, RecurringWeekdayTimeOption[]> = {};
       for (const [k, v] of Object.entries(slotsMap)) slotsByWeekdayDate[k] = Array.isArray(v) ? v : [];
       setAlunoSchedAvail({ dates, slotsByWeekdayDate, timeZone: String(j.timeZone ?? tzUse) });
     } catch (e) {
-      setAlunoSchedError(e instanceof Error ? e.message : String(e ?? "Erro desconhecido."));
+      setAlunoSchedError(toErrorMessage(e, "Erro ao carregar disponibilidade."));
       setAlunoSchedAvail(null);
     } finally {
       setAlunoSchedLoading(false);
