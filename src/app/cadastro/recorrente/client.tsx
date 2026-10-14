@@ -430,6 +430,7 @@ export default function CadastroRecorrenteBody() {
   const [alunoSchedSaving, setAlunoSchedSaving] = useState(false);
   const [alunoSchedSaveError, setAlunoSchedSaveError] = useState("");
   const [alunoForcePainel, setAlunoForcePainel] = useState(false);
+  const skipDraftSyncOnUnloadRef = useRef(false);
 
   useEffect(() => {
     try {
@@ -691,6 +692,7 @@ export default function CadastroRecorrenteBody() {
       await refreshAlunoLeadNow({ phoneDigits: tel, leadId: lid || null });
       closeAlunoSched();
       if (typeof window !== "undefined") {
+        skipDraftSyncOnUnloadRef.current = true;
         window.location.reload();
       }
     } catch (e) {
@@ -1307,7 +1309,9 @@ export default function CadastroRecorrenteBody() {
 
   useEffect(() => {
     if (typeof window === "undefined") return;
+    if (alunoIsMatriculaConcluida || alunoForcePainel) return;
     function onBeforeUnload() {
+      if (skipDraftSyncOnUnloadRef.current) return;
       const telefone = phoneField.replace(/\D/g, "");
       if (!telefone || telefone.length < 10) return;
       try {
@@ -1368,7 +1372,20 @@ export default function CadastroRecorrenteBody() {
     return () => {
       window.removeEventListener("beforeunload", onBeforeUnload);
     };
-  }, [step, phoneField, nome, senha, selectedWeekday, availability, selectedTimeOpt, stateField, cityField, leadTimezone]);
+  }, [
+    step,
+    phoneField,
+    nome,
+    senha,
+    selectedWeekday,
+    availability,
+    selectedTimeOpt,
+    stateField,
+    cityField,
+    leadTimezone,
+    alunoIsMatriculaConcluida,
+    alunoForcePainel,
+  ]);
 
   async function loadAvailability() {
     setAvailLoading(true);
