@@ -721,7 +721,7 @@ export async function PATCH(req: NextRequest) {
           ok = true;
           break;
         } catch (e) {
-          const msg = e instanceof Error ? e.message : String(e ?? "Erro desconhecido.");
+          const msg = toErrorMessage(e, "Erro desconhecido.");
           if (isUndefinedColError(msg)) {
             const c = extractCol(msg);
             if (c && p[c] !== undefined) {
@@ -776,7 +776,7 @@ export async function PATCH(req: NextRequest) {
         return NextResponse.json({ ok: false, error: "Falha ao salvar progresso. Tente novamente." }, { status: 500 });
       }
     } catch (e) {
-      const msg = e instanceof Error ? e.message : String(e ?? "Erro desconhecido.");
+      const msg = toErrorMessage(e, "Erro desconhecido.");
       return NextResponse.json({ ok: false, error: msg }, { status: 500 });
     }
 
