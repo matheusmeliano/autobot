@@ -1,7 +1,7 @@
 import crypto from "node:crypto";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
-import { ATENDIMENTO_DAILY_SUMMARY_PHONE, ATENDIMENTO_EMAIL, ATENDIMENTO_PUBLIC_LINK_SLUG, ATENDIMENTO_STAGE_ORDER, ATENDIMENTO_STATUS_ORDER, BOT_DEDICATED_EXCLUSIVE_PHONE_SUFFIXES_10, isDedicatedExclusiveBotPhone, isOwnerPersonalPrivatePhone } from "@/lib/atendimento/constants";
+import { ATENDIMENTO_DAILY_SUMMARY_PHONE, ATENDIMENTO_EMAIL, ATENDIMENTO_PROFESSOR_TIME_ZONE, ATENDIMENTO_PUBLIC_LINK_SLUG, ATENDIMENTO_STAGE_ORDER, ATENDIMENTO_STATUS_ORDER, BOT_DEDICATED_EXCLUSIVE_PHONE_SUFFIXES_10, isDedicatedExclusiveBotPhone, isOwnerPersonalPrivatePhone } from "@/lib/atendimento/constants";
 import {
   ATENDIMENTO_FILES_BUCKET,
   ATENDIMENTO_ALLOWED_UPLOAD_MIME_TYPES,
@@ -1254,7 +1254,7 @@ export async function sendExperimentalClassStartNotifications(now = new Date()) 
   const PROF_TZ = (
     process.env.EXPERIMENTAL_CLASS_PROFESSOR_TIME_ZONE ||
     process.env.ATENDIMENTO_PROFESSOR_TIME_ZONE ||
-    "America/Sao_Paulo"
+    ATENDIMENTO_PROFESSOR_TIME_ZONE
   ).trim();
 
   const bookingsByLeadId = new Map<string, any>();
@@ -1905,7 +1905,7 @@ export async function sendRecurringClassStartNotifications(now = new Date()) {
   const PROF_TZ = (
     process.env.EXPERIMENTAL_CLASS_PROFESSOR_TIME_ZONE ||
     process.env.ATENDIMENTO_PROFESSOR_TIME_ZONE ||
-    "America/Sao_Paulo"
+    ATENDIMENTO_PROFESSOR_TIME_ZONE
   ).trim();
 
   let rows: any[] = [];
@@ -3981,7 +3981,7 @@ export async function loadRecurringCalendarOccupiedIntervals(params: {
         String(
           process.env.EXPERIMENTAL_CLASS_PROFESSOR_TIME_ZONE ||
             process.env.ATENDIMENTO_PROFESSOR_TIME_ZONE ||
-            "America/Sao_Paulo",
+            ATENDIMENTO_PROFESSOR_TIME_ZONE,
         ).trim();
       const leadTimeZone =
         String((row as any)?.recurring_class_lead_timezone ?? (row as any)?.timezone ?? "").trim() ||
@@ -4075,7 +4075,7 @@ export async function resolveRecurringDisplayOccurrenceMap(params: {
       String((lead as any)?.recurring_class_professor_timezone ?? "").trim() ||
       process.env.EXPERIMENTAL_CLASS_PROFESSOR_TIME_ZONE ||
       process.env.ATENDIMENTO_PROFESSOR_TIME_ZONE ||
-      "America/Sao_Paulo";
+      ATENDIMENTO_PROFESSOR_TIME_ZONE;
 
     if (/^\d{4}-\d{2}-\d{2}$/.test(professorDate) && professorTime) {
       try {
