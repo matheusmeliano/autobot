@@ -640,6 +640,76 @@ function resolveRecurringOccurrenceSearchFromLead(
   });
 }
 
+function buildRecurringSavedScheduleDisplayInfo(
+  lead: AtendimentoLeadListItem,
+): {
+  weekdayWithDate: string;
+  time: string;
+  leadDateRaw: string;
+  leadTimeRaw: string;
+  professorDateRaw: string;
+  professorTimeRaw: string;
+} | null {
+  const effectiveLeadTz = deriveLeadEffectiveTimeZone(lead);
+  const professorDateRaw = String((lead as any)?.recurring_class_professor_date ?? "").trim();
+  const professorTimeRaw = String(
+    (lead as any)?.recurring_class_professor_time ??
+      (lead as any)?.recurring_class_lead_time ??
+      "",
+  ).trim();
+  const storedLeadDateRaw = String((lead as any)?.recurring_class_lead_date ?? "").trim();
+  const storedLeadTimeRaw = String(
+    (lead as any)?.recurring_class_lead_time ??
+      (lead as any)?.recurring_class_professor_time ??
+      "",
+  ).trim();
+
+  let leadDateRaw = storedLeadDateRaw;
+  let leadTimeRaw = storedLeadTimeRaw;
+  if ((!leadDateRaw || !leadTimeRaw) && professorDateRaw && professorTimeRaw) {
+    try {
+      const utcIso = zonedDateTimeToUtcIso({
+        date: professorDateRaw,
+        time: normalizeScheduleTimeForComparison(professorTimeRaw) || professorTimeRaw,
+        timeZone: ATENDIMENTO_PROFESSOR_TIME_ZONE,
+      });
+      leadDateRaw = leadDateRaw || extractLocalDateFromUtcIso(utcIso, effectiveLeadTz);
+      leadTimeRaw = leadTimeRaw || extractLocalTimeFromUtcIso(utcIso, effectiveLeadTz);
+    } catch {}
+  }
+
+  const displayDateRaw = String(leadDateRaw || professorDateRaw).trim();
+  const displayTimeRaw = String(leadTimeRaw || storedLeadTimeRaw || professorTimeRaw).trim();
+  if (!displayDateRaw || !displayTimeRaw) return null;
+
+  const [, mm, dd] = displayDateRaw.split("-");
+  const shortDm = mm && dd ? `${dd}/${mm}` : displayDateRaw;
+  const savedWeekdayLabel = String((lead as any)?.recurring_class_weekday_label ?? "").trim();
+  const cleanWdLabel = (() => {
+    const s = savedWeekdayLabel.trim();
+    if (s) {
+      const withoutOldDate = s.replace(/\s*\(\s*\d{1,2}\s*[\/\-]\s*\d{1,2}\s*\)\s*$/g, "").trim();
+      if (withoutOldDate) return withoutOldDate;
+      return s;
+    }
+    const wdShort = weekdayShortFromLocalDate(displayDateRaw, effectiveLeadTz);
+    const toPTLong: Record<string, string> = {
+      mon: "Segunda-feira", tue: "Terça-feira", wed: "Quarta-feira", thu: "Quinta-feira",
+      fri: "Sexta-feira", sat: "Sábado", sun: "Domingo",
+    };
+    return toPTLong[wdShort] || "";
+  })();
+
+  return {
+    weekdayWithDate: cleanWdLabel ? `${cleanWdLabel} (${shortDm})` : shortDm,
+    time: formatRecurringCardTime(displayTimeRaw),
+    leadDateRaw: displayDateRaw,
+    leadTimeRaw: displayTimeRaw,
+    professorDateRaw: professorDateRaw || displayDateRaw,
+    professorTimeRaw: professorTimeRaw || displayTimeRaw,
+  };
+}
+
 function buildRecurringScheduleDisplayInfo(
   lead: AtendimentoLeadListItem
 ): {
@@ -650,6 +720,10 @@ function buildRecurringScheduleDisplayInfo(
   professorDateRaw: string;
   professorTimeRaw: string;
 } | null {
+  const savedScheduleInfo = buildRecurringSavedScheduleDisplayInfo(lead);
+  if (!isLeadMatriculaConcluida(lead) && savedScheduleInfo) {
+    return savedScheduleInfo;
+  }
   const storedNextOccurrence = getValidStoredNextRecurringOccurrence(lead);
   const storedNextLeadLocal = String(storedNextOccurrence?.leadDate ?? "").trim();
   const storedNextProfessorLocal = String(storedNextOccurrence?.professorDate ?? "").trim();
@@ -906,6 +980,14 @@ function buildExperimentalMetaForList(lead: AtendimentoLeadListItem): { label: s
     const hm = String(hmRaw).replace(/h/gi, "").trim();
     return `Aula em: ${dmy}, ${hm}h`;
   };
+
+  const savedScheduleInfo = buildRecurringSavedScheduleDisplayInfo(lead);
+  if (gRecurringTrulyStarted && gRecurringWeekdayOk && gRecurringTimeOk && !gPayConfirmedGlobal && savedScheduleInfo) {
+    return {
+      label: formatDateNice(savedScheduleInfo.leadDateRaw, savedScheduleInfo.leadTimeRaw),
+      tone: "success",
+    };
+  }
 
   // ============================================================
   // CASO RECORRENTE (prioridade máxima para bater Visão Geral)
@@ -6135,7 +6217,7 @@ export function AtendimentoClient() {
                                         })()}
                                       </div>
                                       <div className="mt-0.5 text-[13px] text-[#1d4ed8]/80">
-                                        Aguarde a definição das aulas recorrentes.
+                                        Dia e horário escolhidos no link de matrícula.
                                       </div>
                                     </div>
                                   </div>
@@ -7671,7 +7753,7 @@ export function AtendimentoClient() {
                                       })()}
                                     </div>
                                     <div className="mt-0.5 text-[13px] text-[#1d4ed8]/80">
-                                      Aguarde a definição das aulas recorrentes.
+                                      Dia e horário escolhidos no link de matrícula.
                                     </div>
                                   </div>
                                 </div>
