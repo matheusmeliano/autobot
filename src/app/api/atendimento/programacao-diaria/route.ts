@@ -48,12 +48,28 @@ function shouldSuppressExperimentalDataForLead(row: any): boolean {
   const statusRaw = String(row?.status ?? "").trim().toLowerCase();
   const funnelRaw = String(row?.funnel_stage ?? "").trim().toLowerCase();
   const recurringStatusRaw = String(row?.recurring_class_status ?? "").trim().toLowerCase();
+  const recurringWeekdayRaw = String(row?.recurring_class_weekday ?? "").trim().toLowerCase();
+  const recurringWeekdayLabelRaw = String(row?.recurring_class_weekday_label ?? "").trim();
+  const recurringProfessorTimeRaw = String(row?.recurring_class_professor_time ?? "").trim();
+  const recurringLeadTimeRaw = String(row?.recurring_class_lead_time ?? "").trim();
   const contractStatusRaw = String(row?.contract_status ?? "").trim().toLowerCase();
   const paymentStatusRaw = String(row?.payment_status ?? "").trim().toLowerCase();
   const paymentConfirmedAtRaw = String(row?.payment_confirmed_at ?? "").trim();
   const enrollmentNumberRaw = String(row?.enrollment_number ?? "").trim();
   const regStepRaw = Number(row?.recurring_registration_step ?? NaN);
   const regStepOk = Number.isFinite(regStepRaw) && regStepRaw >= 1;
+  const recurringWeekdayOk = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"].includes(recurringWeekdayRaw);
+  const recurringWeekdayLabelOk =
+    Boolean(recurringWeekdayLabelRaw) &&
+    /segunda|terça|terca|quarta|quinta|sexta|sabado|sábado|domingo|monday|tuesday|wednesday|thursday|friday|saturday|sunday/i.test(
+      recurringWeekdayLabelRaw,
+    );
+  const recurringTimeOk = Boolean(recurringProfessorTimeRaw) || Boolean(recurringLeadTimeRaw);
+  const recurringProgressStarted =
+    recurringWeekdayOk ||
+    recurringWeekdayLabelOk ||
+    recurringTimeOk ||
+    Boolean(recurringStatusRaw);
   const hasRecurringPassword =
     Boolean(String(row?.recurring_registration_password ?? "").trim()) ||
     Boolean(String(row?.signup_password_raw_temp ?? "").trim());
@@ -73,6 +89,8 @@ function shouldSuppressExperimentalDataForLead(row: any): boolean {
     statusRaw === "contrato_aguardando_aceite" ||
     statusRaw === "contrato_assinado" ||
     statusRaw === "matricula_confirmada" ||
+    statusRaw === "pagamento_pendente_confirmacao" ||
+    statusRaw === "pagamento_nao_realizado" ||
     funnelRaw === "aluno" ||
     funnelRaw === "aluno_recorrente_cadastrado" ||
     funnelRaw === "cadastro_recorrente_pendente_plataforma" ||
@@ -81,12 +99,22 @@ function shouldSuppressExperimentalDataForLead(row: any): boolean {
     funnelRaw === "contrato_assinado" ||
     funnelRaw === "matricula_confirmada" ||
     funnelRaw === "matriculado" ||
+    funnelRaw === "pagamento_pendente_confirmacao" ||
+    funnelRaw === "pagamento_nao_realizado" ||
     recurringStatusRaw === "cadastro_plataforma_pendente" ||
     recurringStatusRaw === "confirmado" ||
     contractStatusRaw === "coletando_dados" ||
     contractStatusRaw === "aguardando_aceite" ||
-    contractStatusRaw === "assinado";
-  return regStepOk || hasRecurringPassword || matriculaConcluida || recurringStageStarted;
+    contractStatusRaw === "assinado" ||
+    paymentStatusRaw === "pendente_confirmacao" ||
+    paymentStatusRaw === "nao_realizado";
+  return (
+    recurringProgressStarted ||
+    regStepOk ||
+    hasRecurringPassword ||
+    matriculaConcluida ||
+    recurringStageStarted
+  );
 }
 
 function weekdayShort(localDateYYYYMMDD: string): string {

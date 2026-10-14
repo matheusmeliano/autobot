@@ -26,6 +26,79 @@ import { localDateInTimeZone } from "@/lib/recurrence";
 
 export const dynamic = "force-dynamic";
 
+function shouldSuppressExperimentalDataForLead(row: any): boolean {
+  const statusRaw = String(row?.status ?? "").trim().toLowerCase();
+  const funnelRaw = String(row?.funnel_stage ?? "").trim().toLowerCase();
+  const recurringStatusRaw = String(row?.recurring_class_status ?? "").trim().toLowerCase();
+  const recurringWeekdayRaw = String(row?.recurring_class_weekday ?? "").trim().toLowerCase();
+  const recurringWeekdayLabelRaw = String(row?.recurring_class_weekday_label ?? "").trim();
+  const recurringProfessorTimeRaw = String(row?.recurring_class_professor_time ?? "").trim();
+  const recurringLeadTimeRaw = String(row?.recurring_class_lead_time ?? "").trim();
+  const contractStatusRaw = String(row?.contract_status ?? "").trim().toLowerCase();
+  const paymentStatusRaw = String(row?.payment_status ?? "").trim().toLowerCase();
+  const paymentConfirmedAtRaw = String(row?.payment_confirmed_at ?? "").trim();
+  const enrollmentNumberRaw = String(row?.enrollment_number ?? "").trim();
+  const regStepRaw = Number(row?.recurring_registration_step ?? NaN);
+  const regStepOk = Number.isFinite(regStepRaw) && regStepRaw >= 1;
+  const recurringWeekdayOk = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"].includes(recurringWeekdayRaw);
+  const recurringWeekdayLabelOk =
+    Boolean(recurringWeekdayLabelRaw) &&
+    /segunda|terça|terca|quarta|quinta|sexta|sabado|sábado|domingo|monday|tuesday|wednesday|thursday|friday|saturday|sunday/i.test(
+      recurringWeekdayLabelRaw,
+    );
+  const recurringTimeOk = Boolean(recurringProfessorTimeRaw) || Boolean(recurringLeadTimeRaw);
+  const recurringProgressStarted =
+    recurringWeekdayOk ||
+    recurringWeekdayLabelOk ||
+    recurringTimeOk ||
+    Boolean(recurringStatusRaw);
+  const hasRecurringPassword =
+    Boolean(String(row?.recurring_registration_password ?? "").trim()) ||
+    Boolean(String(row?.signup_password_raw_temp ?? "").trim());
+  const matriculaConcluida =
+    paymentStatusRaw === "confirmado" ||
+    Boolean(paymentConfirmedAtRaw && paymentConfirmedAtRaw !== "null") ||
+    Boolean(enrollmentNumberRaw) ||
+    statusRaw === "matriculado" ||
+    statusRaw === "matricula_confirmada" ||
+    funnelRaw === "matriculado" ||
+    funnelRaw === "matricula_confirmada";
+  const recurringStageStarted =
+    statusRaw === "aluno" ||
+    statusRaw === "matriculado" ||
+    statusRaw === "cadastro_recorrente_pendente_plataforma" ||
+    statusRaw === "contrato_coletando_dados" ||
+    statusRaw === "contrato_aguardando_aceite" ||
+    statusRaw === "contrato_assinado" ||
+    statusRaw === "matricula_confirmada" ||
+    statusRaw === "pagamento_pendente_confirmacao" ||
+    statusRaw === "pagamento_nao_realizado" ||
+    funnelRaw === "aluno" ||
+    funnelRaw === "aluno_recorrente_cadastrado" ||
+    funnelRaw === "cadastro_recorrente_pendente_plataforma" ||
+    funnelRaw === "contrato_coletando_dados" ||
+    funnelRaw === "contrato_aguardando_aceite" ||
+    funnelRaw === "contrato_assinado" ||
+    funnelRaw === "matricula_confirmada" ||
+    funnelRaw === "matriculado" ||
+    funnelRaw === "pagamento_pendente_confirmacao" ||
+    funnelRaw === "pagamento_nao_realizado" ||
+    recurringStatusRaw === "cadastro_plataforma_pendente" ||
+    recurringStatusRaw === "confirmado" ||
+    contractStatusRaw === "coletando_dados" ||
+    contractStatusRaw === "aguardando_aceite" ||
+    contractStatusRaw === "assinado" ||
+    paymentStatusRaw === "pendente_confirmacao" ||
+    paymentStatusRaw === "nao_realizado";
+  return (
+    recurringProgressStarted ||
+    regStepOk ||
+    hasRecurringPassword ||
+    matriculaConcluida ||
+    recurringStageStarted
+  );
+}
+
 export async function GET(req: Request) {
   const auth = await requireAtendimentoUser();
   if (!auth.ok) {
@@ -77,6 +150,27 @@ export async function GET(req: Request) {
   };
 
   const admin = createSupabaseAdminClient();
+  const leadSuppressionCache = new Map<string, Record<string, unknown> | null>();
+  const fetchLeadForExperimentalSuppression = async (id: string) => {
+    id = String(id ?? "").trim();
+    if (!id) return null;
+    if (leadSuppressionCache.has(id)) return leadSuppressionCache.get(id) ?? null;
+
+    let row: Record<string, unknown> | null = null;
+    try {
+      const { data } = await admin
+        .from("atendimento_leads")
+        .select("*")
+        .eq("id", id)
+        .maybeSingle();
+      if (data && typeof data === "object") {
+        row = data as Record<string, unknown>;
+      }
+    } catch {}
+
+    leadSuppressionCache.set(id, row);
+    return row;
+  };
 
   // =============== 1) EXPERIMENTAIS COMPOSITE (tabela atendimento_experimental_class_bookings) ===============
   // Obs: continuamos SDK aqui (por enquanto, gte/lte date range funciona), mas AGORA select INCLUI
@@ -96,6 +190,11 @@ export async function GET(req: Request) {
         const d = String(b?.professor_date ?? "").trim().slice(0, 10);
         if (!d || !badgeMap[d]) continue;
         if (isSunday(d)) continue;
+        const leadId = String((b as any)?.lead_id ?? "").trim();
+        if (leadId) {
+          const leadRow = await fetchLeadForExperimentalSuppression(leadId);
+          if (leadRow && shouldSuppressExperimentalDataForLead(leadRow)) continue;
+        }
         const st = String(b?.status ?? "").toLowerCase();
         if (!VALID_EXPERIMENTAL_COMPOSITE_STATUS.has(st)) continue;
         // ---- HORÁRIO OBRIGATÓRIO COMPOSITE ----
@@ -146,6 +245,11 @@ export async function GET(req: Request) {
           compositeBookings.map((bk) => String((bk as any).id ?? "").trim()).filter(Boolean),
         );
         for (const r of data) {
+          const leadId = String((r as any)?.id ?? "").trim();
+          if (leadId) {
+            const leadRow = await fetchLeadForExperimentalSuppression(leadId);
+            if (leadRow && shouldSuppressExperimentalDataForLead(leadRow)) continue;
+          }
           const stExpFlat = String((r as any).experimental_class_status ?? "").trim().toLowerCase();
           const stFunnel = String((r as any).funnel_stage ?? "").trim().toLowerCase();
           let ok = false;
