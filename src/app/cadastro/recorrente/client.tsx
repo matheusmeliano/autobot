@@ -543,9 +543,7 @@ export default function CadastroRecorrenteBody() {
       const savedProfessorTime = String(alunoLeadFull?.recurring_class_professor_time ?? "").trim();
       const savedLeadTime = String(alunoLeadFull?.recurring_class_lead_time ?? "").trim();
       const savedProfessorDate = String(
-        alunoLeadFull?.recurring_class_professor_date ??
-          alunoLeadFull?.recurring_class_next_professor_date ??
-          "",
+        alunoLeadFull?.recurring_class_professor_date ?? "",
       ).trim();
 
       let restoredDayId: string | null = null;
@@ -554,9 +552,6 @@ export default function CadastroRecorrenteBody() {
         if (dayCandidates.length === 1) {
           restoredDayId = dayCandidates[0]?.id ?? null;
         } else if (dayCandidates.length > 1) {
-          const matchingByDate = savedProfessorDate
-            ? dayCandidates.find((d) => String(d.professorDate ?? "").trim() === savedProfessorDate) ?? null
-            : null;
           const matchingByLabel =
             savedWeekdayLabel
               ? dayCandidates.find(
@@ -565,7 +560,10 @@ export default function CadastroRecorrenteBody() {
                     String(d.label ?? "").trim() === savedWeekdayLabel,
                 ) ?? null
               : null;
-          restoredDayId = (matchingByDate ?? matchingByLabel ?? dayCandidates[0])?.id ?? null;
+          const matchingByDate = savedProfessorDate
+            ? dayCandidates.find((d) => String(d.professorDate ?? "").trim() === savedProfessorDate) ?? null
+            : null;
+          restoredDayId = (matchingByLabel ?? matchingByDate ?? dayCandidates[0])?.id ?? null;
         }
       }
 
