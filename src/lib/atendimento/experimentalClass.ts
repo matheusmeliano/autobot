@@ -1584,6 +1584,8 @@ export function calculateDisplayRecurringOccurrence(params: {
   const profTz =
     String(params.professorTimeZone ?? ATENDIMENTO_PROFESSOR_TIME_ZONE ?? "").trim() ||
     ATENDIMENTO_PROFESSOR_TIME_ZONE;
+  const fromDateMs =
+    params.fromDate instanceof Date ? params.fromDate.getTime() : NaN;
   const nextStartRaw = String(nextOccurrence.professorStartAt ?? nextOccurrence.leadStartAt ?? "").trim();
   const nextStartMs = nextStartRaw ? new Date(nextStartRaw).getTime() : NaN;
 
@@ -1591,7 +1593,12 @@ export function calculateDisplayRecurringOccurrence(params: {
   const lastNotifiedOccurrenceMs = lastNotifiedOccurrenceRaw
     ? new Date(lastNotifiedOccurrenceRaw).getTime()
     : NaN;
-  if (Number.isFinite(lastNotifiedOccurrenceMs)) {
+  const shouldIgnoreStaleLastNotified =
+    Number.isFinite(fromDateMs) &&
+    Number.isFinite(nextStartMs) &&
+    Number.isFinite(lastNotifiedOccurrenceMs) &&
+    nextStartMs < lastNotifiedOccurrenceMs;
+  if (Number.isFinite(lastNotifiedOccurrenceMs) && !shouldIgnoreStaleLastNotified) {
     const afterLastNotified = calculateNextRecurringOccurrence({
       ...params,
       fromDate: new Date(lastNotifiedOccurrenceMs + 60_000),
@@ -1621,6 +1628,9 @@ export function calculateDisplayRecurringOccurrence(params: {
 
   const latestSentAt = sentCandidates.sort((a, b) => b.getTime() - a.getTime())[0] ?? null;
   if (!latestSentAt) return nextOccurrence;
+  if (Number.isFinite(fromDateMs) && latestSentAt.getTime() < fromDateMs) {
+    return nextOccurrence;
+  }
 
   if (!Number.isFinite(nextStartMs)) return nextOccurrence;
 

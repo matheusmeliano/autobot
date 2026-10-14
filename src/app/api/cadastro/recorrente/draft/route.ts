@@ -464,6 +464,11 @@ export async function PATCH(req: NextRequest) {
     const safeProfessorDate = String(professorDate ?? "").trim();
     const safeProfessorStartAt = String(professorStartAt ?? "").trim();
     const hasAnyTime = Boolean(safeProfessorTime || safeLeadTime);
+    const hasManualScheduleChange =
+      Boolean(validWeekday) ||
+      hasAnyTime ||
+      Boolean(safeProfessorDate) ||
+      Boolean(safeProfessorStartAt);
 
     const safeStepRaw =
       typeof step === "number" && Number.isInteger(step) && step >= 0 && step <= 6 ? step : null;
@@ -649,6 +654,10 @@ export async function PATCH(req: NextRequest) {
     }
     if (safeProfessorDate) patch.recurring_class_professor_date = safeProfessorDate;
     if (safeProfessorStartAt) patch.recurring_class_first_class_at = safeProfessorStartAt;
+    if (hasManualScheduleChange) {
+      patch.recurring_class_student_start_notification_sent_at = null;
+      patch.recurring_class_attendant_start_notification_sent_at = null;
+    }
 
     if (safeNome) {
       patch.full_name = safeNome;

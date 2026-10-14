@@ -724,6 +724,8 @@ export default function CadastroRecorrenteBody() {
             alunoSchedSelectedDay!.professorDate ?? alunoSchedTimeOpt!.professorDate ?? "",
           ).trim() || null,
           recurring_class_first_class_at: String(alunoSchedTimeOpt!.professorStartAtIso ?? "").trim() || null,
+          recurring_class_student_start_notification_sent_at: null,
+          recurring_class_attendant_start_notification_sent_at: null,
           recurring_class_next_professor_date: null,
           recurring_class_next_professor_time: null,
           recurring_class_next_professor_start_at: null,

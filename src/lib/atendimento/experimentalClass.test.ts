@@ -551,6 +551,28 @@ test("resolveRecurringOccurrenceSearchFromDate ancora a proxima ocorrencia na da
   assert.equal(occurrence?.professorStartAt, "2026-10-21T01:00:00.000Z");
 });
 
+test("calculateDisplayRecurringOccurrence ignora avancos antigos ao respeitar nova data manual", () => {
+  const fromDate = resolveRecurringOccurrenceSearchFromDate({
+    now: new Date("2026-10-14T01:07:00.000Z"),
+    firstClassAt: "2026-10-14T13:00:00.000Z",
+  });
+
+  const occurrence = calculateDisplayRecurringOccurrence({
+    weekday: "wed",
+    professorTimeHHMM: "09:00",
+    professorTimeZone: "America/Cuiaba",
+    leadTimeZone: "America/New_York",
+    leadTimeHHMM: "09:00",
+    fromDate,
+    lastNotifiedOccurrenceStartAt: "2026-10-21T13:00:00.000Z",
+    studentNotificationSentAt: "2026-10-14T01:00:30.985Z",
+    attendantNotificationSentAt: "2026-10-14T01:00:30.985Z",
+  });
+
+  assert.equal(occurrence?.professorDate, "2026-10-14");
+  assert.equal(occurrence?.professorStartAt, "2026-10-14T13:00:00.000Z");
+});
+
 test("calculateDisplayRecurringOccurrence pula a proxima semana com horario local recalculado para o aluno", () => {
   const occurrence = calculateDisplayRecurringOccurrence({
     weekday: "mon",
