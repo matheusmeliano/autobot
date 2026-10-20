@@ -4,6 +4,7 @@ import { z } from "zod";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { supabaseErrorToPt } from "@/lib/supabase/errors";
 import { getSafeAuthenticatedPath, normalizeAccessScope } from "@/lib/auth/access";
+import { buildStudentAuthPassword } from "@/lib/auth/studentPassword";
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 
@@ -50,59 +51,6 @@ async function resolveEmailFromLogin(supabase: Awaited<ReturnType<typeof createS
     if (EMAIL_REGEX.test(foundSynEmail)) return foundSynEmail;
   }
 
-  const profilePhoneFilters: string[] = [];
-  profilePhoneFilters.push(`phone.eq.${loginDigits}`);
-  profilePhoneFilters.push(`phone_digits.eq.${loginDigits}`);
-  if (loginDigitsNoCountry && loginDigitsNoCountry !== loginDigits) {
-    profilePhoneFilters.push(`phone.eq.${loginDigitsNoCountry}`);
-    profilePhoneFilters.push(`phone_digits.eq.${loginDigitsNoCountry}`);
-  }
-  if (phoneTail10) {
-    profilePhoneFilters.push(`phone.ilike.%${phoneTail10}`);
-    profilePhoneFilters.push(`phone_digits.ilike.%${phoneTail10}`);
-  }
-  if (phoneTail11 && phoneTail11 !== phoneTail10) {
-    profilePhoneFilters.push(`phone.eq.${phoneTail11}`);
-    profilePhoneFilters.push(`phone_digits.eq.${phoneTail11}`);
-  }
-  if (phoneTail12 && phoneTail12 !== phoneTail11) {
-    profilePhoneFilters.push(`phone.eq.${phoneTail12}`);
-    profilePhoneFilters.push(`phone_digits.eq.${phoneTail12}`);
-  }
-  if (phoneTail13 && phoneTail13 !== phoneTail12) {
-    profilePhoneFilters.push(`phone.eq.${phoneTail13}`);
-    profilePhoneFilters.push(`phone_digits.eq.${phoneTail13}`);
-  }
-
-  const { data: profileRows } = await supabase
-    .from("profiles")
-    .select("phone, phone_digits, email, user_id")
-    .or(profilePhoneFilters.join(","))
-    .limit(50);
-
-  if (Array.isArray(profileRows)) {
-    for (const row of profileRows) {
-      const rowDigits =
-        onlyDigits(String((row as any).phone ?? "")) ||
-        onlyDigits(String((row as any).phone_digits ?? ""));
-      if (!rowDigits) continue;
-      const matchExactOrSuffix =
-        rowDigits === loginDigits ||
-        rowDigits.endsWith(phoneTail10) ||
-        rowDigits.endsWith(phoneTail11) ||
-        rowDigits.endsWith(phoneTail12) ||
-        rowDigits.endsWith(phoneTail13) ||
-        loginDigits.endsWith(rowDigits.slice(-10)) ||
-        loginDigits.endsWith(rowDigits.slice(-11)) ||
-        loginDigits.endsWith(rowDigits.slice(-12)) ||
-        loginDigits.endsWith(rowDigits.slice(-13));
-      if (matchExactOrSuffix) {
-        const email = String((row as any).email ?? "").trim();
-        if (EMAIL_REGEX.test(email)) return email;
-      }
-    }
-  }
-
   const leadFilters: string[] = [];
   leadFilters.push(`phone.eq.${loginDigits}`);
   if (loginDigitsNoCountry && loginDigitsNoCountry !== loginDigits) {
@@ -123,7 +71,7 @@ async function resolveEmailFromLogin(supabase: Awaited<ReturnType<typeof createS
 
   const { data: leadRows } = await supabase
     .from("atendimento_leads")
-    .select("phone, student_email, recurring_registration_password, id")
+    .select("phone, email, recurring_registration_password, id")
     .or(leadFilters.join(","))
     .limit(50);
 
@@ -142,7 +90,7 @@ async function resolveEmailFromLogin(supabase: Awaited<ReturnType<typeof createS
         loginDigits.endsWith(rowDigits.slice(-12)) ||
         loginDigits.endsWith(rowDigits.slice(-13));
       if (!matchExactOrSuffix) continue;
-      const leadEmail = String((row as any).student_email ?? "").trim();
+      const leadEmail = String((row as any).email ?? "").trim();
       if (EMAIL_REGEX.test(leadEmail)) {
         const { data: profileByEmail } = await supabase
           .from("profiles")
@@ -193,7 +141,7 @@ export async function loginAction(formData: FormData) {
 
   let { error } = await supabase.auth.signInWithPassword({
     email: resolvedEmail,
-    password: pwd,
+    password: buildStudentAuthPassword(pwd),
   });
   if (error) {
     return { ok: false, error: supabaseErrorToPt(error.message) };

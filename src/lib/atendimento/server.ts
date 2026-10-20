@@ -1,4 +1,5 @@
 import crypto from "node:crypto";
+import { buildStudentAuthPassword } from "@/lib/auth/studentPassword";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { ATENDIMENTO_DAILY_SUMMARY_PHONE, ATENDIMENTO_EMAIL, ATENDIMENTO_PROFESSOR_TIME_ZONE, ATENDIMENTO_PUBLIC_LINK_SLUG, ATENDIMENTO_STAGE_ORDER, ATENDIMENTO_STATUS_ORDER, BOT_DEDICATED_EXCLUSIVE_PHONE_SUFFIXES_10, isDedicatedExclusiveBotPhone, isOwnerPersonalPrivatePhone } from "@/lib/atendimento/constants";
@@ -4297,10 +4298,6 @@ export async function ensureStudentAuthUserCreatedForLead(params: {
 }) {
   const { admin, leadId, lead } = params;
   if (!lead?.id) return { ok: false, created: false, userId: null, email: null };
-  const assignedUserEmail = String((lead as any)?.assigned_user_email ?? "").trim().toLowerCase();
-  if (assignedUserEmail && assignedUserEmail === ATENDIMENTO_EMAIL.toLowerCase()) {
-    return { ok: false, created: false, userId: null, email: null };
-  }
   const rawPhone = String(lead.phone ?? (lead as any)?.telefone ?? "").trim();
   const phoneDigits = rawPhone.replace(/\D/g, "");
   const studentEmailFromLead =
@@ -4313,6 +4310,7 @@ export async function ensureStudentAuthUserCreatedForLead(params: {
         : null;
   const studentPassword = extractStudentPasswordFromLead(lead);
   if (!studentPassword) return { ok: false, created: false, userId: null, email: studentEmailFromLead };
+  const authPassword = buildStudentAuthPassword(studentPassword);
 
   let email = studentEmailFromLead || buildSyntheticStudentEmail(phoneDigits);
   if (!email) return { ok: false, created: false, userId: null, email: null };
@@ -4414,7 +4412,7 @@ export async function ensureStudentAuthUserCreatedForLead(params: {
       userId = String((match as any).id);
       try {
         await admin.auth.admin.updateUserById(userId, {
-          password: studentPassword,
+          password: authPassword,
           app_metadata: {
             ...(match && typeof match === "object" && "app_metadata" in match && (match as any).app_metadata && typeof (match as any).app_metadata === "object"
               ? (match as any).app_metadata
@@ -4432,7 +4430,7 @@ export async function ensureStudentAuthUserCreatedForLead(params: {
     } else {
       const { data } = await admin.auth.admin.createUser({
         email,
-        password: studentPassword,
+        password: authPassword,
         email_confirm: true,
         phone: phoneDigits ? `+${phoneDigits}` : undefined,
         phone_confirm: true,
@@ -4467,9 +4465,25 @@ export async function ensureStudentAuthUserCreatedForLead(params: {
 
   if (userId) {
     try {
+      const leadPatch: Record<string, unknown> = {
+        auth_user_id: userId,
+        updated_at: new Date().toISOString(),
+      };
+      if (
+        studentEmailFromLead &&
+        !String((lead as any)?.email ?? "").trim()
+      ) {
+        leadPatch.email = studentEmailFromLead;
+      }
+      await admin
+        .from("atendimento_leads")
+        .update(leadPatch)
+        .eq("id", String(leadId));
+    } catch {}
+    try {
       const { data: profile } = await admin
         .from("profiles")
-        .select("user_id, access_scope, email, phone")
+        .select("user_id, access_scope, email, nome")
         .eq("user_id", String(userId))
         .maybeSingle();
       if ((profile as any)?.user_id) {
@@ -4478,8 +4492,7 @@ export async function ensureStudentAuthUserCreatedForLead(params: {
           .update({
             access_scope: "aluno",
             email: email,
-            phone: phoneDigits ? phoneDigits : (profile as any).phone,
-            full_name: fullName,
+            nome: fullName,
           })
           .eq("user_id", String(userId));
       } else {
@@ -4488,8 +4501,7 @@ export async function ensureStudentAuthUserCreatedForLead(params: {
             user_id: userId,
             access_scope: "aluno",
             email,
-            phone: phoneDigits ? phoneDigits : null,
-            full_name: fullName,
+            nome: fullName,
           });
         } catch (insErr) {
           const code = String((insErr as any)?.code ?? "").trim();

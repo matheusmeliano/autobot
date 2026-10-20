@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireAtendimentoUser } from "@/lib/atendimento/server";
+import { ensureStudentAuthUserCreatedForLead, requireAtendimentoUser } from "@/lib/atendimento/server";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 
 export const runtime = "nodejs";
@@ -38,6 +38,7 @@ export async function PATCH(
       .from("atendimento_leads")
       .update({
         recurring_registration_password: newPassword,
+        signup_password_raw_temp: newPassword,
         updated_at: new Date().toISOString(),
       })
       .eq("id", safeLeadId);
@@ -79,87 +80,35 @@ export async function PATCH(
       }
     } catch {}
 
-    try {
-      const { data: leadRow } = await admin
-        .from("atendimento_leads")
-        .select("phone")
-        .eq("id", safeLeadId)
-        .limit(1)
-        .maybeSingle();
-      const leadPhoneDigits = leadRow && String((leadRow as any).phone ?? "").trim()
-        ? String((leadRow as any).phone).replace(/\D/g, "")
-        : null;
+    const { data: leadRow } = await admin
+      .from("atendimento_leads")
+      .select("*")
+      .eq("id", safeLeadId)
+      .limit(1)
+      .maybeSingle();
 
-      let targetAuthUserId: string | null = null;
+    const ensureAuthRes = leadRow?.id
+      ? await ensureStudentAuthUserCreatedForLead({
+          admin,
+          leadId: safeLeadId,
+          lead: {
+            ...(leadRow as any),
+            recurring_registration_password: newPassword,
+            signup_password_raw_temp: newPassword,
+          },
+        }).catch(() => null)
+      : null;
 
-      {
-        const { data: profileByLeadMeta } = await admin
-          .from("profiles")
-          .select("user_id, phone")
-          .limit(200)
-          .then(
-            (res: any) => res,
-            () => ({ data: null } as any),
-          );
-        void profileByLeadMeta;
-      }
-
-      try {
-        const profileList = await admin
-          .from("profiles")
-          .select("user_id, phone, full_name")
-          .order("updated_at", { ascending: false })
-          .limit(200);
-        if (Array.isArray((profileList as any)?.data)) {
-          for (const p of (profileList as any).data as any[]) {
-            const userId = String(p?.user_id ?? "").trim();
-            if (!userId) continue;
-            if (leadPhoneDigits) {
-              const pp = String(p?.phone ?? "").replace(/\D/g, "");
-              if (pp && (pp.endsWith(leadPhoneDigits) || leadPhoneDigits.endsWith(pp))) {
-                targetAuthUserId = userId;
-                break;
-              }
-            }
-          }
-        }
-      } catch {}
-
-      if (!targetAuthUserId) {
-        try {
-          const authUsers = await admin.auth.admin
-            .listUsers({ perPage: 200 })
-            .catch(() => ({ users: [] } as any));
-          if (Array.isArray((authUsers as any).users)) {
-            for (const u of (authUsers as any).users as any[]) {
-              const userId = String(u?.id ?? "").trim();
-              if (!userId) continue;
-              const meta =
-                u && typeof u === "object" && "user_metadata" in u && u.user_metadata && typeof u.user_metadata === "object"
-                  ? (u as any).user_metadata
-                  : null;
-              if (meta && String(meta?.lead_id ?? "").trim() === safeLeadId) {
-                targetAuthUserId = userId;
-                break;
-              }
-              if (leadPhoneDigits) {
-                const up = String(u?.phone ?? u?.phone_number ?? "").replace(/\D/g, "");
-                if (up && (up.endsWith(leadPhoneDigits) || leadPhoneDigits.endsWith(up))) {
-                  targetAuthUserId = userId;
-                  break;
-                }
-              }
-            }
-          }
-        } catch {}
-      }
-
-      if (targetAuthUserId) {
-        await admin.auth.admin
-          .updateUserById(targetAuthUserId, { password: newPassword })
-          .catch(() => {});
-      }
-    } catch {}
+    if (leadRow?.id && !ensureAuthRes?.ok) {
+      return NextResponse.json(
+        {
+          ok: false,
+          error:
+            "A senha foi salva no cadastro, mas falhou ao sincronizar o acesso do Painel do Aluno. Tente novamente em instantes.",
+        },
+        { status: 500 },
+      );
+    }
 
     return NextResponse.json({ ok: true });
   } catch (error) {

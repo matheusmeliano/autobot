@@ -13,6 +13,7 @@ import { resolveStudentTimezone } from "../../../lib/timezone";
 import { AppModal } from "@/components/app/AppModal";
 import { Info, X, Eye, EyeOff, Copy, Check } from "lucide-react";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
+import { buildStudentAuthPassword } from "@/lib/auth/studentPassword";
 
 type RecurringWeekdayKey = "mon" | "tue" | "wed" | "thu" | "fri" | "sat";
 
@@ -2030,7 +2031,10 @@ export default function CadastroRecorrenteBody() {
     setAlunoLoginLoading(true);
     try {
       const supabase = createSupabaseBrowserClient();
-      const { error } = await supabase.auth.signInWithPassword({ email, password });
+      const { error } = await supabase.auth.signInWithPassword({
+        email,
+        password: buildStudentAuthPassword(password),
+      });
       if (error) {
         const m = String(error.message ?? "").toLowerCase();
         if (m.includes("invalid") || m.includes("password") || m.includes("email")) {

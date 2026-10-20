@@ -3718,22 +3718,25 @@ export function AtendimentoClient() {
     }
     try {
       setEditSenhaSaving(true);
-      const response = await fetch(`/api/atendimento/leads/${selectedLead.id}`, {
+      const response = await fetch(`/api/atendimento/leads/${selectedLead.id}/recurring-password`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          recurring_registration_password: raw,
-          signup_password_raw_temp: raw,
-        }),
+        body: JSON.stringify({ new_password: raw }),
       });
-      const payload = (await response.json().catch(() => null)) as { ok?: boolean; lead?: AtendimentoLeadListItem; error?: string } | null;
+      const payload = (await response.json().catch(() => null)) as { ok?: boolean; error?: string } | null;
       if (!response.ok || !payload?.ok) {
         modalToast.error(payload?.error ?? "Falha ao atualizar senha.");
         return;
       }
-      if (payload.lead) {
-        setPanelLeads((current) => current.map((item) => (item.id === selectedLead.id ? { ...item, ...payload.lead } : item)));
-      }
+      setPanelLeads((current) => current.map((item) => (
+        item.id === selectedLead.id
+          ? {
+              ...item,
+              recurring_registration_password: raw,
+              signup_password_raw_temp: raw,
+            }
+          : item
+      )));
       setIsEditSenhaOpen(false);
       setEditSenhaValue("");
       modalToast.success("Senha atualizada com sucesso.");
