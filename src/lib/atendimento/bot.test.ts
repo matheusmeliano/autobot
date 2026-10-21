@@ -357,6 +357,21 @@ test("[extended] resolveTimeZoneFromCityInput reconhece Edison Township NJ", () 
   );
 });
 
+test("[extended] resolveTimeZoneFromCityInput reconhece Kunkletown PA", () => {
+  const resolution = resolveTimeZoneFromCityInput({
+    state: "Pennsylvania",
+    city: "Kunkletown",
+    phone: "+1 267 555 9988",
+    allowPhoneCountryFallback: false,
+  });
+
+  assert.ok(resolution, "Kunkletown PA deve ser reconhecido");
+  assert.equal(resolution?.timeZone, "America/New_York");
+  assert.equal(resolution?.country, "US");
+  assert.equal(resolution?.normalizedCity, "kunkletown");
+  assert.equal(resolution?.normalizedState, "pennsylvania");
+});
+
 test("[extended] resolveTimeZoneFromCityInput reconhece The Villages FL", () => {
   const resolution = resolveTimeZoneFromCityInput({
     state: "FL",
