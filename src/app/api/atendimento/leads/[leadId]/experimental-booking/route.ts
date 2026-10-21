@@ -407,8 +407,53 @@ export async function POST(req: Request, { params }: { params: Promise<{ leadId:
       if (stateErr) throw stateErr;
       if (activeBookingState) {
         const attendanceRaw = String((activeBookingState as any).attendance_status ?? "").trim();
-        const studentSent = Boolean(String((activeBookingState as any).student_start_notification_sent_at ?? "").trim());
-        const attendantSent = Boolean(String((activeBookingState as any).attendant_start_notification_sent_at ?? "").trim());
+        let studentSent = Boolean(String((activeBookingState as any).student_start_notification_sent_at ?? "").trim());
+        let attendantSent = Boolean(String((activeBookingState as any).attendant_start_notification_sent_at ?? "").trim());
+        if (!studentSent || !attendantSent) {
+          try {
+            const { data: notificationHistory } = await admin
+              .from("atendimento_history_events")
+              .select("event_type, details, created_at")
+              .eq("lead_id", leadId)
+              .in("event_type", [
+                "experimental_class_student_start_notification_sent",
+                "experimental_class_attendant_start_notification_sent",
+                "experimental_class_registered_attendant_start_notification_sent",
+              ])
+              .order("created_at", { ascending: false })
+              .limit(20);
+
+            const activeBookingId = String((activeBookingState as any).id ?? "").trim();
+            const activeProfessorStartAt = String((activeBookingState as any).professor_start_at ?? "").trim();
+            const activeLeadStartAt = String((activeBookingState as any).lead_start_at ?? "").trim();
+
+            for (const event of notificationHistory ?? []) {
+              const details =
+                event && typeof event === "object" && "details" in event && event.details && typeof event.details === "object"
+                  ? (event.details as Record<string, unknown>)
+                  : {};
+              const eventBookingId = String(details.booking_id ?? "").trim();
+              const eventStartAt = String(details.start_at ?? "").trim();
+              const sameBooking = activeBookingId && eventBookingId && eventBookingId === activeBookingId;
+              const sameOccurrence =
+                Boolean(eventStartAt) &&
+                (eventStartAt === activeProfessorStartAt || eventStartAt === activeLeadStartAt);
+              if (!sameBooking && !sameOccurrence) continue;
+
+              const eventType = String(event.event_type ?? "").trim();
+              if (eventType === "experimental_class_student_start_notification_sent") {
+                studentSent = true;
+              }
+              if (
+                eventType === "experimental_class_attendant_start_notification_sent" ||
+                eventType === "experimental_class_registered_attendant_start_notification_sent"
+              ) {
+                attendantSent = true;
+              }
+              if (studentSent && attendantSent) break;
+            }
+          } catch {}
+        }
         const hasAttendance = attendanceRaw === "attended" || attendanceRaw === "no_show";
         (globalThis as any).__experimentalBookingHadAnyNotificationBeforeEdit = studentSent || attendantSent;
         (globalThis as any).__experimentalBookingPreviousLeadStartAt = String((activeBookingState as any).lead_start_at ?? "").trim() || null;
