@@ -1266,6 +1266,20 @@ export async function sendExperimentalClassStartNotifications(now = new Date()) 
   const sentRegisteredAttendantBookingIds = new Set<string>();
   const sentCompositeKeys = new Set<string>();
   const latestLessonLinkByLeadId = new Map<string, string | null>();
+  const experimentalLeadSelectBase =
+    "id, full_name, phone, status, funnel_stage, experimental_class_professor_date, experimental_class_lead_date, experimental_class_professor_time, experimental_class_lead_time, experimental_class_professor_start_at, experimental_class_lead_start_at, experimental_class_professor_name, experimental_class_professor_phone";
+  const experimentalLeadSelectLocation = ", cpf, city, state, country, timezone, origin";
+  const experimentalLeadSelectWithRegistered =
+    experimentalLeadSelectBase +
+    ", experimental_class_registered_attendant_notification_sent_at" +
+    experimentalLeadSelectLocation;
+  const experimentalLeadSelectWithoutRegistered = experimentalLeadSelectBase + experimentalLeadSelectLocation;
+  const fullExperimentalLeadSelectWithRegistered =
+    experimentalLeadSelectBase +
+    ", experimental_class_status, experimental_class_registered_attendant_notification_sent_at" +
+    experimentalLeadSelectLocation;
+  const fullExperimentalLeadSelectWithoutRegistered =
+    experimentalLeadSelectBase + ", experimental_class_status" + experimentalLeadSelectLocation;
 
   // Step 1: Tabela real de bookings
   {
@@ -1319,13 +1333,28 @@ export async function sendExperimentalClassStartNotifications(now = new Date()) 
   // Step 2: Leads com experimental_class_professor_start_at na janela (agendamentos feitos no painel manual sem tabela bookings)
   const extraLeadIds: string[] = [];
   try {
+    let leadsData: any[] | null = null;
     const leadsQ = await admin
       .from("atendimento_leads")
-      .select("id, full_name, phone, status, funnel_stage, experimental_class_professor_date, experimental_class_lead_date, experimental_class_professor_time, experimental_class_lead_time, experimental_class_professor_start_at, experimental_class_lead_start_at, experimental_class_professor_name, experimental_class_professor_phone, experimental_class_student_notification_sent_at, experimental_class_attendant_notification_sent_at, experimental_class_registered_attendant_notification_sent_at, cpf, city, state, country, timezone, origin")
+      .select(experimentalLeadSelectWithRegistered)
       .gte("experimental_class_professor_start_at", candidateWindowStartIso)
       .lte("experimental_class_professor_start_at", candidateWindowEndIso);
-    if (!leadsQ.error && Array.isArray(leadsQ.data)) {
-      for (const row of (leadsQ.data as any[])) {
+    if (
+      leadsQ.error &&
+      extractUndefinedColumnName((leadsQ.error as any)?.message) ===
+        "experimental_class_registered_attendant_notification_sent_at"
+    ) {
+      const fallbackLeadsQ = await admin
+        .from("atendimento_leads")
+        .select(experimentalLeadSelectWithoutRegistered)
+        .gte("experimental_class_professor_start_at", candidateWindowStartIso)
+        .lte("experimental_class_professor_start_at", candidateWindowEndIso);
+      if (!fallbackLeadsQ.error) leadsData = (fallbackLeadsQ.data as any[]) ?? [];
+    } else if (!leadsQ.error) {
+      leadsData = (leadsQ.data as any[]) ?? [];
+    }
+    if (Array.isArray(leadsData)) {
+      for (const row of leadsData) {
         const id = String(row?.id ?? "").trim();
         if (!id) continue;
         extraLeadIds.push(id);
@@ -1341,9 +1370,21 @@ export async function sendExperimentalClassStartNotifications(now = new Date()) 
     try {
       const r = await admin
         .from("atendimento_leads")
-        .select("id, full_name, phone, status, funnel_stage, experimental_class_professor_date, experimental_class_lead_date, experimental_class_professor_time, experimental_class_lead_time, experimental_class_professor_start_at, experimental_class_lead_start_at, experimental_class_status, experimental_class_professor_name, experimental_class_professor_phone, experimental_class_student_notification_sent_at, experimental_class_attendant_notification_sent_at, experimental_class_registered_attendant_notification_sent_at, cpf, city, state, country, timezone, origin")
+        .select(fullExperimentalLeadSelectWithRegistered)
         .in("id", allLeadIds);
-      if (!r.error) fullLeads = (r.data as any[]) ?? [];
+      if (
+        r.error &&
+        extractUndefinedColumnName((r.error as any)?.message) ===
+          "experimental_class_registered_attendant_notification_sent_at"
+      ) {
+        const fallbackR = await admin
+          .from("atendimento_leads")
+          .select(fullExperimentalLeadSelectWithoutRegistered)
+          .in("id", allLeadIds);
+        if (!fallbackR.error) fullLeads = (fallbackR.data as any[]) ?? [];
+      } else if (!r.error) {
+        fullLeads = (r.data as any[]) ?? [];
+      }
     } catch (_e) {
       fullLeads = [];
     }
@@ -1503,9 +1544,9 @@ export async function sendExperimentalClassStartNotifications(now = new Date()) 
       conversation_id: null,
       status: "scheduled",
       lesson_link: latestLessonLinkByLeadId.get(leadId) || null,
-      student_start_notification_sent_at: String(row?.experimental_class_student_notification_sent_at ?? "").trim() || null,
-      attendant_start_notification_sent_at: String(row?.experimental_class_attendant_notification_sent_at ?? "").trim() || null,
-      registered_attendant_start_notification_sent_at: String(row?.experimental_class_registered_attendant_notification_sent_at ?? "").trim() || null,
+      student_start_notification_sent_at: null,
+      attendant_start_notification_sent_at: null,
+      registered_attendant_start_notification_sent_at: null,
       attendance_status: null,
       attendance_checked_at: null,
       professor_timezone: PROF_TZ,
@@ -1604,7 +1645,26 @@ export async function sendExperimentalClassStartNotifications(now = new Date()) 
       !Number.isFinite(leadStartAtMs)
     ) continue;
 
-    const lead = leadsById.get(leadId) as any;
+    let lead = leadsById.get(leadId) as any;
+    if (!String(lead?.phone ?? "").trim()) {
+      try {
+        const { data: fallbackLead } = await admin
+          .from("atendimento_leads")
+          .select(
+            "id, full_name, phone, timezone, experimental_class_professor_name, experimental_class_professor_phone",
+          )
+          .eq("id", leadId)
+          .maybeSingle();
+        if (fallbackLead?.id) {
+          lead = {
+            ...(lead ?? {}),
+            ...fallbackLead,
+          };
+        }
+      } catch {
+        /* noop */
+      }
+    }
     const leadPhone = String(lead?.phone ?? "").trim();
     const leadFirstName = getLeadFirstName(lead?.full_name);
     const leadFullName = getLeadFullName(lead?.full_name);
@@ -1864,10 +1924,21 @@ export async function sendExperimentalClassStartNotifications(now = new Date()) 
       }
       if (Object.keys(leadPatch).length > 1) {
         try {
-          await admin
-            .from("atendimento_leads")
-            .update(leadPatch as any)
-            .eq("id", leadId);
+          let nextLeadPatch: Record<string, unknown> | null = { ...leadPatch };
+          while (nextLeadPatch && Object.keys(nextLeadPatch).length > 1) {
+            const { error } = await admin
+              .from("atendimento_leads")
+              .update(nextLeadPatch as any)
+              .eq("id", leadId);
+            if (!error) break;
+            const code = String((error as any)?.code ?? "").trim();
+            if (code === "42703" || extractUndefinedColumnName((error as any)?.message) !== null) {
+              const stripped = stripUndefinedColumnFromPatch(nextLeadPatch, error);
+              nextLeadPatch = stripped.next;
+              continue;
+            }
+            break;
+          }
         } catch (_leadPatchError) {
           void _leadPatchError;
         }
