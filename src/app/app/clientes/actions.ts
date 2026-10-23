@@ -13,7 +13,7 @@ import {
   normalizeRetryWeekdays,
 } from "@/lib/chargeRetry";
 import { syncDebtorChargeStatus } from "@/lib/debtorChargeStatus";
-import { BRAZIL_TIMEZONES } from "@/lib/timezone";
+import { BRAZIL_TIMEZONES, zonedDateTimeToUtcIso } from "@/lib/timezone";
 
 const createSchema = z
   .object({
@@ -103,6 +103,40 @@ function nextMonthYear(baseDate = new Date()) {
   const nextYear = year + Math.floor(monthIndex / 12);
   const nextMonth = (monthIndex % 12) + 1;
   return { month: nextMonth, year: nextYear };
+}
+
+function buildChargeLocalDate(params: {
+  due_day?: number | null;
+  recurrence_month?: number | null;
+  recurrence_year?: number | null;
+}) {
+  const dueDay = Number(params.due_day ?? 0);
+  const month = Number(params.recurrence_month ?? 0);
+  const year = Number(params.recurrence_year ?? 0);
+  if (!Number.isInteger(dueDay) || dueDay < 1 || dueDay > 31) return "";
+  if (!Number.isInteger(month) || month < 1 || month > 12) return "";
+  if (!Number.isInteger(year) || year < 2000 || year > 9999) return "";
+  const safeDay = Math.min(dueDay, new Date(Date.UTC(year, month, 0)).getUTCDate());
+  return `${String(year).padStart(4, "0")}-${String(month).padStart(2, "0")}-${String(safeDay).padStart(2, "0")}`;
+}
+
+function extractLocalTimeFromIso(value: string | null | undefined, timeZone: string) {
+  const iso = String(value ?? "").trim();
+  if (!iso) return null;
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return null;
+  const parts = new Intl.DateTimeFormat("en-GB", {
+    timeZone,
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  }).formatToParts(date);
+  const map: Record<string, string> = {};
+  for (const part of parts) {
+    if (part.type === "literal") continue;
+    map[part.type] = part.value;
+  }
+  return map.hour && map.minute ? `${map.hour}:${map.minute}` : null;
 }
 
 function normalizeDebtorCharges(input: {
@@ -222,6 +256,71 @@ async function syncDebtorChargesAndSchedules(params: {
   if (removedIds.length) {
     const { error: deleteChargesError } = await params.supabase.from("debtor_charges").delete().in("id", removedIds);
     if (deleteChargesError) return { ok: false as const, error: deleteChargesError.message };
+  }
+
+  const { data: liveCharges, error: liveChargesError } = await params.supabase
+    .from("debtor_charges")
+    .select("id, due_day, recurrence_month, recurrence_year")
+    .eq("debtor_id", params.debtorId)
+    .limit(20);
+  if (liveChargesError) return { ok: false as const, error: liveChargesError.message };
+
+  const liveChargeById = new Map(
+    ((liveCharges ?? []) as Array<{
+      id?: string | null;
+      due_day?: number | null;
+      recurrence_month?: number | null;
+      recurrence_year?: number | null;
+    }>)
+      .map((charge) => [String(charge?.id ?? "").trim(), charge] as const)
+      .filter(([id]) => Boolean(id)),
+  );
+
+  const { data: openSchedules, error: openSchedulesError } = await params.supabase
+    .from("schedules")
+    .select("id, charge_id, data_envio, charge_due_at, recurrence_day, recurrence_time, schedule_timezone")
+    .eq("debtor_id", params.debtorId)
+    .is("closed_at", null)
+    .limit(50);
+  if (openSchedulesError) return { ok: false as const, error: openSchedulesError.message };
+
+  for (const schedule of (openSchedules ?? []) as Array<Record<string, unknown>>) {
+    const chargeId = String(schedule?.charge_id ?? "").trim();
+    if (!chargeId) continue;
+    const charge = liveChargeById.get(chargeId);
+    if (!charge) continue;
+
+    const localDate = buildChargeLocalDate(charge);
+    if (!localDate) continue;
+
+    const timeZoneRaw = String(schedule?.schedule_timezone ?? "").trim();
+    const timeZone = BRAZIL_TIMEZONES.includes(timeZoneRaw as (typeof BRAZIL_TIMEZONES)[number])
+      ? timeZoneRaw
+      : "America/Sao_Paulo";
+    const nextTime =
+      String(schedule?.recurrence_time ?? "").trim() ||
+      extractLocalTimeFromIso(String(schedule?.data_envio ?? schedule?.charge_due_at ?? ""), timeZone) ||
+      "09:00";
+    const nextIso = zonedDateTimeToUtcIso({
+      date: localDate,
+      time: nextTime,
+      timeZone,
+    });
+
+    const patch: Record<string, unknown> = {};
+    if (String(schedule?.data_envio ?? "").trim() !== nextIso) patch.data_envio = nextIso;
+    if (String(schedule?.charge_due_at ?? "").trim() !== nextIso) patch.charge_due_at = nextIso;
+    if (Number(schedule?.recurrence_day ?? 0) !== Number(charge?.due_day ?? 0)) {
+      patch.recurrence_day = Number(charge?.due_day ?? 0) || null;
+    }
+
+    if (Object.keys(patch).length === 0) continue;
+
+    const { error: scheduleUpdateError } = await params.supabase
+      .from("schedules")
+      .update(patch)
+      .eq("id", String(schedule?.id ?? ""));
+    if (scheduleUpdateError) return { ok: false as const, error: scheduleUpdateError.message };
   }
 
   await syncDebtorChargeStatus(createSupabaseAdminClient(), params.userId, params.debtorId);
