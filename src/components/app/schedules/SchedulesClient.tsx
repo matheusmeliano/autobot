@@ -897,6 +897,37 @@ export function SchedulesClient({
 
   useEffect(() => {
     if (!open) return;
+    const currentDate = normalizeDateOnly(scheduleDateValue);
+    const nextDate = selectedDebtorReferenceDate || "";
+    const nextChargeId = String(selectedDebtorReferenceOption?.chargeId ?? "").trim();
+
+    if (nextDate && currentDate !== nextDate) {
+      setValue("data_envio_date", nextDate, {
+        shouldDirty: false,
+        shouldTouch: false,
+        shouldValidate: true,
+      });
+    }
+
+    if (selectedChargeId !== nextChargeId) {
+      setValue("charge_id", nextChargeId, {
+        shouldDirty: false,
+        shouldTouch: false,
+        shouldValidate: false,
+      });
+    }
+  }, [
+    open,
+    scheduleDateValue,
+    selectedChargeId,
+    selectedDebtorReferenceDate,
+    selectedDebtorReferenceKey,
+    selectedDebtorReferenceOption,
+    setValue,
+  ]);
+
+  useEffect(() => {
+    if (!open) return;
   }, [open]);
 
   useEffect(() => {

@@ -768,10 +768,6 @@ async function resolveScheduleLocalDate(params: {
   const providedDate = String(params.providedDate ?? "").trim();
   const providedChargeId = String(params.chargeId ?? "").trim();
 
-  if (/^\d{4}-\d{2}-\d{2}$/.test(providedDate)) {
-    return { ok: true as const, localDate: providedDate, chargeId: providedChargeId || null };
-  }
-
   const { data, error } = await params.supabase
     .from("debtors")
     .select("vencimento, debtor_charges(id, due_day, recurrence_month, recurrence_year, created_at)")
@@ -792,7 +788,21 @@ async function resolveScheduleLocalDate(params: {
   const matchedCharge =
     charges.find((charge: DebtorScheduleChargeRow) => String(charge.id ?? "").trim() === providedChargeId) ??
     null;
-  const resolvedCharge = matchedCharge ?? ((charges[0] as DebtorScheduleChargeRow | undefined) ?? null);
+  const matchedChargeByDate =
+    /^\d{4}-\d{2}-\d{2}$/.test(providedDate)
+      ? charges.find((charge: DebtorScheduleChargeRow) => {
+          const localDate = buildReferenceLocalDate({
+            day: charge.due_day,
+            month: charge.recurrence_month,
+            year: charge.recurrence_year,
+          });
+          return localDate === providedDate;
+        }) ?? null
+      : null;
+  const resolvedCharge =
+    matchedCharge ??
+    matchedChargeByDate ??
+    ((charges[0] as DebtorScheduleChargeRow | undefined) ?? null);
   const chargeLocalDate = resolvedCharge
     ? buildReferenceLocalDate({
         day: resolvedCharge.due_day,
@@ -806,6 +816,10 @@ async function resolveScheduleLocalDate(params: {
       localDate: chargeLocalDate,
       chargeId: String(resolvedCharge?.id ?? "").trim() || null,
     };
+  }
+
+  if (/^\d{4}-\d{2}-\d{2}$/.test(providedDate)) {
+    return { ok: true as const, localDate: providedDate, chargeId: null };
   }
 
   const legacyDueDate = String((data as any)?.vencimento ?? "").trim();

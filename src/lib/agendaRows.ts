@@ -176,6 +176,10 @@ function resolveOperationalLocalDate(params: {
   const referenceMonthKey = referenceLocalDate ? referenceLocalDate.slice(0, 7) : "";
   const referenceDay = referenceLocalDate ? Number(referenceLocalDate.slice(-2)) : 0;
 
+  if (params.fallbackLocalDate) {
+    return params.fallbackLocalDate;
+  }
+
   if (scheduleChargeDueLocalDate) {
     return scheduleChargeDueLocalDate;
   }
@@ -294,7 +298,7 @@ export function buildAgendaRows(params: {
       template_pending_id: pendingTemplateId || null,
       template_overdue_id: overdueTemplateId || null,
       data_envio: String(schedule.data_envio ?? schedule.charge_due_at ?? schedule.created_at ?? ""),
-      charge_due_at: schedule.charge_due_at ? String(schedule.charge_due_at) : null,
+      charge_due_at: operationalDueAt || (schedule.charge_due_at ? String(schedule.charge_due_at) : null),
       operational_due_at: operationalDueAt,
       next_charge_due_at: null,
       status: String(schedule.status ?? "agendado"),
