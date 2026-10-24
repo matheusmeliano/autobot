@@ -93,6 +93,85 @@ async function stripSuspectMissingColumnsBeforePatch(
   return next;
 }
 
+function parseIsoMs(raw: unknown): number {
+  const value = String(raw ?? "").trim();
+  if (!value) return 0;
+  const ms = Date.parse(value);
+  return Number.isFinite(ms) ? ms : 0;
+}
+
+function resolveExperimentalBookingCandidate(
+  rows: Array<Record<string, unknown>>,
+  leadRow: Record<string, unknown> | null | undefined,
+): string {
+  const targetProfessorStartAt = String(
+    (leadRow as any)?.experimental_class_professor_start_at ?? "",
+  ).trim();
+  const targetLeadStartAt = String(
+    (leadRow as any)?.experimental_class_lead_start_at ?? "",
+  ).trim();
+  const targetProfessorDate = String(
+    (leadRow as any)?.experimental_class_professor_date ?? "",
+  ).trim().slice(0, 10);
+  const targetProfessorTime = String(
+    (leadRow as any)?.experimental_class_professor_time ?? "",
+  ).trim();
+  const targetLeadDate = String(
+    (leadRow as any)?.experimental_class_lead_date ?? "",
+  ).trim().slice(0, 10);
+  const targetLeadTime = String(
+    (leadRow as any)?.experimental_class_lead_time ?? "",
+  ).trim();
+
+  let bestId = "";
+  let bestScore = Number.NEGATIVE_INFINITY;
+  let bestMs = 0;
+
+  for (const row of rows) {
+    const id = String((row as any)?.id ?? "").trim();
+    if (!id) continue;
+    const status = String((row as any)?.status ?? "").trim().toLowerCase();
+    const isCancelled = status === "cancelled";
+    let score = isCancelled ? -1000 : 0;
+
+    const professorStartAt = String((row as any)?.professor_start_at ?? "").trim();
+    const leadStartAt = String((row as any)?.lead_start_at ?? "").trim();
+    const professorDate = String((row as any)?.professor_date ?? "").trim().slice(0, 10);
+    const professorTime = String((row as any)?.professor_time ?? "").trim();
+    const leadDate = String((row as any)?.lead_date ?? "").trim().slice(0, 10);
+    const leadTime = String((row as any)?.lead_time ?? "").trim();
+
+    if (targetProfessorStartAt && professorStartAt === targetProfessorStartAt) score += 500;
+    if (targetLeadStartAt && leadStartAt === targetLeadStartAt) score += 450;
+    if (
+      targetProfessorDate &&
+      professorDate === targetProfessorDate &&
+      targetProfessorTime &&
+      professorTime === targetProfessorTime
+    ) {
+      score += 300;
+    }
+    if (
+      targetLeadDate &&
+      leadDate === targetLeadDate &&
+      targetLeadTime &&
+      leadTime === targetLeadTime
+    ) {
+      score += 250;
+    }
+    if (professorDate || leadDate) score += 25;
+
+    const updatedMs = parseIsoMs((row as any)?.updated_at) || parseIsoMs((row as any)?.created_at);
+    if (score > bestScore || (score === bestScore && updatedMs >= bestMs)) {
+      bestId = id;
+      bestScore = score;
+      bestMs = updatedMs;
+    }
+  }
+
+  return bestId;
+}
+
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ leadId: string }> }) {
   try {
     const auth = await requireAtendimentoUser();
@@ -137,7 +216,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ le
 
     const { data: leadExists, error: leadErr } = await admin
       .from("atendimento_leads")
-      .select("id, experimental_class_booking_id, updated_at")
+      .select("id, experimental_class_booking_id, experimental_class_professor_date, experimental_class_professor_time, experimental_class_professor_start_at, experimental_class_lead_date, experimental_class_lead_time, experimental_class_lead_start_at, updated_at")
       .eq("id", safeLeadId)
       .maybeSingle();
     if (leadErr) throw leadErr;
@@ -145,7 +224,25 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ le
       return NextResponse.json({ ok: false, error: "Interessado não encontrado." }, { status: 404 });
     }
 
-    const bookingId = String((leadExists as any)?.experimental_class_booking_id ?? "").trim();
+    let bookingId = String((leadExists as any)?.experimental_class_booking_id ?? "").trim();
+    if (!bookingId && (scope === "experimental" || scope === "both")) {
+      try {
+        const { data: bookingRows } = await admin
+          .from("atendimento_experimental_class_bookings")
+          .select(
+            "id, status, professor_date, professor_time, professor_start_at, lead_date, lead_time, lead_start_at, created_at, updated_at",
+          )
+          .eq("lead_id", safeLeadId)
+          .limit(20);
+        if (Array.isArray(bookingRows) && bookingRows.length > 0) {
+          bookingId = resolveExperimentalBookingCandidate(
+            bookingRows as Array<Record<string, unknown>>,
+            leadExists as Record<string, unknown>,
+          );
+        }
+      } catch {
+      }
+    }
     const updatedAt = new Date().toISOString();
 
     // ============================================================
@@ -228,6 +325,9 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ le
     if (scope === "experimental" || scope === "both") {
       leadPatch.experimental_class_professor_name = match.name;
       leadPatch.experimental_class_professor_phone = match.phone;
+      if (bookingId) {
+        leadPatch.experimental_class_booking_id = bookingId;
+      }
     }
     if (scope === "recurring" || scope === "both") {
       leadPatch.recurring_class_professor_name = match.name;

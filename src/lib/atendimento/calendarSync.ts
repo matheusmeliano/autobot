@@ -201,3 +201,121 @@ export function flatExpDedupId(
   if (bkId) return bkId;
   return `flat-exp-${String(leadId ?? "x").trim() || "x"}`;
 }
+
+function isSyntheticFlatExperimentalId(idRaw: unknown): boolean {
+  const id = String(idRaw ?? "").trim();
+  return id.startsWith("flat-exp-");
+}
+
+function hasAssignedProfessor(entry: Record<string, unknown>): boolean {
+  return Boolean(
+    String(entry.assigned_professor_name ?? "").trim() ||
+    String(entry.assigned_professor_phone ?? "").trim(),
+  );
+}
+
+function entrySortTimestampMs(entry: Record<string, unknown>): number {
+  const raw =
+    String(entry.updated_at ?? "").trim() ||
+    String(entry.created_at ?? "").trim() ||
+    String(entry.professor_start_at ?? "").trim() ||
+    String(entry.lead_start_at ?? "").trim();
+  if (!raw) return 0;
+  const ms = Date.parse(raw);
+  return Number.isFinite(ms) ? ms : 0;
+}
+
+function pickLatestEntry(
+  current: Record<string, unknown> | null,
+  next: Record<string, unknown>,
+): Record<string, unknown> {
+  if (!current) return next;
+  return entrySortTimestampMs(next) >= entrySortTimestampMs(current) ? next : current;
+}
+
+export function experimentalOccurrenceDedupKey(
+  entry: Record<string, unknown>,
+): string {
+  const type = String(entry.__type ?? "").trim().toLowerCase();
+  if (!type.startsWith("experimental")) return "";
+  const leadId = String(entry.lead_id ?? "").trim();
+  const localDate =
+    String(entry.professor_date ?? "").trim().slice(0, 10) ||
+    String(entry.lead_date ?? "").trim().slice(0, 10);
+  const localTime = normalizeSlotHHMM(
+    String(entry.professor_time ?? "").trim() ||
+    String(entry.lead_time ?? "").trim(),
+  );
+  if (!leadId || !localDate || !localTime) return "";
+  return `${leadId}::${localDate}::${localTime}`;
+}
+
+export function mergeExperimentalOccurrenceEntries(
+  entries: Array<Record<string, unknown>>,
+): Array<Record<string, unknown>> {
+  const grouped = new Map<string, Array<Record<string, unknown>>>();
+  const passthrough: Array<Record<string, unknown>> = [];
+
+  for (const entry of entries) {
+    const key = experimentalOccurrenceDedupKey(entry);
+    if (!key) {
+      passthrough.push({ ...entry });
+      continue;
+    }
+    const bucket = grouped.get(key) ?? [];
+    bucket.push(entry);
+    grouped.set(key, bucket);
+  }
+
+  const merged: Array<Record<string, unknown>> = [];
+  for (const bucket of grouped.values()) {
+    let bestReal: Record<string, unknown> | null = null;
+    let bestAny: Record<string, unknown> | null = null;
+    let bestProfessor: Record<string, unknown> | null = null;
+    let bestLeadMeta: Record<string, unknown> | null = null;
+    let bestLink: Record<string, unknown> | null = null;
+
+    for (const candidate of bucket) {
+      const candidateId = String(candidate.id ?? "").trim();
+      if (candidateId && !isSyntheticFlatExperimentalId(candidateId)) {
+        bestReal = pickLatestEntry(bestReal, candidate);
+      }
+      bestAny = pickLatestEntry(bestAny, candidate);
+      if (hasAssignedProfessor(candidate)) {
+        bestProfessor = pickLatestEntry(bestProfessor, candidate);
+      }
+      if (
+        String(candidate.__lead_full_name ?? "").trim() ||
+        String(candidate.__lead_phone ?? "").trim()
+      ) {
+        bestLeadMeta = pickLatestEntry(bestLeadMeta, candidate);
+      }
+      if (String(candidate.link ?? "").trim()) {
+        bestLink = pickLatestEntry(bestLink, candidate);
+      }
+    }
+
+    const base = { ...(bestReal ?? bestAny ?? bucket[0]) };
+    if (bestProfessor) {
+      base.assigned_professor_name =
+        String(bestProfessor.assigned_professor_name ?? "").trim() || null;
+      base.assigned_professor_phone =
+        String(bestProfessor.assigned_professor_phone ?? "").trim() || null;
+    }
+    if (bestLeadMeta) {
+      if (!String(base.__lead_full_name ?? "").trim()) {
+        base.__lead_full_name = String(bestLeadMeta.__lead_full_name ?? "").trim() || null;
+      }
+      if (!String(base.__lead_phone ?? "").trim()) {
+        base.__lead_phone = String(bestLeadMeta.__lead_phone ?? "").trim() || null;
+      }
+    }
+    if (!String(base.link ?? "").trim() && bestLink) {
+      base.link = String(bestLink.link ?? "").trim() || null;
+    }
+    base.__noProfessor = !hasAssignedProfessor(base);
+    merged.push(base);
+  }
+
+  return [...passthrough, ...merged];
+}

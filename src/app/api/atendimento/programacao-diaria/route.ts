@@ -18,6 +18,7 @@ import {
   VALID_RECURRING_CLASS_STATUS,
   VALID_RECURRING_FUNNEL_STAGE_FALLBACK,
   detectTeacherKey,
+  mergeExperimentalOccurrenceEntries,
   experimentalHasTime,
   flatExpDedupId,
   normalizeSlotHHMM,
@@ -323,6 +324,10 @@ export async function GET(req: Request) {
       }
     }
   } catch {}
+
+  const mergedExperimentalBookings = mergeExperimentalOccurrenceEntries(bookings);
+  bookings.length = 0;
+  bookings.push(...mergedExperimentalBookings);
 
   // Util: formatação de telefone p/ exibição no modal (sempre com +<codigo pais> (area) 9XXXX-XXXX
   const digitsOnly = (s: string | null | undefined): string => String(s ?? "").replace(/\D+/g, "");

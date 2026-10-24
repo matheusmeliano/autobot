@@ -15,7 +15,7 @@ import {
   VALID_RECURRING_FUNNEL_STAGE_FALLBACK,
   detectTeacherKey,
   experimentalHasTime,
-  flatExpDedupId,
+  mergeExperimentalOccurrenceEntries,
   recurringFirstLocalDate,
   recurringHasTime,
   weekdayFromLabel,
@@ -175,7 +175,7 @@ export async function GET(req: Request) {
   // =============== 1) EXPERIMENTAIS COMPOSITE (tabela atendimento_experimental_class_bookings) ===============
   // Obs: continuamos SDK aqui (por enquanto, gte/lte date range funciona), mas AGORA select INCLUI
   // professor_time e lead_time — antes faltavam! experimentalHasTime sempre retornava false.
-  const compositeBookings: Array<Record<string, unknown>> = [];
+  const experimentalEntries: Array<Record<string, unknown>> = [];
   try {
     const baseSelect =
       "id,lead_id,status,professor_date,professor_time,lead_time,assigned_professor_name,assigned_professor_phone";
@@ -209,12 +209,13 @@ export async function GET(req: Request) {
         const id = String((b as any).id ?? "").trim();
         if (id && seenComposite.has(id)) continue;
         if (id) seenComposite.add(id);
-        compositeBookings.push(b);
-        const pName = String((b as any).assigned_professor_name ?? "");
-        const pPhone = String((b as any).assigned_professor_phone ?? "");
-        const hasProf = Boolean(pName.trim() || pPhone.trim());
-        const key = detectTeacherKey(pName, pPhone, !hasProf);
-        (badgeMap[d] as any)[key] = true;
+        const pName = String((b as any).assigned_professor_name ?? "").trim();
+        const pPhone = String((b as any).assigned_professor_phone ?? "").trim();
+        experimentalEntries.push({
+          ...b,
+          __type: "experimental_composite",
+          __noProfessor: !(pName || pPhone),
+        });
       }
     }
   } catch {}
@@ -241,9 +242,6 @@ export async function GET(req: Request) {
     if (res.ok) {
       const data = (await res.json()) as Array<Record<string, unknown>> | null;
       if (Array.isArray(data) && data.length > 0) {
-        const alreadySeenBookingIdsPeriodo = new Set<string>(
-          compositeBookings.map((bk) => String((bk as any).id ?? "").trim()).filter(Boolean),
-        );
         for (const r of data) {
           const leadId = String((r as any)?.id ?? "").trim();
           if (leadId) {
@@ -272,16 +270,35 @@ export async function GET(req: Request) {
             continue;
           const pName = String((r as any).experimental_class_professor_name ?? "").trim();
           const pPhone = String((r as any).experimental_class_professor_phone ?? "").trim();
-          const hasProf = Boolean(pName || pPhone);
-          const bkId = flatExpDedupId(String(r.id ?? ""), (r as any).experimental_class_booking_id);
-          if (bkId && alreadySeenBookingIdsPeriodo.has(bkId)) continue;
-          alreadySeenBookingIdsPeriodo.add(bkId);
-          const key = detectTeacherKey(pName, pPhone, !hasProf);
-          (badgeMap[d] as any)[key] = true;
+          experimentalEntries.push({
+            id: String((r as any).experimental_class_booking_id ?? "").trim() || `flat-exp-${leadId || "x"}`,
+            lead_id: leadId || null,
+            status: stExpFlat || "scheduled",
+            professor_date: pDate || lDate || null,
+            professor_time: (r as any).experimental_class_professor_time ?? null,
+            lead_date: lDate || pDate || null,
+            lead_time: (r as any).experimental_class_lead_time ?? null,
+            assigned_professor_name: pName || null,
+            assigned_professor_phone: pPhone || null,
+            __type: "experimental_flat",
+            __noProfessor: !(pName || pPhone),
+          });
         }
       }
     }
   } catch {}
+
+  for (const entry of mergeExperimentalOccurrenceEntries(experimentalEntries)) {
+    const d =
+      String((entry as any).professor_date ?? "").trim().slice(0, 10) ||
+      String((entry as any).lead_date ?? "").trim().slice(0, 10);
+    if (!d || !badgeMap[d]) continue;
+    const pName = String((entry as any).assigned_professor_name ?? "").trim();
+    const pPhone = String((entry as any).assigned_professor_phone ?? "").trim();
+    const hasProf = Boolean(pName || pPhone);
+    const key = detectTeacherKey(pName, pPhone, !hasProf);
+    (badgeMap[d] as any)[key] = true;
+  }
 
   // =============== 2) RECORRENTES (leads flat) ===============
   // 🔴 TROCADO SDK admin.from() → FETCH REST DIRETO (igual MODAL).
