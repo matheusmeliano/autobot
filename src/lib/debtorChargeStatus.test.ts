@@ -1,7 +1,10 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import { deriveReferenceMonthDebtorChargeProgress } from "./debtorChargeStatus.ts";
+import {
+  deriveReferenceMonthDebtorChargeProgress,
+  deriveReferenceMonthDebtorStatus,
+} from "./debtorChargeStatus.ts";
 
 test("deriveReferenceMonthDebtorChargeProgress nao conta pagamento antigo como recebido do mes atual", () => {
   const progress = deriveReferenceMonthDebtorChargeProgress(
@@ -55,4 +58,44 @@ test("deriveReferenceMonthDebtorChargeProgress conta pagamento confirmado no mes
   );
 
   assert.deepEqual(progress, { paid: 1, total: 1 });
+});
+
+test("deriveReferenceMonthDebtorChargeProgress nao conta disparo executado sem pagamento como recebido", () => {
+  const progress = deriveReferenceMonthDebtorChargeProgress(
+    [],
+    [
+      {
+        id: "schedule-oct",
+        debtor_id: "debtor-1",
+        status: "executado",
+        charge_due_at: "2026-11-10T12:00:00.000Z",
+        last_executed_scheduled_for: "2026-10-10T12:00:00.000Z",
+        payment_received_at: null,
+        schedule_timezone: "America/Sao_Paulo",
+      },
+    ],
+    "2026-10-25T15:00:00.000Z",
+  );
+
+  assert.deepEqual(progress, { paid: 0, total: 1 });
+});
+
+test("deriveReferenceMonthDebtorStatus nao marca como pago quando houve apenas disparo", () => {
+  const status = deriveReferenceMonthDebtorStatus(
+    [],
+    [
+      {
+        id: "schedule-oct",
+        debtor_id: "debtor-1",
+        status: "executado",
+        charge_due_at: "2026-11-10T12:00:00.000Z",
+        last_executed_scheduled_for: "2026-10-10T12:00:00.000Z",
+        payment_received_at: null,
+        schedule_timezone: "America/Sao_Paulo",
+      },
+    ],
+    "2026-10-25T15:00:00.000Z",
+  );
+
+  assert.equal(status, "agendado");
 });

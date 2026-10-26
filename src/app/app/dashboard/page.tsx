@@ -266,7 +266,6 @@ export default async function DashboardPage() {
 
     const monthTotal = baseAmount * chargeMultiplier;
 
-    const debtorRawStatus = String(debtor?.status ?? "").trim().toLowerCase();
     let paidMultiplier = 0;
     if (charges.length || debtorSchedules.length) {
       const progress = deriveReferenceMonthDebtorChargeProgress(charges, debtorSchedules, nowUtcIso);
@@ -274,13 +273,8 @@ export default async function DashboardPage() {
         paidMultiplier = Math.min(progress.total, progress.paid);
       } else {
         const derived = deriveReferenceMonthDebtorStatus(charges, debtorSchedules, nowUtcIso);
-        if (debtorRawStatus === "pago" || derived === "pago") paidMultiplier = chargeMultiplier;
+        if (derived === "pago") paidMultiplier = chargeMultiplier;
       }
-      if (debtorRawStatus === "pago" && paidMultiplier <= 0) {
-        paidMultiplier = chargeMultiplier;
-      }
-    } else if (debtorRawStatus === "pago") {
-      paidMultiplier = chargeMultiplier;
     }
 
     const monthPaid = baseAmount * paidMultiplier;

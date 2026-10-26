@@ -165,7 +165,6 @@ function isAgendarExecutedPaidForReferenceMonth(params: {
 }) {
   const timeZone = String(params.row.schedule_timezone ?? "").trim() || params.scheduleTimeZone;
   const normalizedStatus = String(params.row.status ?? "").trim().toLowerCase();
-  const lastExecutedYearMonth = yearMonthFromIso(params.row.last_executed_scheduled_for ?? null, timeZone);
   const paymentYearMonth = yearMonthFromIso(params.row.payment_received_at ?? null, timeZone);
   const scheduledCycleYearMonth = yearMonthFromIso(
     params.row.charge_due_at ?? params.row.data_envio ?? null,
@@ -174,11 +173,9 @@ function isAgendarExecutedPaidForReferenceMonth(params: {
 
   return (
     paymentYearMonth === params.referenceYearMonth ||
-    normalizedStatus === "pago" ||
-    ((normalizedStatus === "agendado" || normalizedStatus === "executado") &&
-      lastExecutedYearMonth === params.referenceYearMonth &&
+    (normalizedStatus === "pago" &&
       Boolean(scheduledCycleYearMonth) &&
-      scheduledCycleYearMonth !== params.referenceYearMonth)
+      scheduledCycleYearMonth === params.referenceYearMonth)
   );
 }
 
@@ -196,19 +193,11 @@ function isSchedulePaidForReferenceMonth(params: {
     scheduleLocalDate(params.row.closed_at ?? null, timeZone);
   if (paymentLocalDate?.slice(0, 7) === params.referenceYearMonth) return true;
 
-  const lastExecutedYearMonth = yearMonthFromIso(params.row.last_executed_scheduled_for ?? null, timeZone);
   const scheduledCycleYearMonth = yearMonthFromIso(
     params.row.charge_due_at ?? params.row.data_envio ?? null,
     timeZone,
   );
-  if (
-    (normalizedStatus === "agendado" || normalizedStatus === "executado") &&
-    lastExecutedYearMonth === params.referenceYearMonth &&
-    Boolean(scheduledCycleYearMonth) &&
-    scheduledCycleYearMonth !== params.referenceYearMonth
-  ) {
-    return true;
-  }
+  if (normalizedStatus === "pago" && scheduledCycleYearMonth === params.referenceYearMonth) return true;
 
   return false;
 }
