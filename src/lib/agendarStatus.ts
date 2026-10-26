@@ -107,6 +107,29 @@ function buildAgendarOperationalMonthMoment(
   });
 }
 
+function getCurrentMonthSettledMoment(
+  row: AgendarStatusRow,
+  timeZone: BrazilTimeZone,
+  operationalMonthKey: string,
+) {
+  const dueMoment = String(row.charge_due_at ?? row.data_envio ?? "").trim();
+  const lastExecutedMoment = String(row.last_executed_scheduled_for ?? "").trim();
+  const paymentMoment = String(row.payment_received_at ?? "").trim();
+  const dueYearMonth = dueMoment ? agendarYearMonthKey(dueMoment, timeZone) : "";
+  const executedYearMonth = lastExecutedMoment ? agendarYearMonthKey(lastExecutedMoment, timeZone) : "";
+  const paymentYearMonth = paymentMoment ? agendarYearMonthKey(paymentMoment, timeZone) : "";
+
+  if (paymentYearMonth && paymentYearMonth === operationalMonthKey && dueYearMonth !== operationalMonthKey) {
+    return paymentMoment;
+  }
+
+  if (executedYearMonth && executedYearMonth === operationalMonthKey && dueYearMonth !== operationalMonthKey) {
+    return lastExecutedMoment;
+  }
+
+  return "";
+}
+
 export function getAgendarDisplayReferenceMoment(
   row: AgendarStatusRow,
   timeZone: BrazilTimeZone,
@@ -115,9 +138,7 @@ export function getAgendarDisplayReferenceMoment(
   const operationalMoment = String(row.operational_due_at ?? "").trim();
   const dueMoment = String(row.charge_due_at ?? row.data_envio ?? "").trim();
   const lastExecutedMoment = String(row.last_executed_scheduled_for ?? "").trim();
-  if (dueMoment) {
-    return dueMoment;
-  }
+  const currentMonthSettledMoment = getCurrentMonthSettledMoment(row, timeZone, operationalMonthKey);
   const operationalYearMonth = operationalMoment ? agendarYearMonthKey(operationalMoment, timeZone) : "";
   const projectedCurrentMonthMoment = buildAgendarOperationalMonthMoment(
     {
@@ -130,6 +151,14 @@ export function getAgendarDisplayReferenceMoment(
 
   if (operationalYearMonth && operationalYearMonth === operationalMonthKey) {
     return operationalMoment;
+  }
+
+  if (currentMonthSettledMoment) {
+    return currentMonthSettledMoment;
+  }
+
+  if (dueMoment) {
+    return dueMoment;
   }
 
   if (projectedCurrentMonthMoment) {
@@ -147,23 +176,19 @@ function getAgendarStatusReferenceMoment(
   const operationalMoment = String(row.operational_due_at ?? "").trim();
   const dueMoment = String(row.charge_due_at ?? row.data_envio ?? "").trim();
   const lastExecutedMoment = String(row.last_executed_scheduled_for ?? "").trim();
-  if (dueMoment) {
-    return dueMoment;
-  }
+  const currentMonthSettledMoment = getCurrentMonthSettledMoment(row, timeZone, operationalMonthKey);
   const operationalYearMonth = operationalMoment ? agendarYearMonthKey(operationalMoment, timeZone) : "";
-  const dueYearMonth = dueMoment ? agendarYearMonthKey(dueMoment, timeZone) : "";
-  const executedYearMonth = lastExecutedMoment ? agendarYearMonthKey(lastExecutedMoment, timeZone) : "";
 
   if (operationalYearMonth && operationalYearMonth === operationalMonthKey) {
     return operationalMoment;
   }
 
-  if (
-    executedYearMonth &&
-    executedYearMonth === operationalMonthKey &&
-    dueYearMonth !== operationalMonthKey
-  ) {
-    return lastExecutedMoment;
+  if (currentMonthSettledMoment) {
+    return currentMonthSettledMoment;
+  }
+
+  if (dueMoment) {
+    return dueMoment;
   }
 
   return dueMoment || lastExecutedMoment;
