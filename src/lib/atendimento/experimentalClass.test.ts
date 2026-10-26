@@ -17,6 +17,7 @@ import {
   findExperimentalClassTimeOption,
   listExperimentalClassAvailability,
   listRecurringWeekdayAvailability,
+  resolveRecurringDisplayAnchorIso,
   resolveRecurringOccurrenceSearchFromDate,
   resolveRecurringClassAssignedProfessorPhone,
 } from "./experimentalClass.ts";
@@ -549,6 +550,21 @@ test("resolveRecurringOccurrenceSearchFromDate ancora a proxima ocorrencia na da
 
   assert.equal(occurrence?.professorDate, "2026-10-20");
   assert.equal(occurrence?.professorStartAt, "2026-10-21T01:00:00.000Z");
+});
+
+test("resolveRecurringDisplayAnchorIso prioriza a ancora manual futura do link de matricula", () => {
+  const anchorIso = resolveRecurringDisplayAnchorIso({
+    now: new Date("2026-10-26T14:55:00.000Z"),
+    lead: {
+      recurring_class_first_class_at: "2026-10-26T15:00:00.000Z",
+      recurring_class_weekday_label: "Segunda-feira (02/11)",
+      recurring_class_professor_time: "11:00",
+      recurring_class_professor_timezone: "America/Cuiaba",
+      recurring_class_professor_date: "2026-11-02",
+    },
+  });
+
+  assert.equal(anchorIso, "2026-11-02T15:00:00.000Z");
 });
 
 test("calculateDisplayRecurringOccurrence ignora avancos antigos ao respeitar nova data manual", () => {

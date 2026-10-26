@@ -1159,6 +1159,70 @@ export function resolveRecurringOccurrenceSearchFromDate(params: {
   return new Date(firstMs - 1_000);
 }
 
+export function resolveRecurringDisplayAnchorIso(params: {
+  lead: Record<string, unknown>;
+  now?: Date;
+}): string | null {
+  const candidates: number[] = [];
+  const now = params.now ?? new Date();
+  const lead = params.lead ?? {};
+
+  const firstClassAt = String((lead as any)?.recurring_class_first_class_at ?? "").trim();
+  if (firstClassAt) {
+    const firstMs = new Date(firstClassAt).getTime();
+    if (Number.isFinite(firstMs)) candidates.push(firstMs);
+  }
+
+  const weekdayLabelRaw = String((lead as any)?.recurring_class_weekday_label ?? "").trim();
+  const fallbackProfessorDate = (() => {
+    const match = weekdayLabelRaw.match(/\(\s*(\d{1,2})\s*[\/-]\s*(\d{1,2})\s*\)/);
+    if (!match) return "";
+    const dd = String(match[1] ?? "").padStart(2, "0");
+    const mm = String(match[2] ?? "").padStart(2, "0");
+    const firstYear = Number.isFinite(new Date(firstClassAt).getTime())
+      ? new Date(firstClassAt).getUTCFullYear()
+      : now.getUTCFullYear();
+    const buildLocal = (year: number) => `${year}-${mm}-${dd}`;
+    const candidate = buildLocal(firstYear);
+    const candidateMs = new Date(`${candidate}T12:00:00.000Z`).getTime();
+    if (!Number.isFinite(candidateMs)) return "";
+    const sixMonthsMs = 183 * 24 * 60 * 60 * 1000;
+    if (candidateMs < now.getTime() - sixMonthsMs) return buildLocal(firstYear + 1);
+    if (candidateMs > now.getTime() + sixMonthsMs) return buildLocal(firstYear - 1);
+    return candidate;
+  })();
+
+  const professorDate =
+    String((lead as any)?.recurring_class_professor_date ?? "").trim() ||
+    fallbackProfessorDate;
+  const professorTime = /^\d{2}:\d{2}$/.test(String((lead as any)?.recurring_class_professor_time ?? ""))
+    ? String((lead as any)?.recurring_class_professor_time ?? "").trim()
+    : /^\d{2}:\d{2}$/.test(String((lead as any)?.recurring_class_lead_time ?? ""))
+      ? String((lead as any)?.recurring_class_lead_time ?? "").trim()
+      : "";
+  const professorTimeZone =
+    String((lead as any)?.recurring_class_professor_timezone ?? "").trim() ||
+    process.env.EXPERIMENTAL_CLASS_PROFESSOR_TIME_ZONE ||
+    process.env.ATENDIMENTO_PROFESSOR_TIME_ZONE ||
+    ATENDIMENTO_PROFESSOR_TIME_ZONE;
+
+  if (/^\d{4}-\d{2}-\d{2}$/.test(professorDate) && professorTime) {
+    try {
+      const professorAnchorMs = new Date(
+        zonedDateTimeToUtcIso({
+          date: professorDate,
+          time: professorTime,
+          timeZone: professorTimeZone,
+        }),
+      ).getTime();
+      if (Number.isFinite(professorAnchorMs)) candidates.push(professorAnchorMs);
+    } catch {}
+  }
+
+  if (!candidates.length) return null;
+  return new Date(Math.max(...candidates)).toISOString();
+}
+
 function firstOnlyNameForRecurring(full: string | null | undefined): string {
   const safe = String(full ?? "").trim();
   return safe.split(/\s+/)[0] || "";
