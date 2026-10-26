@@ -118,13 +118,22 @@ function getCurrentMonthSettledMoment(
   const dueYearMonth = dueMoment ? agendarYearMonthKey(dueMoment, timeZone) : "";
   const executedYearMonth = lastExecutedMoment ? agendarYearMonthKey(lastExecutedMoment, timeZone) : "";
   const paymentYearMonth = paymentMoment ? agendarYearMonthKey(paymentMoment, timeZone) : "";
+  const projectedOperationalMoment = buildAgendarOperationalMonthMoment(row, timeZone, operationalMonthKey);
 
-  if (paymentYearMonth && paymentYearMonth === operationalMonthKey && dueYearMonth !== operationalMonthKey) {
-    return paymentMoment;
-  }
-
-  if (executedYearMonth && executedYearMonth === operationalMonthKey && dueYearMonth !== operationalMonthKey) {
-    return lastExecutedMoment;
+  if (dueYearMonth !== operationalMonthKey) {
+    if (
+      projectedOperationalMoment &&
+      ((paymentYearMonth && paymentYearMonth === operationalMonthKey) ||
+        (executedYearMonth && executedYearMonth === operationalMonthKey))
+    ) {
+      return projectedOperationalMoment;
+    }
+    if (paymentYearMonth && paymentYearMonth === operationalMonthKey) {
+      return paymentMoment;
+    }
+    if (executedYearMonth && executedYearMonth === operationalMonthKey) {
+      return lastExecutedMoment;
+    }
   }
 
   return "";

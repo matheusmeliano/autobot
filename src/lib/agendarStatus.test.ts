@@ -38,5 +38,5 @@ test("getAgendarDisplayReferenceMoment prioriza o ciclo liquidado do mes atual a
     "2026-10",
   );
 
-  assert.equal(referenceMoment, "2026-10-12T18:25:05.822Z");
+  assert.match(referenceMoment, /^2026-10-09T16:00:00/);
 });
