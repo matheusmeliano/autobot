@@ -102,8 +102,22 @@ function deriveOpenUnpaidScheduleStatus(params: {
   scheduleTimeZone: string;
 }) {
   const timeZone = String(params.row.schedule_timezone ?? "").trim() || params.scheduleTimeZone;
-  if (isPaidSchedule(params.row, timeZone)) return "pago" as const;
   if (String(params.row.closed_at ?? "").trim()) return null;
+
+  const cycleReferenceYearMonth =
+    scheduleReferenceLocalDate(params.row, timeZone)?.slice(0, 7) ??
+    rolledForwardReferenceYearMonth(params.row, timeZone) ??
+    "";
+  if (
+    cycleReferenceYearMonth &&
+    isAgendarExecutedPaidForReferenceMonth({
+      row: params.row,
+      referenceYearMonth: cycleReferenceYearMonth,
+      scheduleTimeZone: timeZone,
+    })
+  ) {
+    return "pago" as const;
+  }
 
   const normalizedStatus = String(params.row.status ?? "").trim().toLowerCase();
   const nowMs = scheduleTimestampMs(params.nowUtcIso);
@@ -122,15 +136,7 @@ function deriveOpenUnpaidScheduleStatus(params: {
 
   const daysAfterDue = diffDaysLocalDate(dueLocalDate, currentLocalDate);
   if (daysAfterDue >= 1) return "atrasado" as const;
-  if (daysAfterDue >= 0) return "nao_pago" as const;
-
-  const scheduledAt = String(params.row.data_envio ?? params.row.charge_due_at ?? "").trim();
-  const scheduledMs = scheduleTimestampMs(scheduledAt);
-  if (scheduledMs != null && nowMs != null && scheduledMs > nowMs) {
-    return "agendado" as const;
-  }
-
-  return "agendado" as const;
+  return "nao_pago" as const;
 }
 
 function rolledForwardReferenceYearMonth(row: DebtorScheduleStatusRow, timeZone: string) {
@@ -184,22 +190,7 @@ function isSchedulePaidForReferenceMonth(params: {
   referenceYearMonth: string;
   scheduleTimeZone: string;
 }) {
-  const timeZone = String(params.row.schedule_timezone ?? "").trim() || params.scheduleTimeZone;
-  if (!isPaidSchedule(params.row, timeZone)) return false;
-
-  const normalizedStatus = String(params.row.status ?? "").trim().toLowerCase();
-  const paymentLocalDate =
-    scheduleLocalDate(params.row.payment_received_at ?? null, timeZone) ??
-    scheduleLocalDate(params.row.closed_at ?? null, timeZone);
-  if (paymentLocalDate?.slice(0, 7) === params.referenceYearMonth) return true;
-
-  const scheduledCycleYearMonth = yearMonthFromIso(
-    params.row.charge_due_at ?? params.row.data_envio ?? null,
-    timeZone,
-  );
-  if (normalizedStatus === "pago" && scheduledCycleYearMonth === params.referenceYearMonth) return true;
-
-  return false;
+  return isAgendarExecutedPaidForReferenceMonth(params);
 }
 
 function getMatchingSchedulesForCharge(params: {
@@ -290,7 +281,6 @@ function hasOpenOverdueSchedule(params: {
     if (!status || status === "pago" || status === "pausado") return false;
 
     const timeZone = String(row.schedule_timezone ?? "").trim() || params.scheduleTimeZone;
-    if (isPaidSchedule(row, timeZone)) return false;
     if (String(row.closed_at ?? "").trim()) return false;
     return (
       deriveOpenUnpaidScheduleStatus({

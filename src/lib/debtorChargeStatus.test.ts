@@ -99,3 +99,63 @@ test("deriveReferenceMonthDebtorStatus nao marca como pago quando houve apenas d
 
   assert.equal(status, "agendado");
 });
+
+test("deriveReferenceMonthDebtorStatus marca como nao pago imediatamente apos disparo sem pagamento", () => {
+  const status = deriveReferenceMonthDebtorStatus(
+    [
+      {
+        id: "charge-oct",
+        due_day: 29,
+        recurrence_month: 10,
+        recurrence_year: 2026,
+      },
+    ],
+    [
+      {
+        id: "schedule-oct",
+        debtor_id: "debtor-1",
+        charge_id: "charge-oct",
+        status: "pendente",
+        data_envio: "2026-10-29T16:00:00.000Z",
+        charge_due_at: "2026-10-29T16:00:00.000Z",
+        first_sent_at: "2026-10-29T16:00:06.000Z",
+        last_sent_at: "2026-10-29T16:00:06.000Z",
+        payment_received_at: null,
+        schedule_timezone: "America/Cuiaba",
+      },
+    ],
+    "2026-10-29T16:05:00.000Z",
+  );
+
+  assert.equal(status, "nao_pago");
+});
+
+test("deriveReferenceMonthDebtorStatus ignora pagamento antigo preso no mesmo agendamento recorrente", () => {
+  const status = deriveReferenceMonthDebtorStatus(
+    [
+      {
+        id: "charge-oct",
+        due_day: 27,
+        recurrence_month: 10,
+        recurrence_year: 2026,
+      },
+    ],
+    [
+      {
+        id: "schedule-oct",
+        debtor_id: "debtor-1",
+        charge_id: "charge-oct",
+        status: "pendente",
+        data_envio: "2026-10-29T16:00:00.000Z",
+        charge_due_at: "2026-10-27T16:00:00.000Z",
+        first_sent_at: "2026-10-27T16:00:06.000Z",
+        last_sent_at: "2026-10-29T16:00:06.000Z",
+        payment_received_at: "2026-09-28T12:58:34.556Z",
+        schedule_timezone: "America/Cuiaba",
+      },
+    ],
+    "2026-10-29T16:05:00.000Z",
+  );
+
+  assert.equal(status, "nao_pago");
+});
