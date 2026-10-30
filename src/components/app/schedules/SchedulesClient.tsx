@@ -774,7 +774,7 @@ export function SchedulesClient({
             String(r.status ?? "") === "executando" ||
             (visualStatus.isCurrentMonth && String(r.status ?? "") === "suspeita_de_pagamento") ||
             (visualStatus.isPaid) ||
-            (visualStatus.isExecuted && !visualStatus.isPaid && !isOverdueByAtLeastOneDay(r))
+            (visualStatus.isExecuted && !visualStatus.isPaid)
           }
           className={triggerButtonClass}
           title="Disparar agora"

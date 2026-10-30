@@ -1291,12 +1291,11 @@ export async function triggerScheduleNowAction(id: string) {
   const diffDays = Math.floor((todayDateUtc - dueDateUtc) / 86400000);
   const isOverdueByAtLeastOneDay = diffDays >= 1;
 
-  const isExecutedNotPaidOverdue =
+  const isExecutedNotPaid =
     loaded.visualStatus.label === "Executado" &&
-    !loaded.visualStatus.isPaid &&
-    isOverdueByAtLeastOneDay;
+    !loaded.visualStatus.isPaid;
 
-  if (loaded.visualStatus.label === "Executado" && !isExecutedNotPaidOverdue) {
+  if (isExecutedNotPaid) {
     return { ok: false, error: "Esse agendamento não pode ser reenviado manualmente agora." };
   }
 
@@ -1315,16 +1314,12 @@ export async function triggerScheduleNowAction(id: string) {
   if (currentStatus === "executando") {
     return { ok: false, error: "Esse agendamento já está sendo processado." };
   }
-  const blockedStatuses = ["pendente", "suspeita_de_pagamento", "pago"];
-  if (currentStatus === "executado" && !isExecutedNotPaidOverdue) {
-    blockedStatuses.push("executado");
-  }
+  const blockedStatuses = ["pendente", "suspeita_de_pagamento", "pago", "executado"];
   if (blockedStatuses.includes(currentStatus)) {
     return { ok: false, error: "Esse agendamento não pode ser reenviado manualmente agora." };
   }
 
   const lockStatuses = ["agendado", "atrasado", "pausado"];
-  if (isExecutedNotPaidOverdue) lockStatuses.push("executado");
 
   const { data: locked, error: lockErr } = await admin
     .from("schedules")
