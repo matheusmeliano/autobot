@@ -123,8 +123,13 @@ function deriveOpenUnpaidScheduleStatus(params: {
   const nowMs = scheduleTimestampMs(params.nowUtcIso);
   const actualSentAt = actualSentTimestampValue(params.row);
   const actualSentMs = scheduleTimestampMs(actualSentAt);
+  const actualSentYearMonth = yearMonthFromIso(actualSentAt, timeZone);
+  const hasBeenSentInCurrentCycle =
+    Boolean(actualSentYearMonth) &&
+    Boolean(cycleReferenceYearMonth) &&
+    actualSentYearMonth === cycleReferenceYearMonth;
   const hasBeenSent =
-    (actualSentAt && actualSentMs != null && nowMs != null && actualSentMs <= nowMs) ||
+    (hasBeenSentInCurrentCycle && actualSentAt && actualSentMs != null && nowMs != null && actualSentMs <= nowMs) ||
     normalizedStatus === "executado" ||
     normalizedStatus === "pago" ||
     normalizedStatus === "suspeita_de_pagamento";

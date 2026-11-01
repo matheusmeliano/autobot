@@ -159,3 +159,32 @@ test("deriveReferenceMonthDebtorStatus ignora pagamento antigo preso no mesmo ag
 
   assert.equal(status, "nao_pago");
 });
+
+test("deriveReferenceMonthDebtorStatus nao marca novembro como nao pago quando o disparo pago foi do ciclo de outubro", () => {
+  const status = deriveReferenceMonthDebtorStatus(
+    [
+      {
+        id: "charge-nov",
+        due_day: 22,
+        recurrence_month: 11,
+        recurrence_year: 2026,
+      },
+    ],
+    [
+      {
+        id: "schedule-rolled-forward",
+        debtor_id: "debtor-1",
+        charge_id: "charge-oct",
+        status: "agendado",
+        data_envio: "2026-11-22T16:00:00.000Z",
+        charge_due_at: "2026-11-22T16:00:00.000Z",
+        payment_received_at: "2026-10-26T03:08:41.730Z",
+        last_executed_scheduled_for: "2026-10-25T16:00:00.000Z",
+        schedule_timezone: "America/Cuiaba",
+      },
+    ],
+    "2026-11-01T15:00:00.000Z",
+  );
+
+  assert.equal(status, "agendado");
+});
