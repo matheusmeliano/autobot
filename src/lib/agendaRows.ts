@@ -176,12 +176,12 @@ function resolveOperationalLocalDate(params: {
   const referenceMonthKey = referenceLocalDate ? referenceLocalDate.slice(0, 7) : "";
   const referenceDay = referenceLocalDate ? Number(referenceLocalDate.slice(-2)) : 0;
 
-  if (params.fallbackLocalDate) {
-    return params.fallbackLocalDate;
-  }
-
   if (scheduleChargeDueLocalDate) {
     return scheduleChargeDueLocalDate;
+  }
+
+  if (scheduleDataEnvioLocalDate) {
+    return scheduleDataEnvioLocalDate;
   }
 
   const scoredCharges = charges
