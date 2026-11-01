@@ -218,3 +218,34 @@ test("deriveReferenceMonthDebtorDueDateLabel acompanha novembro quando o schedul
 
   assert.equal(dueDateLabel, "22/11/2026");
 });
+
+test("deriveReferenceMonthDebtorStatus mantem novembro em aberto quando outubro foi quitado e o novo ciclo ainda nao foi pago", () => {
+  const status = deriveReferenceMonthDebtorStatus(
+    [],
+    [
+      {
+        id: "schedule-oct-paid",
+        debtor_id: "debtor-1",
+        status: "executado",
+        data_envio: "2026-10-27T16:00:00.000Z",
+        charge_due_at: "2026-10-27T16:00:00.000Z",
+        payment_received_at: "2026-11-01T22:27:00.585Z",
+        schedule_timezone: "America/Cuiaba",
+        closed_at: "2026-11-01T22:27:00.585Z",
+      },
+      {
+        id: "schedule-nov-open",
+        debtor_id: "debtor-1",
+        status: "agendado",
+        data_envio: "2026-11-27T16:00:00.000Z",
+        charge_due_at: "2026-11-27T16:00:00.000Z",
+        payment_received_at: null,
+        schedule_timezone: "America/Cuiaba",
+        closed_at: null,
+      },
+    ],
+    "2026-11-01T23:00:00.000Z",
+  );
+
+  assert.equal(status, "agendado");
+});

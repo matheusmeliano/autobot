@@ -23,7 +23,11 @@ import {
   recurrenceLimitMaxDate,
   shouldContinueRecurringRecurrence,
 } from "@/lib/recurrence";
-import { getScheduleChargeAmount, nextRecurringIsoAfterSettlement } from "@/lib/chargeAccumulation";
+import {
+  getOpenMonthlyInstallments,
+  getScheduleChargeAmount,
+  nextRecurringIsoAfterSettlement,
+} from "@/lib/chargeAccumulation";
 import { deriveAgendarVisualStatus } from "@/lib/agendarStatus";
 import { syncDebtorChargeStatus } from "@/lib/debtorChargeStatus";
 import { buildPixCopyLink } from "@/lib/pix-links";
@@ -355,6 +359,11 @@ async function applySchedulePaymentSettlement(params: {
 }) {
   const recurrence = String((params.schedule as any).recurrence ?? "none");
   const nowIso = new Date().toISOString();
+  const timeZone = String((params.schedule as any).schedule_timezone ?? "") || "America/Sao_Paulo";
+  const accumulateOpenMonthlyCharges = Boolean(
+    (params.schedule as any).debtors?.accumulate_open_monthly_charges,
+  );
+  let shouldSplitAccumulatedSettlement = false;
   const scheduledFor = String(
     params.referenceMoment ??
       (params.schedule as any).data_envio ??
@@ -372,14 +381,24 @@ async function applySchedulePaymentSettlement(params: {
 
   let updatePayload: Record<string, unknown>;
   if (recurrence === "monthly" || recurrence === "yearly") {
+    const openMonthlyInstallments =
+      recurrence === "monthly" && accumulateOpenMonthlyCharges
+        ? getOpenMonthlyInstallments({
+            chargeDueAt: String((params.schedule as any).charge_due_at ?? "") || null,
+            dataEnvio: String((params.schedule as any).data_envio ?? "") || null,
+            nowUtcIso: nowIso,
+            timeZone,
+          })
+        : 1;
     const nextIsoBase = nextRecurringIsoAfterSettlement({
-      accumulateOpenMonthlyCharges: Boolean(
-        (params.schedule as any).debtors?.accumulate_open_monthly_charges,
-      ),
+      accumulateOpenMonthlyCharges:
+        recurrence === "monthly" && accumulateOpenMonthlyCharges && openMonthlyInstallments > 1
+          ? false
+          : accumulateOpenMonthlyCharges,
       chargeDueAt: String((params.schedule as any).charge_due_at ?? "") || null,
       dataEnvio: String((params.schedule as any).data_envio ?? "") || null,
       nowUtcIso: nowIso,
-      timeZone: String((params.schedule as any).schedule_timezone ?? "") || "America/Sao_Paulo",
+      timeZone,
       day: Number((params.schedule as any).recurrence_day ?? 1),
       time: String((params.schedule as any).recurrence_time ?? "") || "00:00",
       recurrence,
@@ -388,15 +407,24 @@ async function applySchedulePaymentSettlement(params: {
     });
     const nextIso = shiftFirstChargeFromWeekendUtcIso({
       utcIso: nextIsoBase,
-      timeZone: String((params.schedule as any).schedule_timezone ?? "") || "America/Sao_Paulo",
+      timeZone,
       enabled: Boolean((params.schedule as any).debtors?.skip_weekends_on_first_charge),
     });
     const shouldContinue = shouldContinueRecurringRecurrence({
       nextUtcIso: nextIso,
       recurrenceUntil: String((params.schedule as any).recurrence_until ?? "") || null,
-      timeZone: String((params.schedule as any).schedule_timezone ?? "") || "America/Sao_Paulo",
+      timeZone,
     });
-    updatePayload = shouldContinue
+    shouldSplitAccumulatedSettlement =
+      recurrence === "monthly" && accumulateOpenMonthlyCharges && openMonthlyInstallments > 1;
+
+    updatePayload = shouldSplitAccumulatedSettlement
+      ? {
+          status: "executado",
+          payment_received_at: nowIso,
+          closed_at: nowIso,
+        }
+      : shouldContinue
       ? {
           status: "agendado",
           data_envio: nextIso,
@@ -440,6 +468,81 @@ async function applySchedulePaymentSettlement(params: {
     .update(updatePayload)
     .eq("id", String((params.schedule as any).id));
   if (updateError) return { ok: false as const, error: updateError.message };
+
+  if (
+    recurrence === "monthly" &&
+    accumulateOpenMonthlyCharges &&
+    shouldSplitAccumulatedSettlement
+  ) {
+    const nextDataEnvio = nextRecurringIsoAfterSettlement({
+      accumulateOpenMonthlyCharges: false,
+      chargeDueAt: String((params.schedule as any).charge_due_at ?? "") || null,
+      dataEnvio: String((params.schedule as any).data_envio ?? "") || null,
+      nowUtcIso: nowIso,
+      timeZone,
+      day: Number((params.schedule as any).recurrence_day ?? 1),
+      time: String((params.schedule as any).recurrence_time ?? "") || "00:00",
+      recurrence,
+      targetMonth: Number((params.schedule as any).charge?.recurrence_month ?? 0) || null,
+      targetYear: Number((params.schedule as any).charge?.recurrence_year ?? 0) || null,
+    });
+    const nextIso = shiftFirstChargeFromWeekendUtcIso({
+      utcIso: nextDataEnvio,
+      timeZone,
+      enabled: Boolean((params.schedule as any).debtors?.skip_weekends_on_first_charge),
+    });
+    const shouldContinue = shouldContinueRecurringRecurrence({
+      nextUtcIso: nextIso,
+      recurrenceUntil: String((params.schedule as any).recurrence_until ?? "") || null,
+      timeZone,
+    });
+
+    if (shouldContinue) {
+      const nextDueDate = (() => {
+        try {
+          return localDateInTimeZone(nextIso, timeZone);
+        } catch {
+          return null;
+        }
+      })();
+      const { data: debtorCharges } = await params.admin
+        .from("debtor_charges")
+        .select("id, due_day, recurrence_month, recurrence_year")
+        .eq("debtor_id", String((params.schedule as any).debtor_id ?? ""))
+        .limit(20);
+      const nextChargeId =
+        ((debtorCharges ?? []) as any[]).find((charge) => {
+          const year = Number((charge as any)?.recurrence_year ?? 0);
+          const month = Number((charge as any)?.recurrence_month ?? 0);
+          const day = Number((charge as any)?.due_day ?? 0);
+          if (!year || !month || !day || !nextDueDate) return false;
+          const [nextYear, nextMonth, nextDay] = nextDueDate.split("-").map(Number);
+          return year === nextYear && month === nextMonth && day === nextDay;
+        })?.id ?? null;
+
+      const { error: insertError } = await params.admin.from("schedules").insert({
+        debtor_id: String((params.schedule as any).debtor_id ?? ""),
+        charge_id: nextChargeId,
+        template_id: (params.schedule as any).template_id ?? null,
+        template_pending_id: (params.schedule as any).template_pending_id ?? null,
+        template_overdue_id: (params.schedule as any).template_overdue_id ?? null,
+        data_envio: nextIso,
+        charge_due_at: nextIso,
+        recurrence,
+        schedule_timezone: timeZone,
+        recurrence_day: Number((params.schedule as any).recurrence_day ?? 1) || null,
+        recurrence_time: String((params.schedule as any).recurrence_time ?? "") || null,
+        recurrence_until: String((params.schedule as any).recurrence_until ?? "") || null,
+        status: "agendado",
+        first_sent_at: null,
+        last_sent_at: null,
+        retry_attempts: 0,
+        payment_received_at: null,
+        closed_at: null,
+      });
+      if (insertError) return { ok: false as const, error: insertError.message };
+    }
+  }
 
   const { data: updatedSchedule, error: updatedScheduleError } = await params.admin
     .from("schedules")
