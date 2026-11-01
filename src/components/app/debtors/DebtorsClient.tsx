@@ -127,6 +127,14 @@ function dueDateLabel(v: string | null) {
   return d.toLocaleDateString("pt-BR", { timeZone: "UTC" });
 }
 
+function dueDayLabel(v: string | null) {
+  if (!v) return "";
+  if (/^\d{4}-\d{2}-\d{2}$/.test(v)) return String(Number(v.slice(8, 10)));
+  const d = new Date(v);
+  if (Number.isNaN(d.getTime())) return "";
+  return String(d.getDate());
+}
+
 function chargesTotal(row: DebtorRow, reference?: { month: number; year: number }) {
   if (typeof row.valor === "number" && Number.isFinite(row.valor)) {
     return row.valor;
