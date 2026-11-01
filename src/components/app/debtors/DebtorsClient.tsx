@@ -116,12 +116,15 @@ function money(v: number | null, fmt: (val: any) => string) {
   return fmt(v);
 }
 
-function dueDayLabel(v: string | null) {
+function dueDateLabel(v: string | null) {
   if (!v) return "-";
-  if (/^\d{4}-\d{2}-\d{2}$/.test(v)) return String(Number(v.slice(8, 10)));
+  if (/^\d{4}-\d{2}-\d{2}$/.test(v)) {
+    const [year, month, day] = v.split("-");
+    return `${day}/${month}/${year}`;
+  }
   const d = new Date(v);
   if (Number.isNaN(d.getTime())) return v;
-  return String(d.getDate());
+  return d.toLocaleDateString("pt-BR", { timeZone: "UTC" });
 }
 
 function chargesTotal(row: DebtorRow, reference?: { month: number; year: number }) {
@@ -179,19 +182,46 @@ function joinDueDays(values: string[]) {
   return `${values.slice(0, -1).join(", ")} e ${values[values.length - 1]}`;
 }
 
-function chargesDueDaysLabel(row: DebtorRow) {
+function chargeDueDateLabel(charge: {
+  due_day?: number | string | null;
+  recurrence_month?: number | string | null;
+  recurrence_year?: number | string | null;
+}) {
+  const dueDay = Number(charge.due_day);
+  const month = Number(charge.recurrence_month);
+  const year = Number(charge.recurrence_year);
+  if (
+    Number.isInteger(dueDay) &&
+    dueDay >= 1 &&
+    dueDay <= 31 &&
+    Number.isInteger(month) &&
+    month >= 1 &&
+    month <= 12 &&
+    Number.isInteger(year) &&
+    year >= 1000
+  ) {
+    return `${String(dueDay).padStart(2, "0")}/${String(month).padStart(2, "0")}/${String(year)}`;
+  }
+  return null;
+}
+
+function chargesDueDaysLabel(row: DebtorRow, reference?: { month: number; year: number }) {
   if (row.charges && row.charges.length) {
-    const dueDays = [...row.charges]
+    const scopedCharges = reference
+      ? row.charges.filter(
+          (charge) =>
+            Number(charge.recurrence_month ?? 0) === reference.month &&
+            Number(charge.recurrence_year ?? 0) === reference.year,
+        )
+      : row.charges;
+    const dueDays = [...(scopedCharges.length ? scopedCharges : row.charges)]
       .sort(compareChargeOrder)
-      .map((c) => {
-        const dueDay = Number(c.due_day);
-        return Number.isInteger(dueDay) && dueDay >= 1 && dueDay <= 31 ? String(dueDay) : null;
-      })
+      .map((c) => chargeDueDateLabel(c))
       .filter((value): value is string => Boolean(value));
     const uniqueDueDays = Array.from(new Set(dueDays));
-    return uniqueDueDays.length ? joinDueDays(uniqueDueDays) : dueDayLabel(row.vencimento);
+    return uniqueDueDays.length ? joinDueDays(uniqueDueDays) : dueDateLabel(row.vencimento);
   }
-  return dueDayLabel(row.vencimento);
+  return dueDateLabel(row.vencimento);
 }
 
 function nextMonthYear(baseDate: Date) {
@@ -826,9 +856,9 @@ export function DebtorsClient({ initial, plan }: { initial: DebtorRow[]; plan: P
                       </div>
                       <div
                         className="mt-1 truncate text-[11px] text-[var(--app-text-55)]"
-                        title={`${money(chargesTotal(r, currentRecurrence), fmt)} será ${chargesDueDaysLabel(r)}`}
+                        title={`${money(chargesTotal(r, currentRecurrence), fmt)} será ${chargesDueDaysLabel(r, currentRecurrence)}`}
                       >
-                        {money(chargesTotal(r, currentRecurrence), fmt)} será {chargesDueDaysLabel(r)}
+                        {money(chargesTotal(r, currentRecurrence), fmt)} será {chargesDueDaysLabel(r, currentRecurrence)}
                       </div>
                     </div>
                     <span
@@ -863,7 +893,7 @@ export function DebtorsClient({ initial, plan }: { initial: DebtorRow[]; plan: P
                           Vencimento
                         </div>
                         <div className="mt-1 truncate text-[15px] font-semibold text-[var(--app-text-85)]">
-                          {chargesDueDaysLabel(r)}
+                          {chargesDueDaysLabel(r, currentRecurrence)}
                         </div>
                       </div>
                     </div>
@@ -957,7 +987,7 @@ export function DebtorsClient({ initial, plan }: { initial: DebtorRow[]; plan: P
                   </div>
                   <div className="col-span-2 text-center">{money(chargesTotal(r, currentRecurrence), fmt)}</div>
                   <div className="col-span-2 text-center text-[var(--app-text-70)]">
-                    {chargesDueDaysLabel(r)}
+                    {chargesDueDaysLabel(r, currentRecurrence)}
                   </div>
                   <div className="col-span-1 flex justify-center">
                     <span
