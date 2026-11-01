@@ -80,6 +80,21 @@ function buildChargeLocalDate(charge: DebtorChargeRow) {
   return `${String(year).padStart(4, "0")}-${String(month).padStart(2, "0")}-${String(safeDay).padStart(2, "0")}`;
 }
 
+function formatLocalDatePtBr(localDate: string | null | undefined) {
+  const value = String(localDate ?? "").trim();
+  const match = value.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!match) return "";
+  const [, year, month, day] = match;
+  return `${day}/${month}/${year}`;
+}
+
+function joinDateLabels(values: string[]) {
+  if (!values.length) return null;
+  if (values.length === 1) return values[0] ?? null;
+  if (values.length === 2) return `${values[0]} e ${values[1]}`;
+  return `${values.slice(0, -1).join(", ")} e ${values[values.length - 1]}`;
+}
+
 function scheduleReferenceLocalDate(row: DebtorScheduleStatusRow, timeZone: string) {
   return scheduleLocalDate(
     row.data_envio ?? row.charge_due_at ?? row.first_sent_at ?? row.last_sent_at ?? null,
@@ -491,6 +506,54 @@ export function deriveReferenceMonthDebtorStatus(
 
   if (hasReferenceMonthOverdue) return "atrasado";
   return "agendado";
+}
+
+export function deriveReferenceMonthDebtorDueDateLabel(
+  charges: DebtorChargeRow[],
+  schedules: DebtorScheduleStatusRow[],
+  nowUtcIso = new Date().toISOString(),
+) {
+  const scheduleTimeZone = String(schedules[0]?.schedule_timezone ?? "") || "America/Sao_Paulo";
+  const currentLocalDate = scheduleLocalDate(nowUtcIso, scheduleTimeZone);
+  if (!currentLocalDate) return null;
+  const referenceYearMonth = currentLocalDate.slice(0, 7);
+  const openSchedules = schedules.filter((row) => !String(row.closed_at ?? "").trim());
+
+  const referenceCharges = charges
+    .filter((charge) => buildChargeLocalDate(charge))
+    .filter((charge) => {
+      const year = String(charge.recurrence_year ?? "").padStart(4, "0");
+      const month = String(charge.recurrence_month ?? "").padStart(2, "0");
+      return `${year}-${month}` === referenceYearMonth;
+    })
+    .sort(compareChargeOrder);
+
+  const chargeLabels = Array.from(
+    new Set(
+      referenceCharges
+        .map((charge) => formatLocalDatePtBr(buildChargeLocalDate(charge)))
+        .filter((value): value is string => Boolean(value)),
+    ),
+  );
+  if (chargeLabels.length) return joinDateLabels(chargeLabels);
+
+  const scheduleLabels = Array.from(
+    new Set(
+      getReferenceMonthOperationalSchedules({
+        schedules: openSchedules,
+        referenceYearMonth,
+        scheduleTimeZone,
+      })
+        .map((row) => {
+          const timeZone = String(row.schedule_timezone ?? "").trim() || scheduleTimeZone;
+          const localDate = scheduleReferenceLocalDate(row, timeZone);
+          return formatLocalDatePtBr(localDate);
+        })
+        .filter((value): value is string => Boolean(value)),
+    ),
+  );
+
+  return joinDateLabels(scheduleLabels);
 }
 
 export function deriveDebtorChargeProgress(

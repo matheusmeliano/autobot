@@ -1,5 +1,8 @@
 import { createSupabaseServerClient } from "@/lib/supabase/server";
-import { applyCurrentMonthDebtorStatuses } from "@/lib/debtorChargeStatus";
+import {
+  applyCurrentMonthDebtorStatuses,
+  deriveReferenceMonthDebtorDueDateLabel,
+} from "@/lib/debtorChargeStatus";
 import { listAllClientesDebtors, listAllClientesScheduleRuns, listAllClientesSchedules } from "@/lib/clientesData";
 
 function compareCreatedAtDesc(a: { created_at?: string | null }, b: { created_at?: string | null }) {
@@ -39,6 +42,15 @@ export async function GET() {
     last_executed_scheduled_for:
       latestExecutedRunBySchedule.get(String((schedule as any)?.id ?? "").trim()) ?? null,
   }));
+  const schedulesByDebtor = new Map<string, any[]>();
+  for (const s of schedulesWithRuns) {
+    const debtorId = String((s as any)?.debtor_id ?? "");
+    if (!debtorId) continue;
+    const list = schedulesByDebtor.get(debtorId) ?? [];
+    list.push(s);
+    schedulesByDebtor.set(debtorId, list);
+  }
+  const nowUtcIso = new Date().toISOString();
 
   return Response.json(
     applyCurrentMonthDebtorStatuses({
@@ -54,6 +66,16 @@ export async function GET() {
         })),
       })),
       schedules: schedulesWithRuns as any[],
-    }).sort(compareCreatedAtDesc),
+      nowUtcIso,
+    })
+      .map((row: any) => ({
+        ...row,
+        display_vencimento: deriveReferenceMonthDebtorDueDateLabel(
+          row.charges ?? [],
+          schedulesByDebtor.get(String(row.id)) ?? [],
+          nowUtcIso,
+        ),
+      }))
+      .sort(compareCreatedAtDesc),
   );
 }

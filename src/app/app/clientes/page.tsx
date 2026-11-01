@@ -2,7 +2,11 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { DebtorsClient, type DebtorRow } from "@/components/app/debtors/DebtorsClient";
 import Link from "next/link";
 import { normalizePlan, type PlanKey } from "@/lib/plans";
-import { applyCurrentMonthDebtorStatuses, deriveReferenceMonthDebtorChargeProgress } from "@/lib/debtorChargeStatus";
+import {
+  applyCurrentMonthDebtorStatuses,
+  deriveReferenceMonthDebtorChargeProgress,
+  deriveReferenceMonthDebtorDueDateLabel,
+} from "@/lib/debtorChargeStatus";
 import { listAllClientesDebtors, listAllClientesScheduleRuns, listAllClientesSchedules } from "@/lib/clientesData";
 
 function compareCreatedAtDesc(a: { created_at?: string | null }, b: { created_at?: string | null }) {
@@ -88,6 +92,7 @@ export default async function ClientesPage() {
       })),
     })),
     schedules: schedulesWithRuns as any[],
+    nowUtcIso,
   });
 
   const rows = (rowsWithStatus as any[])
@@ -97,7 +102,16 @@ export default async function ClientesPage() {
         schedulesByDebtor.get(String(row.id)) ?? [],
         nowUtcIso,
       );
-      return { ...row, progress_paid: prog.paid, progress_total: prog.total };
+      return {
+        ...row,
+        progress_paid: prog.paid,
+        progress_total: prog.total,
+        display_vencimento: deriveReferenceMonthDebtorDueDateLabel(
+          row.charges ?? [],
+          schedulesByDebtor.get(String(row.id)) ?? [],
+          nowUtcIso,
+        ),
+      };
     })
     .sort(compareCreatedAtDesc);
 

@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 
 import {
   deriveReferenceMonthDebtorChargeProgress,
+  deriveReferenceMonthDebtorDueDateLabel,
   deriveReferenceMonthDebtorStatus,
 } from "./debtorChargeStatus.ts";
 
@@ -187,4 +188,33 @@ test("deriveReferenceMonthDebtorStatus nao marca novembro como nao pago quando o
   );
 
   assert.equal(status, "agendado");
+});
+
+test("deriveReferenceMonthDebtorDueDateLabel acompanha novembro quando o schedule recorrente ja virou de mes", () => {
+  const dueDateLabel = deriveReferenceMonthDebtorDueDateLabel(
+    [
+      {
+        id: "charge-oct",
+        due_day: 22,
+        recurrence_month: 10,
+        recurrence_year: 2026,
+      },
+    ],
+    [
+      {
+        id: "schedule-rolled-forward",
+        debtor_id: "debtor-1",
+        charge_id: "charge-oct",
+        status: "agendado",
+        data_envio: "2026-11-22T16:00:00.000Z",
+        charge_due_at: "2026-11-22T16:00:00.000Z",
+        payment_received_at: "2026-10-26T03:08:41.730Z",
+        last_executed_scheduled_for: "2026-10-25T16:00:00.000Z",
+        schedule_timezone: "America/Cuiaba",
+      },
+    ],
+    "2026-11-01T15:00:00.000Z",
+  );
+
+  assert.equal(dueDateLabel, "22/11/2026");
 });

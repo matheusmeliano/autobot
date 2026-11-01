@@ -38,6 +38,7 @@ export type DebtorRow = {
   telefone: string | null;
   valor: number | null;
   vencimento: string | null;
+  display_vencimento?: string | null;
   pix_key: string | null;
   observacoes: string | null;
   status: string;
@@ -222,14 +223,17 @@ function chargesDueDaysLabel(row: DebtorRow, reference?: { month: number; year: 
             Number(charge.recurrence_year ?? 0) === reference.year,
         )
       : row.charges;
-    const dueDays = [...(scopedCharges.length ? scopedCharges : row.charges)]
+    const chargesForDisplay = scopedCharges.length ? scopedCharges : reference ? [] : row.charges;
+    const dueDays = [...chargesForDisplay]
       .sort(compareChargeOrder)
       .map((c) => chargeDueDateLabel(c))
       .filter((value): value is string => Boolean(value));
     const uniqueDueDays = Array.from(new Set(dueDays));
-    return uniqueDueDays.length ? joinDueDays(uniqueDueDays) : dueDateLabel(row.vencimento);
+    return uniqueDueDays.length
+      ? joinDueDays(uniqueDueDays)
+      : String(row.display_vencimento ?? "").trim() || dueDateLabel(row.vencimento);
   }
-  return dueDateLabel(row.vencimento);
+  return String(row.display_vencimento ?? "").trim() || dueDateLabel(row.vencimento);
 }
 
 function nextMonthYear(baseDate: Date) {
