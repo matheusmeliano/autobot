@@ -7,7 +7,11 @@ import {
 } from "@/lib/atendimento/server";
 import { isAtendimentoOnlyAccessScope, normalizeAccessScope } from "@/lib/auth/access";
 import { ATENDIMENTO_PROFESSOR_TIME_ZONE } from "@/lib/atendimento/constants";
-import { calculatePastRecurringOccurrences } from "@/lib/atendimento/experimentalClass";
+import {
+  calculateDisplayRecurringOccurrence,
+  calculatePastRecurringOccurrences,
+  resolveRecurringOccurrenceSearchFromDate,
+} from "@/lib/atendimento/experimentalClass";
 import {
   inferTimeZoneFromPhoneCountryCode,
   resolveTimeZoneFromCityInput,
@@ -558,6 +562,36 @@ export async function GET(request: Request, context: { params: Promise<{ leadId:
     const recTimeOk =
       Boolean(String((lead as any)?.recurring_class_professor_time ?? "").trim()) ||
       Boolean(String((lead as any)?.recurring_class_lead_time ?? "").trim());
+    const recProfessorTime =
+      String((lead as any)?.recurring_class_professor_time ?? "").trim() ||
+      String((lead as any)?.recurring_class_lead_time ?? "").trim() ||
+      "08:00";
+    const recLeadTime =
+      String((lead as any)?.recurring_class_lead_time ?? "").trim() ||
+      String((lead as any)?.recurring_class_professor_time ?? "").trim() ||
+      "08:00";
+    const recProfessorTimeZone =
+      String((lead as any)?.recurring_class_professor_timezone ?? "").trim() ||
+      ATENDIMENTO_PROFESSOR_TIME_ZONE;
+    const recLeadTimeZone =
+      String((lead as any)?.recurring_class_lead_timezone ?? (lead as any)?.timezone ?? "").trim() ||
+      recProfessorTimeZone;
+    const recurringDisplayFallback =
+      recWeekdayOk && recTimeOk
+        ? calculateDisplayRecurringOccurrence({
+            weekday: recWeekdayRaw as "mon" | "tue" | "wed" | "thu" | "fri" | "sat" | "sun",
+            professorTimeHHMM: recProfessorTime,
+            professorTimeZone: recProfessorTimeZone,
+            leadTimeZone: recLeadTimeZone,
+            leadTimeHHMM: recLeadTime,
+            fromDate: resolveRecurringOccurrenceSearchFromDate({
+              firstClassAt:
+                String((lead as any)?.recurring_class_first_class_at ?? "").trim() ||
+                String((lead as any)?.recurring_class_created_at ?? (lead as any).created_at ?? "").trim() ||
+                null,
+            }),
+          })
+        : null;
 
     const bookingWithFallback = existingBooking
       ? existingBooking
@@ -594,14 +628,14 @@ export async function GET(request: Request, context: { params: Promise<{ leadId:
                 attendant_start_notification_sent_at: synthAttendantNotif,
                 attendance_status: synthAttendance,
                 attendance_checked_at: synthAttendanceChecked,
-                professor_timezone: ATENDIMENTO_PROFESSOR_TIME_ZONE,
-                lead_timezone: String((lead as any)?.timezone ?? "").trim() || ATENDIMENTO_PROFESSOR_TIME_ZONE,
-                professor_date: datePlusNDaysIso(3),
-                professor_time: String((lead as any)?.recurring_class_professor_time ?? (lead as any)?.recurring_class_lead_time ?? "08:00").trim(),
-                professor_start_at: "",
-                lead_date: datePlusNDaysIso(3),
-                lead_time: String((lead as any)?.recurring_class_lead_time ?? (lead as any)?.recurring_class_professor_time ?? "08:00").trim(),
-                lead_start_at: "",
+                professor_timezone: String(recurringDisplayFallback?.professorTimeZone ?? recProfessorTimeZone).trim(),
+                lead_timezone: String(recurringDisplayFallback?.leadTimeZone ?? recLeadTimeZone).trim(),
+                professor_date: String(recurringDisplayFallback?.professorDate ?? datePlusNDaysIso(3)).trim(),
+                professor_time: String(recurringDisplayFallback?.professorTime ?? recProfessorTime).trim(),
+                professor_start_at: String(recurringDisplayFallback?.professorStartAt ?? "").trim(),
+                lead_date: String(recurringDisplayFallback?.leadDate ?? datePlusNDaysIso(3)).trim(),
+                lead_time: String(recurringDisplayFallback?.leadTime ?? recLeadTime).trim(),
+                lead_start_at: String(recurringDisplayFallback?.leadStartAt ?? "").trim(),
                 conversation_id: String((lead as any)?.conversation_id ?? ""),
                 created_at: String((lead as any).updated_at ?? (lead as any).created_at ?? ""),
                 source: "manual",
@@ -614,9 +648,10 @@ export async function GET(request: Request, context: { params: Promise<{ leadId:
       try {
         const recOcc = calculatePastRecurringOccurrences({
           weekday: recWeekdayRaw as any,
-          professorTimeHHMM: String((lead as any)?.recurring_class_professor_time ?? "").trim() || String((lead as any)?.recurring_class_lead_time ?? "").trim(),
-          professorTimeZone: ATENDIMENTO_PROFESSOR_TIME_ZONE,
-          leadTimeZone: String((lead as any)?.timezone ?? "").trim() || ATENDIMENTO_PROFESSOR_TIME_ZONE,
+          professorTimeHHMM: recProfessorTime,
+          professorTimeZone: recProfessorTimeZone,
+          leadTimeZone: recLeadTimeZone,
+          leadTimeHHMM: recLeadTime,
           fromDate: String((lead as any)?.recurring_class_created_at ?? (lead as any).created_at ?? "").trim(),
         });
         const lastRec = recOcc[0] ?? null;

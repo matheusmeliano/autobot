@@ -4,7 +4,11 @@ import {
   requireAtendimentoUser,
   resolveRecurringDisplayOccurrenceMap,
 } from "@/lib/atendimento/server";
-import { calculatePastRecurringOccurrences } from "@/lib/atendimento/experimentalClass";
+import {
+  calculateDisplayRecurringOccurrence,
+  calculatePastRecurringOccurrences,
+  resolveRecurringOccurrenceSearchFromDate,
+} from "@/lib/atendimento/experimentalClass";
 import {
   loadHiddenWhatsAppPhoneBlocklist,
   phoneIsInHiddenBrazilianBlocklist,
@@ -1004,6 +1008,36 @@ function sectionTimestampMs(row: any, sectionName: "interessados" | "alunos" | "
       const recTimeOk =
         Boolean(String((row as any)?.recurring_class_professor_time ?? "").trim()) ||
         Boolean(String((row as any)?.recurring_class_lead_time ?? "").trim());
+      const recProfessorTime =
+        String((row as any)?.recurring_class_professor_time ?? "").trim() ||
+        String((row as any)?.recurring_class_lead_time ?? "").trim() ||
+        "08:00";
+      const recLeadTime =
+        String((row as any)?.recurring_class_lead_time ?? "").trim() ||
+        String((row as any)?.recurring_class_professor_time ?? "").trim() ||
+        "08:00";
+      const recProfessorTimeZone =
+        String((row as any)?.recurring_class_professor_timezone ?? "").trim() ||
+        ATENDIMENTO_PROFESSOR_TIME_ZONE;
+      const recLeadTimeZone =
+        String((row as any)?.recurring_class_lead_timezone ?? (row as any)?.timezone ?? "").trim() ||
+        recProfessorTimeZone;
+      const recurringDisplayFallback =
+        recWeekdayOk && recTimeOk
+          ? calculateDisplayRecurringOccurrence({
+              weekday: recWeekdayRaw as "mon" | "tue" | "wed" | "thu" | "fri" | "sat" | "sun",
+              professorTimeHHMM: recProfessorTime,
+              professorTimeZone: recProfessorTimeZone,
+              leadTimeZone: recLeadTimeZone,
+              leadTimeHHMM: recLeadTime,
+              fromDate: resolveRecurringOccurrenceSearchFromDate({
+                firstClassAt:
+                  String((row as any)?.recurring_class_first_class_at ?? "").trim() ||
+                  String((row as any)?.recurring_class_created_at ?? row.created_at ?? "").trim() ||
+                  null,
+              }),
+            })
+          : null;
 
       let synthStudentNotif: string | null = null;
       let synthAttendantNotif: string | null = null;
@@ -1071,14 +1105,14 @@ function sectionTimestampMs(row: any, sectionName: "interessados" | "alunos" | "
                 attendant_start_notification_sent_at: synthAttendantNotif,
                 attendance_status: synthAttendance,
                 attendance_checked_at: synthAttendanceChecked,
-                professor_timezone: ATENDIMENTO_PROFESSOR_TIME_ZONE,
-                lead_timezone: String((row as any)?.timezone ?? "").trim() || ATENDIMENTO_PROFESSOR_TIME_ZONE,
-                professor_date: datePlusNDaysIso(3),
-                professor_time: String((row as any)?.recurring_class_professor_time ?? (row as any)?.recurring_class_lead_time ?? "08:00").trim(),
-                professor_start_at: "",
-                lead_date: datePlusNDaysIso(3),
-                lead_time: String((row as any)?.recurring_class_lead_time ?? (row as any)?.recurring_class_professor_time ?? "08:00").trim(),
-                lead_start_at: "",
+                professor_timezone: String(recurringDisplayFallback?.professorTimeZone ?? recProfessorTimeZone).trim(),
+                lead_timezone: String(recurringDisplayFallback?.leadTimeZone ?? recLeadTimeZone).trim(),
+                professor_date: String(recurringDisplayFallback?.professorDate ?? datePlusNDaysIso(3)).trim(),
+                professor_time: String(recurringDisplayFallback?.professorTime ?? recProfessorTime).trim(),
+                professor_start_at: String(recurringDisplayFallback?.professorStartAt ?? "").trim(),
+                lead_date: String(recurringDisplayFallback?.leadDate ?? datePlusNDaysIso(3)).trim(),
+                lead_time: String(recurringDisplayFallback?.leadTime ?? recLeadTime).trim(),
+                lead_start_at: String(recurringDisplayFallback?.leadStartAt ?? "").trim(),
                 conversation_id: String((row as any)?.conversation_id ?? ""),
                 created_at: String(row.updated_at ?? row.created_at ?? ""),
                 source: "manual",
@@ -1094,9 +1128,10 @@ function sectionTimestampMs(row: any, sectionName: "interessados" | "alunos" | "
         try {
           const recOcc = calculatePastRecurringOccurrences({
             weekday: recWeekdayRaw as any,
-            professorTimeHHMM: String((row as any)?.recurring_class_professor_time ?? "").trim() || String((row as any)?.recurring_class_lead_time ?? "").trim(),
-            professorTimeZone: ATENDIMENTO_PROFESSOR_TIME_ZONE,
-            leadTimeZone: String((row as any)?.timezone ?? "").trim() || ATENDIMENTO_PROFESSOR_TIME_ZONE,
+            professorTimeHHMM: recProfessorTime,
+            professorTimeZone: recProfessorTimeZone,
+            leadTimeZone: recLeadTimeZone,
+            leadTimeHHMM: recLeadTime,
             fromDate: String((row as any)?.recurring_class_created_at ?? row.created_at ?? "").trim(),
           });
           const lastRec = recOcc[0] ?? null;
