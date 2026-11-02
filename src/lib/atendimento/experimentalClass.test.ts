@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import {
   calculateCurrentOrNextRecurringOccurrence,
   calculateDisplayRecurringOccurrence,
+  calculateNextRecurringOccurrence,
   buildExperimentalClassAttendantWhatsAppMessage,
   buildExperimentalClassAttendantStartReminderWhatsAppMessage,
   buildExperimentalClassBookingChatMessages,
@@ -499,17 +500,32 @@ test("calculateDisplayRecurringOccurrence recalcula o horario local do aluno ao 
   });
 
   assert.equal(occurrence?.professorDate, "2026-10-19");
-  assert.equal(occurrence?.professorTime, "14:00");
-  assert.equal(occurrence?.leadTime, "13:00");
+  assert.equal(occurrence?.professorTime, "12:00");
+  assert.equal(occurrence?.leadTime, "11:00");
 });
 
-test("calculateDisplayRecurringOccurrence recalcula horario local do aluno apos DST nos EUA", () => {
+test("calculateNextRecurringOccurrence mantem o horario local do aluno apos DST nos EUA", () => {
+  const occurrence = calculateNextRecurringOccurrence({
+    weekday: "tue",
+    professorTimeHHMM: "20:00",
+    professorTimeZone: "America/Cuiaba",
+    leadTimeZone: "America/New_York",
+    leadTimeHHMM: "19:00",
+    fromDate: new Date("2026-11-02T12:00:00.000Z"),
+  });
+
+  assert.equal(occurrence?.professorDate, "2026-11-03");
+  assert.equal(occurrence?.professorTime, "20:00");
+  assert.equal(occurrence?.leadTime, "19:00");
+});
+
+test("calculateDisplayRecurringOccurrence mantem o horario local do aluno apos DST nos EUA", () => {
   const occurrence = calculateDisplayRecurringOccurrence({
     weekday: "tue",
     professorTimeHHMM: "20:00",
     professorTimeZone: "America/Cuiaba",
     leadTimeZone: "America/New_York",
-    leadTimeHHMM: "20:00",
+    leadTimeHHMM: "19:00",
     fromDate: new Date("2026-11-02T12:00:00.000Z"),
   });
 
@@ -529,8 +545,8 @@ test("calculateCurrentOrNextRecurringOccurrence recalcula horario local do aluno
   });
 
   assert.equal(occurrence?.professorDate, "2026-11-04");
-  assert.equal(occurrence?.professorTime, "09:00");
-  assert.equal(occurrence?.leadTime, "07:00");
+  assert.equal(occurrence?.professorTime, "10:00");
+  assert.equal(occurrence?.leadTime, "08:00");
 });
 
 test("resolveRecurringOccurrenceSearchFromDate ancora a proxima ocorrencia na data futura escolhida", () => {
@@ -606,8 +622,8 @@ test("calculateDisplayRecurringOccurrence pula a proxima semana com horario loca
   });
 
   assert.equal(occurrence?.professorDate, "2026-10-26");
-  assert.equal(occurrence?.professorTime, "14:00");
-  assert.equal(occurrence?.leadTime, "13:00");
+  assert.equal(occurrence?.professorTime, "12:00");
+  assert.equal(occurrence?.leadTime, "11:00");
 });
 
 test("listRecurringWeekdayAvailability remove horario recorrente quando o intervalo ja esta ocupado", () => {

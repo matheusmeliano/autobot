@@ -85,13 +85,19 @@ export async function POST(req: Request, { params }: { params: Promise<{ leadId:
   const recurringProfessorTime = normalizeScheduleTimeForComparison(
     String((lead as any)?.recurring_class_professor_time ?? (lead as any)?.recurring_class_lead_time ?? "").trim(),
   );
+  const recurringLeadTime = normalizeScheduleTimeForComparison(
+    String((lead as any)?.recurring_class_lead_time ?? (lead as any)?.recurring_class_professor_time ?? "").trim(),
+  );
   const displayOccurrence =
     ["mon", "tue", "wed", "thu", "fri", "sat", "sun"].includes(wr) && recurringProfessorTime
       ? calculateDisplayRecurringOccurrence({
           weekday: wr as "mon" | "tue" | "wed" | "thu" | "fri" | "sat" | "sun",
           professorTimeHHMM: recurringProfessorTime,
           professorTimeZone: String((lead as any)?.recurring_class_professor_timezone ?? "").trim() || null,
-          leadTimeZone: String((lead as any)?.recurring_class_lead_timezone ?? "").trim() || null,
+          leadTimeZone:
+            String((lead as any)?.recurring_class_lead_timezone ?? (lead as any)?.timezone ?? "").trim() ||
+            null,
+          leadTimeHHMM: recurringLeadTime || null,
           fromDate: resolveRecurringOccurrenceSearchFromDate({
             firstClassAt: String((lead as any)?.recurring_class_first_class_at ?? "").trim() || null,
           }),

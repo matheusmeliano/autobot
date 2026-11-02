@@ -2079,6 +2079,9 @@ export async function sendRecurringClassStartNotifications(now = new Date()) {
     const professorTz = String(row?.recurring_class_professor_timezone ?? "").trim() || PROF_TZ;
     const leadTz =
       String(row?.recurring_class_lead_timezone ?? row?.timezone ?? "").trim() || professorTz;
+    const leadTimeHHMM = /^\d{2}:\d{2}$/.test(String(row?.recurring_class_lead_time ?? ""))
+      ? String(row?.recurring_class_lead_time ?? "").trim()
+      : professorTimeHHMM;
 
     if (!validWeekdayKeys.has(weekdayRaw) || !professorTimeHHMM) {
       missingRecurringMeta += 1;
@@ -2094,6 +2097,7 @@ export async function sendRecurringClassStartNotifications(now = new Date()) {
       professorTimeHHMM,
       professorTimeZone: professorTz,
       leadTimeZone: leadTz,
+      leadTimeHHMM,
       fromDate: occurrenceSearchFromDate,
     });
 

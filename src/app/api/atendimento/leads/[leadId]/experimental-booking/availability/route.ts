@@ -2,6 +2,7 @@ import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { requireAtendimentoUser } from "@/lib/atendimento/server";
 import { ATENDIMENTO_PROFESSOR_TIME_ZONE } from "@/lib/atendimento/constants";
 import { listExperimentalClassAvailability } from "@/lib/atendimento/experimentalClass";
+import { resolveStudentTimezone } from "@/lib/timezone";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -92,7 +93,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ leadId:
 
     const { data: leadExists, error: leadErr } = await supabase
       .from("atendimento_leads")
-      .select("id, assigned_user_email, timezone, country, city, state")
+      .select("id, assigned_user_email, timezone, country, city, state, phone")
       .eq("id", leadId)
       .eq("assigned_user_email", "atendimento.usa.music@gmail.com")
       .maybeSingle();
@@ -105,7 +106,13 @@ export async function GET(_req: Request, { params }: { params: Promise<{ leadId:
     }
 
     const leadTimeZoneRaw =
-      String((leadExists as any)?.timezone ?? "").trim() || ATENDIMENTO_PROFESSOR_TIME_ZONE;
+      resolveStudentTimezone({
+        city: String((leadExists as any)?.city ?? "").trim() || null,
+        state: String((leadExists as any)?.state ?? "").trim() || null,
+        phone: String((leadExists as any)?.phone ?? "").trim() || null,
+      }) ||
+      String((leadExists as any)?.timezone ?? "").trim() ||
+      ATENDIMENTO_PROFESSOR_TIME_ZONE;
 
     const nowIso = new Date().toISOString();
     const currentBookingIds = new Set<string>(await findLeadCurrentBookingIds(supabase, leadId));
@@ -146,7 +153,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ leadId:
           if (!leadId) return null as any;
           const { data } = await supabase
             .from("atendimento_leads")
-            .select("timezone")
+            .select("timezone, city, state, phone")
             .eq("id", leadId)
             .eq("assigned_user_email", "atendimento.usa.music@gmail.com")
             .limit(1)
@@ -156,7 +163,14 @@ export async function GET(_req: Request, { params }: { params: Promise<{ leadId:
           return null as any;
         }
       })();
-      const tz = String((fallbackLead as any)?.timezone ?? "").trim() || ATENDIMENTO_PROFESSOR_TIME_ZONE;
+      const tz =
+        resolveStudentTimezone({
+          city: String((fallbackLead as any)?.city ?? "").trim() || null,
+          state: String((fallbackLead as any)?.state ?? "").trim() || null,
+          phone: String((fallbackLead as any)?.phone ?? "").trim() || null,
+        }) ||
+        String((fallbackLead as any)?.timezone ?? "").trim() ||
+        ATENDIMENTO_PROFESSOR_TIME_ZONE;
       const availability = listExperimentalClassAvailability({
         now: new Date(nowIso),
         leadTimeZone: tz,

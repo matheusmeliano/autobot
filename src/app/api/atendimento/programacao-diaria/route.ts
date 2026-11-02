@@ -595,6 +595,18 @@ export async function GET(req: Request) {
           const resolvedNextProfessorDate = String(
             resolvedRecurringOccurrence?.professorDate ?? "",
           ).trim();
+          const resolvedProfessorTime = String(
+            resolvedRecurringOccurrence?.professorTime ?? "",
+          ).trim();
+          const resolvedLeadDate = String(
+            resolvedRecurringOccurrence?.leadDate ?? "",
+          ).trim();
+          const resolvedLeadTime = String(
+            resolvedRecurringOccurrence?.leadTime ?? "",
+          ).trim();
+          const resolvedProfessorStartAt = String(
+            resolvedRecurringOccurrence?.professorStartAt ?? "",
+          ).trim();
           const lastNotifiedOccurrenceStartAt = String(
             (r as any)?.recurring_class_last_notified_occurrence_start_at ?? "",
           ).trim();
@@ -609,29 +621,46 @@ export async function GET(req: Request) {
             Boolean(resolvedNextProfessorDate) &&
             resolvedNextProfessorDate > targetDate;
           let startIso = "";
-          try {
-            startIso = zonedDateTimeToUtcIso({
-              date: targetDate,
-              time: pTime,
-              timeZone:
-                String((r as any).recurring_class_professor_timezone ?? "").trim() ||
-                ATENDIMENTO_PROFESSOR_TIME_ZONE,
-            });
-          } catch {}
+          const effectiveProfessorTime =
+            resolvedNextProfessorDate === targetDate && resolvedProfessorTime
+              ? resolvedProfessorTime
+              : pTime;
+          if (resolvedNextProfessorDate === targetDate && resolvedProfessorStartAt) {
+            startIso = resolvedProfessorStartAt;
+          } else {
+            try {
+              startIso = zonedDateTimeToUtcIso({
+                date: targetDate,
+                time: effectiveProfessorTime,
+                timeZone:
+                  String((r as any).recurring_class_professor_timezone ?? "").trim() ||
+                  ATENDIMENTO_PROFESSOR_TIME_ZONE,
+              });
+            } catch {}
+          }
           const entry: Record<string, unknown> = {
             id: `recurring-${leadId}`,
             lead_id: leadId,
             phone: String(r.phone ?? "").trim() || null,
             status: stRec || "scheduled",
             professor_date: targetDate,
-            professor_time: pTime,
+            professor_time: effectiveProfessorTime,
             professor_start_at: startIso || null,
-            lead_date: targetDate,
-            lead_time: String((r as any).recurring_class_lead_time ?? "").trim() || null,
+            lead_date: resolvedLeadDate || targetDate,
+            lead_time:
+              resolvedLeadTime || String((r as any).recurring_class_lead_time ?? "").trim() || null,
             lead_timezone:
-              String((r as any).recurring_class_lead_timezone ?? "").trim() || null,
+              String(
+                resolvedRecurringOccurrence?.leadTimeZone ??
+                  (r as any).recurring_class_lead_timezone ??
+                  "",
+              ).trim() || null,
             professor_timezone:
-              String((r as any).recurring_class_professor_timezone ?? "").trim() || null,
+              String(
+                resolvedRecurringOccurrence?.professorTimeZone ??
+                  (r as any).recurring_class_professor_timezone ??
+                  "",
+              ).trim() || null,
             assigned_professor_name: hasProfessor ? pName || null : null,
             assigned_professor_phone: hasProfessor ? pPhone || null : null,
             recurring_class_weekday: effectiveWeekday,
