@@ -1259,12 +1259,21 @@ export async function PATCH(request: Request, context: { params: Promise<{ leadI
           derivedCountry = "Estados Unidos";
         } else if (
           normState.includes("portugal") ||
+          normState.includes("madeira") ||
+          normState.includes("acores") ||
+          normState.includes("azores") ||
           normCity.includes("lisboa") ||
           normCity.includes("lisbon") ||
-          normCity.includes("porto")
+          normCity.includes("porto") ||
+          normCity.includes("funchal")
         ) {
           derivedCountry = "Portugal";
-          derivedTimezone = "Europe/Lisbon";
+          derivedTimezone =
+            normState.includes("madeira") || normCity.includes("funchal")
+              ? "Atlantic/Madeira"
+              : normState.includes("acores") || normState.includes("azores") || normCity.includes("pontadelgada")
+                ? "Atlantic/Azores"
+                : "Europe/Lisbon";
         } else if (
           normState.includes("espanha") ||
           normState.includes("spain") ||
@@ -1318,10 +1327,17 @@ export async function PATCH(request: Request, context: { params: Promise<{ leadI
         } else if (
           normCity.includes("lisboa") ||
           normCity.includes("lisbon") ||
-          normCity.includes("porto")
+          normCity.includes("porto") ||
+          normCity.includes("funchal") ||
+          normCity.includes("pontadelgada")
         ) {
           derivedCountry = "Portugal";
-          derivedTimezone = "Europe/Lisbon";
+          derivedTimezone =
+            normCity.includes("funchal")
+              ? "Atlantic/Madeira"
+              : normCity.includes("pontadelgada")
+                ? "Atlantic/Azores"
+                : "Europe/Lisbon";
         } else if (normCity.includes("madrid") || normCity.includes("barcelona")) {
           derivedCountry = "Espanha";
           derivedTimezone = "Europe/Madrid";
@@ -1634,7 +1650,13 @@ export async function PATCH(request: Request, context: { params: Promise<{ leadI
       if (cityRes?.timeZone) {
         resolvedTz = cityRes.timeZone;
         resolvedCountry =
-          cityRes.country === "BR" ? "Brasil" : cityRes.country === "US" ? "Estados Unidos" : null;
+          cityRes.country === "BR"
+            ? "Brasil"
+            : cityRes.country === "US"
+              ? "Estados Unidos"
+              : cityRes.country === "PT"
+                ? "Portugal"
+                : null;
       }
     }
 
@@ -1646,7 +1668,13 @@ export async function PATCH(request: Request, context: { params: Promise<{ leadI
       if (stateRes?.timeZone) {
         resolvedTz = stateRes.timeZone;
         resolvedCountry =
-          stateRes.country === "BR" ? "Brasil" : stateRes.country === "US" ? "Estados Unidos" : null;
+            stateRes.country === "BR"
+              ? "Brasil"
+              : stateRes.country === "US"
+                ? "Estados Unidos"
+                : stateRes.country === "PT"
+                  ? "Portugal"
+                  : null;
       }
     }
 
@@ -1655,7 +1683,13 @@ export async function PATCH(request: Request, context: { params: Promise<{ leadI
       if (phoneFb?.timeZone) {
         resolvedTz = phoneFb.timeZone;
         resolvedCountry =
-          phoneFb.country === "BR" ? "Brasil" : phoneFb.country === "US" ? "Estados Unidos" : null;
+          phoneFb.country === "BR"
+            ? "Brasil"
+            : phoneFb.country === "US"
+              ? "Estados Unidos"
+              : phoneFb.country === "PT"
+                ? "Portugal"
+                : null;
       }
     }
 

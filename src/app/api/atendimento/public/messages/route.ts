@@ -71,9 +71,9 @@ const MAX_SCHEDULE_SELECTION_ATTEMPTS = 3;
 const WHATSAPP_PENDING_MESSAGE =
   "Perfeito! Estou validando seu WhatsApp. Aguarde um instante.";
 const WHATSAPP_INVALID_MESSAGE =
-  "Não foi possível validar esse número de WhatsApp. Por favor, informe um WhatsApp válido com o código do país no início (+55 para Brasil ou +1 para Estados Unidos).";
+  "Não foi possível validar esse número de WhatsApp. Por favor, informe um WhatsApp válido com o código do país no início (+55 para Brasil, +1 para Estados Unidos ou +351 para Portugal).";
 const WHATSAPP_INVALID_FORMAT_MESSAGE =
-  "O número informado é inválido. Informe um WhatsApp válido com o código do país no início (+55 para Brasil ou +1 para Estados Unidos).";
+  "O número informado é inválido. Informe um WhatsApp válido com o código do país no início (+55 para Brasil, +1 para Estados Unidos ou +351 para Portugal).";
 const WHATSAPP_INVALID_FORMAT_FINAL_MESSAGE = ATENDIMENTO_BLOCKED_FINAL_MESSAGE;
 const NUMERIC_ONLY_TEXT_MESSAGE =
   "Essa resposta não me parece válida. Responda somente com números.";
@@ -83,6 +83,13 @@ const PHONE_CONFIRMATION_PROMPT_MESSAGE =
   'Para continuarmos, confirme se o número informado acima está correto respondendo "sim". Caso contrário, envie apenas o número correto para prosseguirmos.';
 const PHONE_CONFIRMATION_SEND_FAILED_MESSAGE =
   "Ops! Parece que ocorreu uma falha em nosso sistema.\n\nEntre em contato conosco pelo link abaixo para que nossa equipe possa ajuda-lo:\n\nhttps://wa.me/5565996933336";
+
+function formatResolvedCountryLabel(country: "BR" | "US" | "PT" | null | undefined) {
+  if (country === "BR") return "Brasil";
+  if (country === "US") return "Estados Unidos";
+  if (country === "PT") return "Portugal";
+  return null;
+}
 
 function firstNameFromLead(lead: { full_name?: string | null }) {
   const clean = String(lead.full_name ?? "").trim().replace(/\s+/g, " ");
@@ -371,7 +378,7 @@ function buildLeadLocationContext(params: {
 
   const normalizedCity = String(resolved.city ?? "").trim();
   const normalizedState = String(resolved.state ?? (state.replace(/\s+/g, " ").trim() || "")).trim() || null;
-  const country = resolved.country === "BR" ? "Brasil" : resolved.country === "US" ? "Estados Unidos" : null;
+  const country = formatResolvedCountryLabel(resolved.country);
   const leadPatch = {
     ...params.captured,
     ...(normalizedState ? { state: normalizedState } : {}),

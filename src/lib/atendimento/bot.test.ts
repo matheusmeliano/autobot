@@ -37,7 +37,7 @@ test("initialBotMessages inicia o fluxo com convite e pré-cadastro", () => {
   assert.match(messages[2], /aula experimental/i);
   assert.equal(
     messages[3],
-    "Perfeito! Para começarmos, informe o número do seu WhatsApp.\n\nBrasil: +55 (65) 99999-9999\nEstados Unidos: +1 (407) 555-1234\n\nImportante: inclua o código do país no início do número (+55 para Brasil ou +1 para Estados Unidos).",
+    "Perfeito! Para começarmos, informe o número do seu WhatsApp.\n\nBrasil: +55 (65) 99999-9999\nEstados Unidos: +1 (407) 555-1234\nPortugal: +351 912 345 678\n\nImportante: inclua o código do país no início do número (+55 para Brasil, +1 para Estados Unidos ou +351 para Portugal).",
   );
 });
 

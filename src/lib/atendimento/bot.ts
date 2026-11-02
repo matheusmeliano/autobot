@@ -325,7 +325,7 @@ export function validateContractFieldValue(
       return {
         ok: false,
         reason:
-          "Informe um WhatsApp válido com código do país (+55 para Brasil ou +1 para Estados Unidos).",
+          "Informe um WhatsApp válido com código do país (+55 para Brasil, +1 para Estados Unidos ou +351 para Portugal).",
       };
     }
     const digits = String(text ?? "").replace(/\D+/g, "").slice(0, 16);

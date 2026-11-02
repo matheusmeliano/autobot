@@ -3495,7 +3495,13 @@ export function AtendimentoClient() {
         if (direct?.timeZone) {
           resolvedTimeZone = direct.timeZone;
           resolvedCountry =
-            direct.country === "BR" ? "Brasil" : direct.country === "US" ? "Estados Unidos" : null;
+            direct.country === "BR"
+              ? "Brasil"
+              : direct.country === "US"
+                ? "Estados Unidos"
+                : direct.country === "PT"
+                  ? "Portugal"
+                  : null;
         } else {
           const studentTz = resolveStudentTimezone({
             city,
@@ -3512,7 +3518,13 @@ export function AtendimentoClient() {
         if (phoneFb?.timeZone) {
           resolvedTimeZone = phoneFb.timeZone;
           resolvedCountry =
-            phoneFb.country === "BR" ? "Brasil" : phoneFb.country === "US" ? "Estados Unidos" : null;
+            phoneFb.country === "BR"
+              ? "Brasil"
+              : phoneFb.country === "US"
+                ? "Estados Unidos"
+                : phoneFb.country === "PT"
+                  ? "Portugal"
+                  : null;
         }
       }
 

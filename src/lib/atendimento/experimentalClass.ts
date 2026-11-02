@@ -1901,6 +1901,14 @@ export function inferCountry(
     ].includes(tzLow)) {
       return "Brasil";
     }
+    if ([
+      "Europe/Lisbon",
+      "Atlantic/Madeira",
+      "Atlantic/Azores",
+      "Portugal",
+    ].includes(tzLow)) {
+      return "Portugal";
+    }
   }
 
   // 1) PRIORIDADE MAXIMA: keywords explicitas de estado/cidade que o usuario digitou.
@@ -2006,6 +2014,8 @@ export function inferCountry(
     "Brazil/DeNoronha",
   ];
   if (timezone && brTz.includes(timezone)) return "Brasil";
+  const ptTz = ["Europe/Lisbon", "Atlantic/Madeira", "Atlantic/Azores", "Portugal"];
+  if (timezone && ptTz.includes(timezone)) return "Portugal";
 
   // Timezone -> fallback regional (mais largo). Ja deu preferencia para keywords/estados Brasil acima.
   if (timezone.startsWith("America/")) {
@@ -2034,6 +2044,8 @@ export function inferCountry(
       "US_Hawaii","Eastern","Central","Mountain","Pacific","Aleutian","Hawaii"
     ];
     if (brTail.includes(tail)) return "Brasil";
+    if (["Lisbon"].includes(tail)) return "Portugal";
+    if (tail.startsWith("Madeira") || tail.startsWith("Azores")) return "Portugal";
     if (tail.startsWith("Argentina")) return "Argentina";
     if (["Buenos_Aires","Cordoba","Rosario","Jujuy","Mendoza","Tucuman","Catamarca","La_Rioja","San_Juan","San_Luis","Rio_Gallegos","Comodoro_Rivadavia","Salta","Santiago_del_Estero","Mercedes","Corrientes","Posadas","Formosa","Resistencia","Bariloche","Ushuaia"].includes(tail)) return "Argentina";
     if (["Santiago","Punta_Arenas","Easter","Rapa_Nui"].includes(tail)) return "Chile";

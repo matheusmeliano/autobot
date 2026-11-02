@@ -95,7 +95,7 @@ export const CONTRACT_INVALID_MESSAGE = (fieldLabel: string): string =>
 export const CAPTURED_FIELD_PROMPTS: Record<(typeof CAPTURED_FIELD_ORDER)[number], string> = {
   full_name: "Qual é o seu nome e sobrenome?",
   phone:
-    "Perfeito! Para começarmos, informe o número do seu WhatsApp.\n\nBrasil: +55 (65) 99999-9999\nEstados Unidos: +1 (407) 555-1234\n\nImportante: inclua o código do país no início do número (+55 para Brasil ou +1 para Estados Unidos).",
+    "Perfeito! Para começarmos, informe o número do seu WhatsApp.\n\nBrasil: +55 (65) 99999-9999\nEstados Unidos: +1 (407) 555-1234\nPortugal: +351 912 345 678\n\nImportante: inclua o código do país no início do número (+55 para Brasil, +1 para Estados Unidos ou +351 para Portugal).",
   state: "Em qual estado você mora?",
   city: "E a cidade?",
 };

@@ -6,7 +6,7 @@ type ZonedDateTimeInput = {
 
 type CityTimeZoneRule = {
   timeZone: string;
-  country: "BR" | "US";
+  country: "BR" | "US" | "PT";
   keywords: string[];
   stateKeywords?: string[];
 };
@@ -18,7 +18,7 @@ export type CityTimeZoneResolution = {
   normalizedState: string | null;
   timeZone: string;
   teacherTimeZone: string;
-  country: "BR" | "US" | null;
+  country: "BR" | "US" | "PT" | null;
   source: "city_match" | "state_match" | "phone_country_fallback" | "extended_locality_match";
 };
 
@@ -26,7 +26,7 @@ export type StateTimeZoneResolution = {
   state: string;
   normalizedState: string;
   timeZone: string;
-  country: "BR" | "US";
+  country: "BR" | "US" | "PT";
 };
 
 export const PROFESSOR_TIME_ZONE = "America/Cuiaba";
@@ -139,6 +139,180 @@ const BASE_CITY_TIME_ZONE_RULES: CityTimeZoneRule[] = [
       "alpharetta fl",
     ],
     stateKeywords: ["florida", "fl"],
+  },
+  {
+    timeZone: "Atlantic/Azores",
+    country: "PT",
+    keywords: [
+      "ponta delgada",
+      "ribeira grande azores",
+      "lagoa acores",
+      "vila franca do campo",
+      "nordeste acores",
+      "povoacao",
+      "angra do heroismo",
+      "praia da vitoria",
+      "horta",
+      "madalena azores",
+      "lajes do pico",
+      "sao roque do pico",
+      "velas",
+      "calheta sao jorge",
+      "santa cruz da graciosa",
+      "vila do porto",
+      "santa cruz das flores",
+      "lajes das flores",
+      "vila nova do corvo",
+      "capelas",
+      "livramento acores",
+      "relva",
+    ],
+    stateKeywords: [
+      "acores",
+      "açores",
+      "azores",
+      "regiao autonoma dos acores",
+      "região autonoma dos açores",
+      "regiao autonoma dos açores",
+      "região autónoma dos açores",
+      "sao miguel",
+      "são miguel",
+      "terceira",
+      "faial",
+      "pico",
+      "santa maria",
+      "sao jorge",
+      "são jorge",
+      "flores",
+      "corvo",
+      "graciosa",
+    ],
+  },
+  {
+    timeZone: "Atlantic/Madeira",
+    country: "PT",
+    keywords: [
+      "funchal",
+      "camara de lobos",
+      "câmara de lobos",
+      "santa cruz madeira",
+      "machico",
+      "canico",
+      "caniço",
+      "porto santo",
+      "ribeira brava madeira",
+      "ponta do sol madeira",
+      "calheta madeira",
+      "porto moniz",
+      "sao vicente madeira",
+      "são vicente madeira",
+      "santana madeira",
+      "canical",
+      "curral das freiras",
+      "jardim do mar",
+      "camacha madeira",
+      "estreito da calheta",
+      "santana ilha da madeira",
+    ],
+    stateKeywords: [
+      "madeira",
+      "ilha da madeira",
+      "regiao autonoma da madeira",
+      "região autonoma da madeira",
+      "regiao autónoma da madeira",
+      "região autónoma da madeira",
+      "porto santo",
+    ],
+  },
+  {
+    timeZone: "Europe/Lisbon",
+    country: "PT",
+    keywords: [
+      "lisboa",
+      "lisbon",
+      "porto",
+      "oporto",
+      "vila nova de gaia",
+      "gaia",
+      "matosinhos",
+      "maia portugal",
+      "braga",
+      "guimaraes",
+      "guimarães",
+      "barcelos",
+      "famalicao",
+      "famalicão",
+      "coimbra",
+      "aveiro",
+      "leiria",
+      "viseu",
+      "viana do castelo",
+      "faro",
+      "albufeira",
+      "lagos portugal",
+      "portimao",
+      "portimão",
+      "setubal",
+      "setúbal",
+      "sintra",
+      "cascais",
+      "oeiras",
+      "amadora",
+      "loures",
+      "odivelas",
+      "almada",
+      "seixal",
+      "barreiro",
+      "evora",
+      "évora",
+      "beja",
+      "castelo branco",
+      "guarda portugal",
+      "braganca",
+      "bragança",
+      "vila real",
+      "portalegre",
+      "santarem",
+      "santarém",
+      "nazare",
+      "nazaré",
+      "covilha",
+      "covilhã",
+      "figueira da foz",
+      "estoril",
+      "vilamoura",
+      "tavira",
+      "quarteira",
+      "almada portugal",
+      "ericeira",
+    ],
+    stateKeywords: [
+      "portugal",
+      "portugal continental",
+      "continente",
+      "aveiro",
+      "beja",
+      "braga",
+      "braganca",
+      "bragança",
+      "castelo branco",
+      "coimbra",
+      "evora",
+      "évora",
+      "faro",
+      "guarda",
+      "leiria",
+      "lisboa",
+      "porto",
+      "portalegre",
+      "santarem",
+      "santarém",
+      "setubal",
+      "setúbal",
+      "viana do castelo",
+      "vila real",
+      "viseu",
+    ],
   },
   {
     timeZone: "America/Cuiaba",
@@ -2882,6 +3056,12 @@ export function inferTimeZoneFromPhoneCountryCode(phone: string | null | undefin
       country: "US" as const,
     };
   }
+  if (digits.startsWith("351")) {
+    return {
+      timeZone: "Europe/Lisbon",
+      country: "PT" as const,
+    };
+  }
   return null;
 }
 
@@ -3069,10 +3249,23 @@ export function resolveTimeZoneFromCityInput(params: {
     }
     return null;
   })();
-  const explicitStateCountry: "BR" | "US" | null = usStateFromRaw
+  const ptStateFromRaw: { country: "PT"; normalizedState: string } | null = (() => {
+    if (!rawState) return null;
+    for (const rule of CITY_TIME_ZONE_RULES.filter((r) => r.country === "PT")) {
+      for (const kw of rule.stateKeywords ?? []) {
+        if (candidateMatchesKeyword(stateCandidates, kw)) {
+          return { country: "PT", normalizedState: kw };
+        }
+      }
+    }
+    return null;
+  })();
+  const explicitStateCountry: "BR" | "US" | "PT" | null = usStateFromRaw
     ? "US"
     : brStateFromRaw
       ? "BR"
+      : ptStateFromRaw
+        ? "PT"
       : null;
 
   for (const rule of CITY_TIME_ZONE_RULES) {

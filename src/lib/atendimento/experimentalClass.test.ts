@@ -549,6 +549,36 @@ test("calculateCurrentOrNextRecurringOccurrence recalcula horario local do aluno
   assert.equal(occurrence?.leadTime, "08:00");
 });
 
+test("calculateNextRecurringOccurrence mantem o horario local do aluno em Portugal continental durante DST europeu", () => {
+  const occurrence = calculateNextRecurringOccurrence({
+    weekday: "tue",
+    professorTimeHHMM: "15:00",
+    professorTimeZone: "America/Cuiaba",
+    leadTimeZone: "Europe/Lisbon",
+    leadTimeHHMM: "19:00",
+    fromDate: new Date("2026-03-30T12:00:00.000Z"),
+  });
+
+  assert.equal(occurrence?.professorDate, "2026-03-31");
+  assert.equal(occurrence?.professorTime, "14:00");
+  assert.equal(occurrence?.leadTime, "19:00");
+});
+
+test("calculateCurrentOrNextRecurringOccurrence mantem o horario local do aluno nos Açores apos fim do DST", () => {
+  const occurrence = calculateCurrentOrNextRecurringOccurrence({
+    weekday: "wed",
+    professorTimeHHMM: "16:00",
+    professorTimeZone: "America/Cuiaba",
+    leadTimeZone: "Atlantic/Azores",
+    leadTimeHHMM: "19:00",
+    fromDate: new Date("2026-11-02T12:00:00.000Z"),
+  });
+
+  assert.equal(occurrence?.professorDate, "2026-11-04");
+  assert.equal(occurrence?.professorTime, "16:00");
+  assert.equal(occurrence?.leadTime, "19:00");
+});
+
 test("resolveRecurringOccurrenceSearchFromDate ancora a proxima ocorrencia na data futura escolhida", () => {
   const fromDate = resolveRecurringOccurrenceSearchFromDate({
     now: new Date("2026-10-13T23:58:00.000Z"),

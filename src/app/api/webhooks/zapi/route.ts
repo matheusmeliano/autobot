@@ -77,11 +77,18 @@ import { resolveBaseUrlFromHeaders } from "@/lib/site-url";
 export const runtime = "nodejs";
 const MAX_PHONE_VALIDATION_ATTEMPTS = 3;
 const WHATSAPP_INVALID_MESSAGE =
-  "Não foi possível validar esse número de WhatsApp. Por favor, informe um WhatsApp válido com o código do país no início (+55 para Brasil ou +1 para Estados Unidos).";
+  "Não foi possível validar esse número de WhatsApp. Por favor, informe um WhatsApp válido com o código do país no início (+55 para Brasil, +1 para Estados Unidos ou +351 para Portugal).";
 const WHATSAPP_INVALID_FINAL_MESSAGE =
   "Não foi possível validar seu número de WhatsApp após 3 tentativas. Este cadastro foi bloqueado. Para tentar novamente, entre em contato com nosso suporte para desbloquear o e-mail utilizado ou realize um novo cadastro com outro e-mail.\n\nFale com nossa equipe pelo link abaixo:\n\nhttps://wa.me/5565996933336";
 const WHATSAPP_TECHNICAL_TIMEOUT_MESSAGE =
   "Nao foi possivel concluir a validacao do seu WhatsApp neste momento por instabilidade tecnica. Tente novamente em instantes.";
+
+function formatResolvedCountryLabel(country: "BR" | "US" | "PT" | null | undefined) {
+  if (country === "BR") return "Brasil";
+  if (country === "US") return "Estados Unidos";
+  if (country === "PT") return "Portugal";
+  return null;
+}
 
 function normalizePhone(phone: string) {
   const raw = String(phone ?? "").trim();
@@ -2253,12 +2260,7 @@ export async function POST(req: Request) {
       ...(leadRecord as any),
       phone: pendingPhone,
       timezone: resolvedLeadLocation?.timeZone ?? (String((leadRecord as any)?.timezone ?? "").trim() || null),
-      country:
-        resolvedLeadLocation?.country === "BR"
-          ? "Brasil"
-          : resolvedLeadLocation?.country === "US"
-            ? "Estados Unidos"
-            : String((leadRecord as any)?.country ?? "").trim() || null,
+      country: formatResolvedCountryLabel(resolvedLeadLocation?.country) || String((leadRecord as any)?.country ?? "").trim() || null,
     };
     const botResponse = botReplyForLead({
       lead: nextLead,
@@ -2277,7 +2279,7 @@ export async function POST(req: Request) {
               state: resolvedLeadLocation.state,
               city: resolvedLeadLocation.city,
               timezone: resolvedLeadLocation.timeZone,
-              country: resolvedLeadLocation.country === "BR" ? "Brasil" : "Estados Unidos",
+              country: formatResolvedCountryLabel(resolvedLeadLocation.country),
             }
           : {}),
         status: nextStatus,
@@ -2304,7 +2306,7 @@ export async function POST(req: Request) {
           city: resolvedLeadLocation.city,
           timezone: resolvedLeadLocation.timeZone,
           teacher_timezone: ATENDIMENTO_PROFESSOR_TIME_ZONE,
-          country: resolvedLeadLocation.country === "BR" ? "Brasil" : "Estados Unidos",
+          country: formatResolvedCountryLabel(resolvedLeadLocation.country),
           source: resolvedLeadLocation.source,
         },
         actorType: "system",
@@ -5256,7 +5258,7 @@ export async function POST(req: Request) {
             .update({
               state: stateResolution.state,
               timezone: stateResolution.timeZone,
-              country: stateResolution.country === "BR" ? "Brasil" : "Estados Unidos",
+              country: formatResolvedCountryLabel(stateResolution.country),
               updated_at: nowIso,
             })
             .eq("id", leadId);
@@ -5273,7 +5275,7 @@ export async function POST(req: Request) {
               state: stateResolution.state,
               normalized_state: stateResolution.normalizedState,
               timezone: stateResolution.timeZone,
-              country: stateResolution.country === "BR" ? "Brasil" : "Estados Unidos",
+              country: formatResolvedCountryLabel(stateResolution.country),
             },
             actorType: "system",
           });
@@ -5456,7 +5458,7 @@ export async function POST(req: Request) {
               city: finalCityValue,
               state: finalStateValue,
               timezone: resolved?.timeZone ?? (String((lead as any)?.timezone ?? "").trim() || null),
-              country: resolved?.country === "BR" ? "Brasil" : resolved?.country === "US" ? "Estados Unidos" : (String((lead as any)?.country ?? "").trim() || null),
+              country: formatResolvedCountryLabel(resolved?.country) ?? (String((lead as any)?.country ?? "").trim() || null),
               funnel_stage: "pre_cadastro_concluido",
               status: "matricula_pendente",
               updated_at: nowIso,
@@ -5475,7 +5477,7 @@ export async function POST(req: Request) {
               state: finalStateValue,
               city: finalCityValue,
               timezone: resolved?.timeZone ?? null,
-              country: resolved?.country === "BR" ? "Brasil" : resolved?.country === "US" ? "Estados Unidos" : null,
+              country: formatResolvedCountryLabel(resolved?.country),
               source: (resolved as any)?.source ?? "city_match",
             },
             actorType: "system",
@@ -5491,7 +5493,7 @@ export async function POST(req: Request) {
               city: finalCityValue,
               timezone: resolved?.timeZone ?? null,
               teacher_timezone: ATENDIMENTO_PROFESSOR_TIME_ZONE,
-              country: resolved?.country === "BR" ? "Brasil" : resolved?.country === "US" ? "Estados Unidos" : null,
+              country: formatResolvedCountryLabel(resolved?.country),
               source: (resolved as any)?.source ?? "city_match",
             },
             actorType: "system",
