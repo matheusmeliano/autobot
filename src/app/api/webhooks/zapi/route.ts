@@ -699,7 +699,7 @@ function isValidCityInput(raw: string): { valid: boolean; reason?: string } {
 
 function cityResolutionIsReliable(
   resolution: ReturnType<typeof resolveTimeZoneFromCityInput> | null,
-  params?: { stateSoFarCountry?: "BR" | "US" | null },
+  params?: { stateSoFarCountry?: "BR" | "US" | "PT" | null },
 ): resolution is NonNullable<ReturnType<typeof resolveTimeZoneFromCityInput>> {
   if (!resolution) return false;
   if (
