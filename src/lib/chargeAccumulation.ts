@@ -57,7 +57,18 @@ export function getOpenMonthlyInstallments(params: {
   const currentMonthIndex = monthIndex(currentLocalDate);
   if (dueMonthIndex === null || currentMonthIndex === null) return 1;
 
-  return Math.max(1, currentMonthIndex - dueMonthIndex + 1);
+  const dueParts = parseLocalDate(dueLocalDate);
+  const currentParts = parseLocalDate(currentLocalDate);
+  if (!dueParts || !currentParts) return 1;
+
+  const currentMonthDueDay = Math.min(
+    dueParts.day,
+    lastDayOfMonth(currentParts.year, currentParts.month),
+  );
+  const currentInstallments =
+    currentMonthIndex - dueMonthIndex + (currentParts.day >= currentMonthDueDay ? 1 : 0);
+
+  return Math.max(1, currentInstallments);
 }
 
 export function getScheduleChargeAmount(params: {
