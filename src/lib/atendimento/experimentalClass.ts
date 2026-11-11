@@ -825,6 +825,7 @@ export function listExperimentalClassAvailability(params: {
   now?: Date;
   leadTimeZone?: string | null;
   bookedProfessorStartAts?: string[];
+  occupiedIntervals?: RecurringOccupiedInterval[];
 }) {
   const now = params.now ?? new Date();
   const nowMs = now.getTime();
@@ -889,6 +890,14 @@ export function listExperimentalClassAvailability(params: {
           return professorStartMs < bookedEndMs && bookedStartMs < professorEndMs;
         });
         if (overlapsExistingBooking) continue;
+        if (
+          recurringOccurrenceConflictsWithIntervals({
+            startAt: professorStartAt,
+            occupiedIntervals: params.occupiedIntervals ?? [],
+          })
+        ) {
+          continue;
+        }
 
         const leadDate = localDateInTimeZone(professorStartAt, leadTimeZone);
         daySlots.push({

@@ -51,6 +51,7 @@ import {
   findLeadByPhone,
   formalizeAndPersistContract,
   getAuthenticatedAtendimentoConversationAccess,
+  loadRecurringCalendarOccupiedIntervals,
   maybeNotifyRegisteredAttendantAboutExperimentalClassScheduled,
   maybeSendExperimentalClassConfirmationToStudent,
   sendAtendimentoWhatsAppText,
@@ -522,6 +523,22 @@ async function listScheduledExperimentalClassProfessorStarts(params: {
   ).filter((value) => value && value >= params.nowIso);
 }
 
+async function listRecurringProfessorOccupiedIntervals(params: {
+  admin: ReturnType<typeof createSupabaseAdminClient>;
+  now: Date;
+}) {
+  return (await loadRecurringCalendarOccupiedIntervals({
+    admin: params.admin,
+    now: params.now,
+    lookAheadWeeks: 4,
+  }))
+    .filter((interval) => interval.source === "recurring_schedule")
+    .map((interval) => ({
+      startAt: interval.start_at,
+      endAt: interval.end_at,
+    }));
+}
+
 async function getScheduledExperimentalClassBooking(params: {
   admin: ReturnType<typeof createSupabaseAdminClient>;
   leadId: string;
@@ -680,10 +697,15 @@ async function presentExperimentalClassDateOptions(params: {
     admin: params.admin,
     nowIso: now.toISOString(),
   });
+  const recurringOccupiedIntervals = await listRecurringProfessorOccupiedIntervals({
+    admin: params.admin,
+    now,
+  });
   const availability = listExperimentalClassAvailability({
     now,
     leadTimeZone: params.leadTimeZone,
     bookedProfessorStartAts: bookedStarts,
+    occupiedIntervals: recurringOccupiedIntervals,
   });
   const messages = buildExperimentalClassDatesMessages(availability.dates);
   let outbound: Record<string, unknown> | null = null;
@@ -735,10 +757,15 @@ async function presentExperimentalClassTimeOptions(params: {
     admin: params.admin,
     nowIso: now.toISOString(),
   });
+  const recurringOccupiedIntervals = await listRecurringProfessorOccupiedIntervals({
+    admin: params.admin,
+    now,
+  });
   const availability = listExperimentalClassAvailability({
     now,
     leadTimeZone: params.leadTimeZone,
     bookedProfessorStartAts: bookedStarts,
+    occupiedIntervals: recurringOccupiedIntervals,
   });
   const dateOption =
     availability.dates.find((option) => String(option.id ?? "") === String(params.dateOptionId ?? "").trim()) ??
@@ -2948,9 +2975,14 @@ export async function POST(req: Request) {
         admin,
         nowIso: nowIso,
       });
+      const recurringOccupiedIntervals = await listRecurringProfessorOccupiedIntervals({
+        admin,
+        now: new Date(nowIso),
+      });
       const currentAvailability = listExperimentalClassAvailability({
         leadTimeZone,
         bookedProfessorStartAts: bookedProfessorStarts,
+        occupiedIntervals: recurringOccupiedIntervals,
       });
       const selectedDateOption =
         currentAvailability.dates.find((option) => String(option.id ?? "") === dateOptionId) ??
@@ -3171,9 +3203,14 @@ export async function POST(req: Request) {
       admin,
       nowIso,
     });
+    const recurringOccupiedIntervals = await listRecurringProfessorOccupiedIntervals({
+      admin,
+      now: new Date(nowIso),
+    });
     const availability = listExperimentalClassAvailability({
       leadTimeZone,
       bookedProfessorStartAts: bookedProfessorStarts,
+      occupiedIntervals: recurringOccupiedIntervals,
     });
     const selectedDateOption = findExperimentalClassDateOption(contentText, availability.dates);
 

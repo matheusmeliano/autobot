@@ -1,5 +1,8 @@
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
-import { requireAtendimentoUser } from "@/lib/atendimento/server";
+import {
+  loadRecurringCalendarOccupiedIntervals,
+  requireAtendimentoUser,
+} from "@/lib/atendimento/server";
 import { ATENDIMENTO_PROFESSOR_TIME_ZONE } from "@/lib/atendimento/constants";
 import { listExperimentalClassAvailability } from "@/lib/atendimento/experimentalClass";
 import { resolveStudentTimezone } from "@/lib/timezone";
@@ -124,11 +127,22 @@ export async function GET(_req: Request, { params }: { params: Promise<{ leadId:
       if (row?.id && currentBookingIds.has(String(row.id))) continue;
       bookedAts.push(row.professor_start_at);
     }
+    const occupiedIntervals = (await loadRecurringCalendarOccupiedIntervals({
+      admin: supabase,
+      now: new Date(nowIso),
+      lookAheadWeeks: 4,
+    }))
+      .filter((interval) => interval.source === "recurring_schedule")
+      .map((interval) => ({
+        startAt: interval.start_at,
+        endAt: interval.end_at,
+      }));
 
     const availability = listExperimentalClassAvailability({
       now: new Date(nowIso),
       leadTimeZone: leadTimeZoneRaw,
       bookedProfessorStartAts: bookedAts,
+      occupiedIntervals,
     });
 
     const slotsByDate: Record<string, any[]> = {};
@@ -175,6 +189,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ leadId:
         now: new Date(nowIso),
         leadTimeZone: tz,
         bookedProfessorStartAts: [],
+        occupiedIntervals: [],
       });
       const slotsByDate: Record<string, any[]> = {};
       availability.slotsByProfessorDate.forEach((value, key) => {

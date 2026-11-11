@@ -57,6 +57,7 @@ import {
   ensureWhatsAppLeadAndConversation,
   findLeadByPhone,
   hasAnyBotMessage,
+  loadRecurringCalendarOccupiedIntervals,
   maybeNotifyRegisteredAttendantAboutExperimentalClassScheduled,
   maybeSendExperimentalClassConfirmationToStudent,
   sendAtendimentoWhatsAppText,
@@ -306,6 +307,22 @@ async function listScheduledExperimentalClassProfessorStarts(params: {
       ...(historyData ?? []).map((row) => String(((row as any)?.details ?? {}).professor_start_at ?? "").trim()),
     ]),
   ).filter((value) => value && value >= params.nowIso);
+}
+
+async function listRecurringProfessorOccupiedIntervals(params: {
+  admin: ReturnType<typeof createSupabaseAdminClient>;
+  now: Date;
+}) {
+  return (await loadRecurringCalendarOccupiedIntervals({
+    admin: params.admin,
+    now: params.now,
+    lookAheadWeeks: 4,
+  }))
+    .filter((interval) => interval.source === "recurring_schedule")
+    .map((interval) => ({
+      startAt: interval.start_at,
+      endAt: interval.end_at,
+    }));
 }
 
 async function findPendingPhoneValidationEvent(params: {
@@ -1102,10 +1119,15 @@ async function presentExperimentalClassDateOptionsWhatsApp(params: {
   const bookedProfessorStarts = bErr
     ? []
     : (bookedStartsRaw ?? []).map((row: any) => String(row?.professor_start_at ?? "").trim()).filter(Boolean);
+  const recurringOccupiedIntervals = await listRecurringProfessorOccupiedIntervals({
+    admin: params.admin,
+    now,
+  });
   const availability = listExperimentalClassAvailability({
     now,
     leadTimeZone: params.leadTimeZone,
     bookedProfessorStartAts: bookedProfessorStarts,
+    occupiedIntervals: recurringOccupiedIntervals,
   });
   const messagesRaw = buildExperimentalClassDatesMessages(availability.dates);
   const messages = [messagesRaw.filter(Boolean).join("\n\n")];
@@ -1165,10 +1187,15 @@ async function presentExperimentalClassTimeOptionsWhatsApp(params: {
   const bookedProfessorStarts = bErr
     ? []
     : (bookedStartsRaw ?? []).map((row: any) => String(row?.professor_start_at ?? "").trim()).filter(Boolean);
+  const recurringOccupiedIntervals = await listRecurringProfessorOccupiedIntervals({
+    admin: params.admin,
+    now,
+  });
   const availability = listExperimentalClassAvailability({
     now,
     leadTimeZone: params.leadTimeZone,
     bookedProfessorStartAts: bookedProfessorStarts,
+    occupiedIntervals: recurringOccupiedIntervals,
   });
   const dateOption =
     availability.dates.find((o) => String(o.id ?? "") === String(params.dateOptionId ?? "").trim()) ??
@@ -1238,10 +1265,15 @@ async function presentRecurringCalendarDateOptionsWhatsApp(params: {
   const bookedProfessorStarts = bErr
     ? []
     : (bookedStartsRaw ?? []).map((row: any) => String(row?.professor_start_at ?? "").trim()).filter(Boolean);
+  const recurringOccupiedIntervals = await listRecurringProfessorOccupiedIntervals({
+    admin: params.admin,
+    now,
+  });
   const availability = listRecurringCalendarAvailability({
     now,
     leadTimeZone: params.leadTimeZone,
     bookedProfessorStartAts: bookedProfessorStarts,
+    occupiedIntervals: recurringOccupiedIntervals,
   });
   const messagesRaw = buildRecurringCalendarDatesMessages(availability.dates);
   const messages = [messagesRaw.filter(Boolean).join("\n\n")];
@@ -1300,10 +1332,15 @@ async function presentRecurringCalendarTimeOptionsWhatsApp(params: {
   const bookedProfessorStarts = bErr
     ? []
     : (bookedStartsRaw ?? []).map((row: any) => String(row?.professor_start_at ?? "").trim()).filter(Boolean);
+  const recurringOccupiedIntervals = await listRecurringProfessorOccupiedIntervals({
+    admin: params.admin,
+    now,
+  });
   const availability = listRecurringCalendarAvailability({
     now,
     leadTimeZone: params.leadTimeZone,
     bookedProfessorStartAts: bookedProfessorStarts,
+    occupiedIntervals: recurringOccupiedIntervals,
   });
   const dateOption = availability.dates.find((o) => o.professorDate === params.professorDate) ?? null;
   const slots = availability.slotsByProfessorDate.get(params.professorDate) ?? [];
@@ -2376,9 +2413,14 @@ export async function POST(req: Request) {
         admin,
         nowIso,
       });
+      const recurringOccupiedIntervals = await listRecurringProfessorOccupiedIntervals({
+        admin,
+        now: new Date(nowIso),
+      });
       const availability = listExperimentalClassAvailability({
         leadTimeZone: String((nextLead as any)?.timezone ?? "").trim() || ATENDIMENTO_PROFESSOR_TIME_ZONE,
         bookedProfessorStartAts: bookedProfessorStarts,
+        occupiedIntervals: recurringOccupiedIntervals,
       });
       const availabilityMessages = buildExperimentalClassDatesMessages(availability.dates);
 

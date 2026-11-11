@@ -103,6 +103,48 @@ test("listExperimentalClassAvailability agrupa por data local do aluno sem dupli
   assert.ok(slots.some((slot) => slot.professorDate === "2026-07-14"));
 });
 
+test("listExperimentalClassAvailability em Portugal começa ao meio-dia e vai até a madrugada conforme o fuso atual", () => {
+  const availability = listExperimentalClassAvailability({
+    now: new Date("2026-11-10T10:00:00.000Z"),
+    leadTimeZone: "Europe/Lisbon",
+    bookedProfessorStartAts: [],
+  });
+
+  const selectedDate = availability.dates.find((option) => option.id === "2026-11-11");
+  assert.ok(selectedDate);
+
+  const slots = availability.slotsByProfessorDate.get(selectedDate.id) ?? [];
+  const leadTimes = slots.map((slot) => slot.leadTime);
+
+  assert.equal(leadTimes.includes("12:00"), true);
+  assert.equal(leadTimes.includes("02:00"), true);
+  assert.equal(leadTimes.includes("08:00"), false);
+});
+
+test("listExperimentalClassAvailability bloqueia em Portugal o horário já ocupado por recorrente no fuso do professor", () => {
+  const availability = listExperimentalClassAvailability({
+    now: new Date("2026-11-10T10:00:00.000Z"),
+    leadTimeZone: "Europe/Lisbon",
+    bookedProfessorStartAts: [],
+    occupiedIntervals: [
+      {
+        startAt: "2026-11-11T14:00:00.000Z",
+        endAt: "2026-11-11T15:00:00.000Z",
+      },
+    ],
+  });
+
+  const selectedDate = availability.dates.find((option) => option.id === "2026-11-11");
+  assert.ok(selectedDate);
+
+  const slots = availability.slotsByProfessorDate.get(selectedDate.id) ?? [];
+  const leadTimes = slots.map((slot) => slot.leadTime);
+  const professorTimes = slots.map((slot) => slot.professorTime);
+
+  assert.equal(leadTimes.includes("14:00"), false);
+  assert.equal(professorTimes.includes("10:00"), false);
+});
+
 test("listExperimentalClassAvailability: sábado só mostra horários de início até 18:00 (disponibilidade do professor)", () => {
   // 2026-07-25 = sábado
   const availability = listExperimentalClassAvailability({
