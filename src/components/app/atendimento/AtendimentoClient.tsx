@@ -3604,8 +3604,16 @@ export function AtendimentoClient() {
             const pTime = String(booking?.professor_time ?? "").trim();
             if (pDate && pTime) {
               const slotId = `${pDate}|${pTime}`;
-              const maybeSlots = Array.isArray(slotsByDate?.[pDate]) ? (slotsByDate[pDate] as any[]) : [];
-              const maybeDate = dates.find((d) => String(d?.id ?? d?.professorDate ?? "") === pDate);
+              const maybeDate =
+                dates.find((d) =>
+                  Array.isArray(slotsByDate?.[String(d?.id ?? "")]) &&
+                  (slotsByDate[String(d?.id ?? "")] as any[]).some(
+                    (slot) => String(slot?.professorDate ?? "").slice(0, 10) === pDate,
+                  ),
+                ) ?? null;
+              const maybeSlots = maybeDate && Array.isArray(slotsByDate?.[String(maybeDate.id ?? "")])
+                ? (slotsByDate[String(maybeDate.id ?? "")] as any[])
+                : [];
               if (maybeDate) {
                 setSelectedExperimentalDateId(String(maybeDate.id));
               }
@@ -3640,13 +3648,13 @@ export function AtendimentoClient() {
             if (recurringWeekday) {
               matchedDate =
                 dates.find((date) => {
-                  const dateKey = String(date?.professorDate ?? date?.id ?? "").slice(0, 10);
-                  return dateKey && weekdayShortFromLocalDate(dateKey, ATENDIMENTO_PROFESSOR_TIME_ZONE) === recurringWeekday;
+                  const weekdayKey = normalizeRecurringWeekdayToken(date?.weekday ?? date?.label ?? date?.displayLabel);
+                  return weekdayKey === recurringWeekday;
                 }) ?? null;
             }
             if (!matchedDate && (recurringProfessorTime || recurringLeadTime)) {
               for (const date of dates) {
-                const dateKey = String(date?.professorDate ?? date?.id ?? "").slice(0, 10);
+                const dateKey = String(date?.id ?? "").trim();
                 if (!dateKey) continue;
                 if (matchSlotInDate(dateKey)) {
                   matchedDate = date;
@@ -3656,7 +3664,7 @@ export function AtendimentoClient() {
             }
             if (matchedDate) {
               const matchedDateId = String(matchedDate?.id ?? matchedDate?.professorDate ?? "").trim();
-              const matchedDateKey = String(matchedDate?.professorDate ?? matchedDate?.id ?? "").slice(0, 10);
+              const matchedDateKey = String(matchedDate?.id ?? matchedDate?.professorDate ?? "").trim();
               if (matchedDateId) {
                 setSelectedExperimentalDateId(matchedDateId);
               }
@@ -3784,8 +3792,8 @@ export function AtendimentoClient() {
       modalToast.error("Selecione um horário disponível.");
       return;
     }
-    const daySlots = Array.isArray(slotsByDate[String(selectedDate.professorDate ?? selectedDate.id ?? "")])
-      ? (slotsByDate[String(selectedDate.professorDate ?? selectedDate.id ?? "")] as any[])
+    const daySlots = Array.isArray(slotsByDate[String(selectedDate.id ?? "")])
+      ? (slotsByDate[String(selectedDate.id ?? "")] as any[])
       : [];
     const selectedSlot = daySlots.find((s) => String(s?.id ?? "") === selectedExperimentalSlotId);
     if (!selectedSlot) {
@@ -8777,15 +8785,15 @@ export function AtendimentoClient() {
                         const displayLabel = String(dateOption?.displayLabel ?? "").trim();
                         const slotCount = Number(dateOption?.slotCount ?? 0);
                         const isSelected = selectedExperimentalDateId === dateId;
-                        const dateRaw = String(dateOption?.professorDate ?? dateId ?? "").slice(0, 10);
+                        const dateRaw = String(dateOption?.leadDate ?? dateId ?? "").slice(0, 10);
                         let weekdayShort = displayLabel
                           ? displayLabel.split(",")[0]?.trim() ?? ""
                           : "";
                         if (!weekdayShort || /^\d+$/.test(weekdayShort.replace(/\s/g, "")) || weekdayShort.length > 4) {
                           try {
                             if (/^\d{4}-\d{2}-\d{2}$/.test(dateRaw)) {
-                              const d = new Date(dateRaw + "T00:00:00");
-                              weekdayShort = new Intl.DateTimeFormat("pt-BR", { weekday: "short" })
+                              const d = new Date(dateRaw + "T12:00:00Z");
+                              weekdayShort = new Intl.DateTimeFormat("pt-BR", { weekday: "short", timeZone: "UTC" })
                                 .format(d)
                                 .replace(/\./g, "")
                                 .slice(0, 3)
@@ -8861,7 +8869,7 @@ export function AtendimentoClient() {
                       const selectedDate = (experimentalAvailability?.dates ?? []).find(
                         (d) => String(d?.id ?? "") === selectedExperimentalDateId,
                       );
-                      const keyForSlots = String(selectedDate?.professorDate ?? selectedDate?.id ?? "");
+                      const keyForSlots = String(selectedDate?.id ?? selectedExperimentalDateId ?? "");
                       const slots = Array.isArray(experimentalAvailability?.slotsByDate?.[keyForSlots])
                         ? (experimentalAvailability!.slotsByDate[keyForSlots] as any[])
                         : [];

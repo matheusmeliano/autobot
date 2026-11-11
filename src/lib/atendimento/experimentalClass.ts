@@ -257,7 +257,9 @@ function weekdayInTimeZone(value: Date | string | number, timeZone: string) {
 function formatDateInTimeZone(iso: string, timeZone: string) {
   return new Intl.DateTimeFormat("pt-BR", {
     timeZone,
+    weekday: "short",
     day: "2-digit",
+    month: "2-digit",
   }).format(new Date(iso));
 }
 
@@ -441,7 +443,33 @@ function normalizeFlexibleTimeSelection(value: string) {
 }
 
 function buildDisplayDateLabel(iso: string, timeZone: string) {
-  return formatDateInTimeZone(iso, timeZone);
+  return formatDateInTimeZone(iso, timeZone).replace(/\./g, "");
+}
+
+function localDateToUtcNoonMs(localDate: string) {
+  const [year, month, day] = localDate.split("-").map(Number);
+  if (!year || !month || !day) return Number.NaN;
+  return Date.UTC(year, month - 1, day, 12, 0, 0, 0);
+}
+
+function weekdayKeyFromLocalDate(localDate: string): RecurringWeekdayKey | "sun" | null {
+  const ms = localDateToUtcNoonMs(localDate);
+  if (!Number.isFinite(ms)) return null;
+  return weekdayInTimeZone(ms, "UTC").toLowerCase() as RecurringWeekdayKey | "sun";
+}
+
+function startOfWeekLocalDate(localDate: string) {
+  const weekday = weekdayKeyFromLocalDate(localDate);
+  const order: Array<RecurringWeekdayKey | "sun"> = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"];
+  const weekdayIndex = weekday ? order.indexOf(weekday) : -1;
+  return addDaysToLocalDate(localDate, -Math.max(0, weekdayIndex));
+}
+
+function diffDaysBetweenLocalDates(left: string, right: string) {
+  const leftMs = localDateToUtcNoonMs(left);
+  const rightMs = localDateToUtcNoonMs(right);
+  if (!Number.isFinite(leftMs) || !Number.isFinite(rightMs)) return 0;
+  return Math.trunc((leftMs - rightMs) / (24 * 60 * 60 * 1000));
 }
 
 function joinWithFinalConjunction(values: string[]) {
@@ -812,7 +840,7 @@ export function listExperimentalClassAvailability(params: {
 
   const professorToday = localDateInTimeZone(now, ATENDIMENTO_PROFESSOR_TIME_ZONE);
   const dates: ExperimentalClassDateOption[] = [];
-  const slotsByProfessorDate = new Map<string, ExperimentalClassTimeOption[]>();
+  const slotsByDateId = new Map<string, ExperimentalClassTimeOption[]>();
 
   function startOfProfessorWeek(d: Date): string {
     const todayLocal = localDateInTimeZone(d, ATENDIMENTO_PROFESSOR_TIME_ZONE);
@@ -876,17 +904,12 @@ export function listExperimentalClassAvailability(params: {
 
       if (!daySlots.length) continue;
 
-      slotsByProfessorDate.set(currentDate, daySlots);
-      const leadDate = daySlots[0]?.leadDate ?? currentDate;
-      const dayLabel = leadDate.slice(8, 10);
-      dates.push({
-        id: currentDate,
-        professorDate: currentDate,
-        leadDate,
-        dayLabel,
-        displayLabel: buildDisplayDateLabel(daySlots[0]?.professorStartAt ?? middayIso, leadTimeZone),
-        slotCount: daySlots.length,
-      });
+      for (const slot of daySlots) {
+        const dateId = String(slot.leadDate ?? "").trim() || currentDate;
+        const bucket = slotsByDateId.get(dateId) ?? [];
+        bucket.push(slot);
+        slotsByDateId.set(dateId, bucket);
+      }
     }
   };
 
@@ -894,9 +917,31 @@ export function listExperimentalClassAvailability(params: {
     collectDates(week.startLocal, week.endLocal);
   }
 
+  const sortedDateIds = Array.from(slotsByDateId.keys()).sort((left, right) => {
+    const leftMs = localDateToUtcNoonMs(left);
+    const rightMs = localDateToUtcNoonMs(right);
+    return leftMs - rightMs;
+  });
+
+  for (const dateId of sortedDateIds) {
+    const daySlots = (slotsByDateId.get(dateId) ?? []).slice().sort((left, right) => {
+      return new Date(left.professorStartAt).getTime() - new Date(right.professorStartAt).getTime();
+    });
+    if (!daySlots.length) continue;
+    slotsByDateId.set(dateId, daySlots);
+    dates.push({
+      id: dateId,
+      professorDate: daySlots[0]?.professorDate ?? dateId,
+      leadDate: dateId,
+      dayLabel: dateId.slice(8, 10),
+      displayLabel: buildDisplayDateLabel(daySlots[0]?.professorStartAt ?? new Date(localDateToUtcNoonMs(dateId)).toISOString(), leadTimeZone),
+      slotCount: daySlots.length,
+    });
+  }
+
   return {
     dates,
-    slotsByProfessorDate,
+    slotsByProfessorDate: slotsByDateId,
   };
 }
 
@@ -1101,6 +1146,19 @@ export function findExperimentalClassTimeOption(
     }
   }
 
+  // Retrocompatibilidade: ainda aceita o horário no fuso do professor quando o usuário
+  // envia exatamente o valor salvo internamente, mas só depois de tentar tudo pelo lado
+  // visível do aluno para não priorizar o horário errado em cenários com fusos distintos.
+  for (const option of options) {
+    if (normalizedInput === normalizeSelectionText(option.professorTime)) return option;
+    if (
+      normalizedFlexibleInput &&
+      normalizedFlexibleInput === normalizeFlexibleTimeSelection(option.professorTime)
+    ) {
+      return option;
+    }
+  }
+
   return null;
 }
 
@@ -1132,7 +1190,7 @@ export type RecurringWeekdayOption = {
   displayLabel: string;
   slotCount: number;
   professorDate: string;
-  weekIndex: 0 | 1;
+  weekIndex: number;
   weekLabel: string;
 };
 
@@ -1143,7 +1201,8 @@ export type RecurringWeekdayTimeOption = {
   leadTime: string;
   displayLabel: string;
   professorDate: string;
-  professorStartAtIso: string;
+  leadDate?: string;
+  professorStartAtIso?: string;
 };
 
 export function resolveRecurringOccurrenceSearchFromDate(params: {
@@ -1288,11 +1347,11 @@ export function listRecurringWeekdayAvailability(params: {
     ...(params.bookedProfessorStartAts ?? []).map((value) => ({ startAt: String(value ?? "") })),
   ];
 
-  const weekdayOrder: RecurringWeekdayKey[] = ["mon", "tue", "wed", "thu", "fri", "sat"];
+  const professorWeekdayOrder: RecurringWeekdayKey[] = ["mon", "tue", "wed", "thu", "fri", "sat"];
   const optionsByWeekdayDate = new Map<string, RecurringWeekdayTimeOption[]>();
   const metaByWeekdayDate = new Map<
     string,
-    { weekday: RecurringWeekdayKey; professorDate: string; weekIndex: 0 | 1; weekLabel: string }
+    { weekday: RecurringWeekdayKey; professorDate: string; leadDate: string; weekIndex: number; weekLabel: string }
   >();
 
   function startOfProfessorWeek(d: Date): string {
@@ -1310,17 +1369,27 @@ export function listRecurringWeekdayAvailability(params: {
   }
 
   const mondayThisWeek = startOfProfessorWeek(now);
-  const weeksToEmit: Array<{ mondayLocal: string; index: 0 | 1; label: string }> = [
-    { mondayLocal: mondayThisWeek, index: 0, label: "Semana atual" },
-    { mondayLocal: addDaysToLocalDate(mondayThisWeek, 7), index: 1, label: "Próxima semana" },
-  ];
+  const leadToday = localDateInTimeZone(now, leadTimeZone);
+  const leadWeekStart = startOfWeekLocalDate(leadToday);
+  const weeksToEmit: Array<{ mondayLocal: string; index: number; label: string }> = Array.from(
+    { length: lookAheadWeeks },
+    (_, index) => ({
+      mondayLocal: addDaysToLocalDate(mondayThisWeek, index * 7),
+      index,
+      label:
+        index === 0
+          ? "Semana atual"
+          : index === 1
+            ? "Próxima semana"
+            : `Semana ${index + 1}`,
+    }),
+  );
   const orderIdx: Array<RecurringWeekdayKey | "sun"> = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"];
 
   for (const week of weeksToEmit) {
-    for (const weekday of weekdayOrder) {
+    for (const weekday of professorWeekdayOrder) {
       const wdIdx = orderIdx.indexOf(weekday);
       const professorDate = addDaysToLocalDate(week.mondayLocal, wdIdx);
-      const slots: RecurringWeekdayTimeOption[] = [];
       for (const professorTime of EXPERIMENTAL_CLASS_SLOT_TIMES) {
         if (!professorTimeIsAllowed({ weekdayShort: weekday, professorTimeHHMM: professorTime })) continue;
         const professorStartAt = zonedDateTimeToUtcIso({
@@ -1339,25 +1408,41 @@ export function listRecurringWeekdayAvailability(params: {
           continue;
         }
 
-        slots.push({
-          id: `${professorDate}|${weekday}|${professorTime}`,
-          weekday,
+        const leadDate = localDateInTimeZone(professorStartAt, leadTimeZone);
+        const leadWeekday = weekdayKeyFromLocalDate(leadDate);
+        if (!leadWeekday || leadWeekday === "sun") continue;
+        const leadWeekdayKey = leadWeekday as RecurringWeekdayKey;
+        const dateId = `${leadDate}|${leadWeekdayKey}`;
+        const weekIndex = Math.max(0, Math.trunc(diffDaysBetweenLocalDates(startOfWeekLocalDate(leadDate), leadWeekStart) / 7));
+        const weekLabel =
+          weekIndex === 0
+            ? "Semana atual"
+            : weekIndex === 1
+              ? "Próxima semana"
+              : `Semana ${weekIndex + 1}`;
+        const slot: RecurringWeekdayTimeOption = {
+          id: `${professorDate}|${leadDate}|${leadWeekdayKey}|${professorTime}`,
+          weekday: leadWeekdayKey,
           professorTime,
           professorDate,
+          leadDate,
           professorStartAtIso: professorStartAt,
           leadTime: formatTimeInTimeZone(professorStartAt, leadTimeZone),
           displayLabel: formatTimeInTimeZone(professorStartAt, leadTimeZone),
-        });
-      }
-      if (slots.length > 0) {
-        const key = `${professorDate}|${weekday}`;
-        optionsByWeekdayDate.set(key, slots);
-        metaByWeekdayDate.set(key, {
-          weekday,
-          professorDate,
-          weekIndex: week.index,
-          weekLabel: week.label,
-        });
+        };
+        const slots = optionsByWeekdayDate.get(dateId) ?? [];
+        slots.push(slot);
+        optionsByWeekdayDate.set(dateId, slots);
+        const currentMeta = metaByWeekdayDate.get(dateId);
+        if (!currentMeta || professorDate < currentMeta.professorDate) {
+          metaByWeekdayDate.set(dateId, {
+            weekday: leadWeekdayKey,
+            professorDate,
+            leadDate,
+            weekIndex,
+            weekLabel,
+          });
+        }
       }
     }
   }
@@ -1368,31 +1453,22 @@ export function listRecurringWeekdayAvailability(params: {
       const wa = a.meta.weekIndex;
       const wb = b.meta.weekIndex;
       if (wa !== wb) return wa - wb;
-      const da = new Date(zonedDateTimeToUtcIso({ date: a.meta.professorDate, time: "12:00", timeZone: ATENDIMENTO_PROFESSOR_TIME_ZONE })).getTime();
-      const db = new Date(zonedDateTimeToUtcIso({ date: b.meta.professorDate, time: "12:00", timeZone: ATENDIMENTO_PROFESSOR_TIME_ZONE })).getTime();
+      const da = localDateToUtcNoonMs(a.meta.leadDate);
+      const db = localDateToUtcNoonMs(b.meta.leadDate);
       return da - db;
     });
 
   const dates: RecurringWeekdayOption[] = entries.map(({ key, meta }) => {
-    const slots = optionsByWeekdayDate.get(key) ?? [];
-    const formattedDate = (() => {
-      const noonUtc = zonedDateTimeToUtcIso({
-        date: meta.professorDate,
-        time: "12:00",
-        timeZone: ATENDIMENTO_PROFESSOR_TIME_ZONE,
-      });
-      const pt = new Intl.DateTimeFormat("pt-BR", {
-        day: "2-digit",
-        month: "2-digit",
-        timeZone: ATENDIMENTO_PROFESSOR_TIME_ZONE,
-      }).format(new Date(noonUtc));
-      return pt;
-    })();
+    const slots = (optionsByWeekdayDate.get(key) ?? []).slice().sort((left, right) => {
+      return new Date(left.professorStartAtIso ?? "").getTime() - new Date(right.professorStartAtIso ?? "").getTime();
+    });
+    optionsByWeekdayDate.set(key, slots);
+    const formattedDate = meta.leadDate.slice(8, 10) + "/" + meta.leadDate.slice(5, 7);
     return {
       id: key,
       weekday: meta.weekday,
       professorDate: meta.professorDate,
-      weekIndex: meta.weekIndex,
+      weekIndex: meta.weekIndex as 0 | 1 | number,
       weekLabel: meta.weekLabel,
       label: RECURRING_WEEKDAY_LABELS_PT_BR[meta.weekday],
       shortLabel: RECURRING_WEEKDAY_SHORT_LABELS[meta.weekday],

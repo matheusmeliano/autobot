@@ -2208,6 +2208,7 @@ const LOCALITY_TYPES_TO_INCLUDE: string[] = [
   "municipio", "condominio", "condominio fechado", "comunidade planejada",
   "comunidade fechada", "loteamento", "bairro", "residencial", "nucleo habitacional",
   "colonia", "colonias", "aldeia", "povoado", "povoado rural", "aglomerado",
+  "freguesia", "freguesias", "uniao de freguesias", "concelho", "concelhos",
   // EN
   "village", "villages", "town", "towns", "township", "townships",
   "census designated place", "cdp",
@@ -2225,6 +2226,64 @@ const LOCALITY_TYPES_TO_INCLUDE: string[] = [
 // Conteúdo = arrays de keywords para append nas regras correspondentes.
 // ================================================================
 const EXTENDED_LOCALITIES_BY_STATE_KEY: Record<string, string[]> = {
+  // ================================================================
+  // PT — PORTUGAL CONTINENTAL / MADEIRA / ACORES
+  // ================================================================
+  "portugal": [
+    // Area metropolitana de Lisboa
+    "agualva", "agualva cacem", "cacem", "sao marcos", "cacem e sao marcos",
+    "queluz", "belas", "queluz e belas", "massama", "monte abraao",
+    "massama e monte abraao", "algueirao mem martins", "mem martins",
+    "rio de mouro", "casal de cambra", "carnaxide", "linda a velha", "alges",
+    "cruz quebrada dafundo", "paco de arcos", "caxias",
+    "oeiras e sao juliao da barra paco de arcos e caxias",
+    "carcavelos", "parede", "carcavelos e parede", "sacavem",
+    "santo antonio dos cavaleiros", "povoa de santa iria", "forte da casa",
+    "alverca do ribatejo", "vialonga", "vila franca de xira", "amora",
+    "corroios", "charneca de caparica", "sobreda", "costa da caparica",
+    "seixal", "barreiro", "moita", "montijo", "alcochete", "palmela",
+    "sesimbra", "mafra", "ericeira", "torres vedras",
+    // Norte e centro
+    "gondomar", "valongo", "trofa", "santo tirso", "povoa de varzim",
+    "vila do conde", "espinho", "santa maria da feira", "oliveira de azemeis",
+    "pacos de ferreira", "paços de ferreira", "lousada", "felgueiras",
+    "penafiel", "barcelinhos", "fao", "fao esposende", "esposende",
+    "guimaraes", "braga parque", "viana do castelo", "fundao", "fundão",
+    "seia", "tomar", "abrantes", "torres novas", "alcobaca", "alcobaça",
+    "caldas da rainha", "marinha grande", "peniche",
+    // Algarve e sul
+    "olhao", "olhão", "loule", "loulé", "silves", "monchique", "aljezur",
+    "almancil", "quinta do lago", "vila real de santo antonio",
+    "vila real de santo antónio", "lagoa algarve",
+  ],
+  "madeira": [
+    "camara de lobos", "santo antonio", "santo antonio madeira", "sao martinho madeira",
+    "sao goncalo madeira", "são gonçalo madeira", "ribeira brava",
+    "ponta do sol", "calheta", "sao vicente", "são vicente", "santana",
+    "porto moniz", "santa cruz", "machico", "canical", "caniçal",
+    "canico", "caniço", "camacha", "curral das freiras",
+    "santo antonio da serra",
+  ],
+  "acores": [
+    "rabo de peixe", "arrifes", "fenais da luz", "agua de pau", "água de pau",
+    "lagoa sao miguel", "lagoa são miguel", "ribeira seca sao miguel",
+    "ribeira seca são miguel", "porto formoso", "capelas", "livramento",
+    "relva", "madalena do pico", "lajes do pico", "sao roque do pico",
+    "são roque do pico", "velas sao jorge", "velas são jorge",
+    "ribeira seca sao jorge", "ribeira seca são jorge",
+    "santa cruz da graciosa", "vila do porto", "santa cruz das flores",
+    "lajes das flores", "vila nova do corvo",
+  ],
+  "açores": [
+    "rabo de peixe", "arrifes", "fenais da luz", "agua de pau", "água de pau",
+    "lagoa sao miguel", "lagoa são miguel", "ribeira seca sao miguel",
+    "ribeira seca são miguel", "porto formoso", "capelas", "livramento",
+    "relva", "madalena do pico", "lajes do pico", "sao roque do pico",
+    "são roque do pico", "velas sao jorge", "velas são jorge",
+    "ribeira seca sao jorge", "ribeira seca são jorge",
+    "santa cruz da graciosa", "vila do porto", "santa cruz das flores",
+    "lajes das flores", "vila nova do corvo",
+  ],
   // ================================================================
   // BR — SÃO PAULO (SP) — TZ America/Sao_Paulo
   // ================================================================

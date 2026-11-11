@@ -726,7 +726,8 @@ async function presentExperimentalClassTimeOptions(params: {
   leadId: string;
   conversationId: string;
   leadTimeZone?: string | null;
-  professorDate: string;
+  professorDate?: string;
+  dateOptionId?: string;
   now?: Date;
 }) {
   const now = params.now ?? new Date();
@@ -739,10 +740,15 @@ async function presentExperimentalClassTimeOptions(params: {
     leadTimeZone: params.leadTimeZone,
     bookedProfessorStartAts: bookedStarts,
   });
-  const dateOption = availability.dates.find((option) => option.professorDate === params.professorDate) ?? null;
-  const timeOptions = availability.slotsByProfessorDate.get(params.professorDate) ?? [];
+  const dateOption =
+    availability.dates.find((option) => String(option.id ?? "") === String(params.dateOptionId ?? "").trim()) ??
+    availability.dates.find((option) => option.professorDate === params.professorDate) ??
+    null;
+  const timeOptions = dateOption
+    ? availability.slotsByProfessorDate.get(String(dateOption.id ?? "").trim()) ?? []
+    : [];
   const messages = buildExperimentalClassTimesMessages({
-    dayLabel: dateOption?.dayLabel ?? params.professorDate.slice(8, 10),
+    dayLabel: dateOption?.displayLabel ?? dateOption?.dayLabel ?? String(params.professorDate ?? "").slice(8, 10),
     options: timeOptions,
   });
   let outbound: Record<string, unknown> | null = null;
@@ -763,8 +769,9 @@ async function presentExperimentalClassTimeOptions(params: {
       teacher_timezone: ATENDIMENTO_PROFESSOR_TIME_ZONE,
       lead_timezone: String(params.leadTimeZone ?? "").trim() || ATENDIMENTO_PROFESSOR_TIME_ZONE,
       professor_date: params.professorDate,
+      date_option_id: dateOption?.id ?? params.dateOptionId ?? null,
       date_label: dateOption?.displayLabel ?? params.professorDate,
-      day_label: dateOption?.dayLabel ?? params.professorDate.slice(8, 10),
+      day_label: dateOption?.dayLabel ?? String(params.professorDate ?? "").slice(8, 10),
       options: timeOptions,
     },
     actorType: "system",
@@ -2915,8 +2922,9 @@ export async function POST(req: Request) {
       });
       const latestTimeDetails = (latestTimeOptionsEvent?.details ?? {}) as Record<string, unknown>;
       const professorDate = String(latestTimeDetails.professor_date ?? "").trim();
+      const dateOptionId = String(latestTimeDetails.date_option_id ?? "").trim();
 
-      if (!professorDate) {
+      if (!professorDate && !dateOptionId) {
         const dateOptionsPresentation = await presentExperimentalClassDateOptions({
           admin,
           leadId,
@@ -2944,7 +2952,13 @@ export async function POST(req: Request) {
         leadTimeZone,
         bookedProfessorStartAts: bookedProfessorStarts,
       });
-      const timeOptions = currentAvailability.slotsByProfessorDate.get(professorDate) ?? [];
+      const selectedDateOption =
+        currentAvailability.dates.find((option) => String(option.id ?? "") === dateOptionId) ??
+        currentAvailability.dates.find((option) => option.professorDate === professorDate) ??
+        null;
+      const timeOptions = selectedDateOption
+        ? currentAvailability.slotsByProfessorDate.get(String(selectedDateOption.id ?? "").trim()) ?? []
+        : [];
       const selectedTimeOption = findExperimentalClassTimeOption(contentText, timeOptions);
 
       if (!selectedTimeOption) {

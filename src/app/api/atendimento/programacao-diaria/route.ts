@@ -18,7 +18,6 @@ import {
   VALID_RECURRING_CLASS_STATUS,
   VALID_RECURRING_FUNNEL_STAGE_FALLBACK,
   detectTeacherKey,
-  mergeExperimentalOccurrenceEntries,
   experimentalHasTime,
   flatExpDedupId,
   normalizeSlotHHMM,
@@ -325,10 +324,6 @@ export async function GET(req: Request) {
     }
   } catch {}
 
-  const mergedExperimentalBookings = mergeExperimentalOccurrenceEntries(bookings);
-  bookings.length = 0;
-  bookings.push(...mergedExperimentalBookings);
-
   // Util: formatação de telefone p/ exibição no modal (sempre com +<codigo pais> (area) 9XXXX-XXXX
   const digitsOnly = (s: string | null | undefined): string => String(s ?? "").replace(/\D+/g, "");
   const formatPhoneDisplay = (rawPhone: string | null | undefined): string => {
@@ -595,72 +590,46 @@ export async function GET(req: Request) {
           const resolvedNextProfessorDate = String(
             resolvedRecurringOccurrence?.professorDate ?? "",
           ).trim();
-          const resolvedProfessorTime = String(
-            resolvedRecurringOccurrence?.professorTime ?? "",
-          ).trim();
-          const resolvedLeadDate = String(
-            resolvedRecurringOccurrence?.leadDate ?? "",
-          ).trim();
-          const resolvedLeadTime = String(
-            resolvedRecurringOccurrence?.leadTime ?? "",
-          ).trim();
-          const resolvedProfessorStartAt = String(
-            resolvedRecurringOccurrence?.professorStartAt ?? "",
-          ).trim();
           const lastNotifiedOccurrenceStartAt = String(
             (r as any)?.recurring_class_last_notified_occurrence_start_at ?? "",
           ).trim();
           const recurringProfessorTimeZone =
             String((r as any).recurring_class_professor_timezone ?? "").trim() ||
             ATENDIMENTO_PROFESSOR_TIME_ZONE;
-          const recurringLastNotifiedMatchesTargetDate =
-            Boolean(lastNotifiedOccurrenceStartAt) &&
-            localDateInTimeZone(lastNotifiedOccurrenceStartAt, recurringProfessorTimeZone) ===
-              targetDate;
-          const recurringAdvancedPastTargetDate =
-            Boolean(resolvedNextProfessorDate) &&
-            resolvedNextProfessorDate > targetDate;
+          const recurringLeadTimeZone =
+            String((r as any).recurring_class_lead_timezone ?? "").trim() ||
+            recurringProfessorTimeZone;
           let startIso = "";
-          const effectiveProfessorTime =
-            resolvedNextProfessorDate === targetDate && resolvedProfessorTime
-              ? resolvedProfessorTime
-              : pTime;
-          if (resolvedNextProfessorDate === targetDate && resolvedProfessorStartAt) {
-            startIso = resolvedProfessorStartAt;
-          } else {
-            try {
-              startIso = zonedDateTimeToUtcIso({
-                date: targetDate,
-                time: effectiveProfessorTime,
-                timeZone:
-                  String((r as any).recurring_class_professor_timezone ?? "").trim() ||
-                  ATENDIMENTO_PROFESSOR_TIME_ZONE,
-              });
-            } catch {}
-          }
+          try {
+            startIso = zonedDateTimeToUtcIso({
+              date: targetDate,
+              time: pTime,
+              timeZone: recurringProfessorTimeZone,
+            });
+          } catch {}
+          const leadDate = startIso
+            ? localDateInTimeZone(startIso, recurringLeadTimeZone)
+            : targetDate;
+          const recurringLastNotifiedMatchesTargetDate = Boolean(
+            lastNotifiedOccurrenceStartAt &&
+              localDateInTimeZone(lastNotifiedOccurrenceStartAt, recurringProfessorTimeZone) ===
+                targetDate,
+          );
+          const recurringHasAdvancedPastTargetDate = Boolean(
+            resolvedNextProfessorDate && resolvedNextProfessorDate > targetDate,
+          );
           const entry: Record<string, unknown> = {
             id: `recurring-${leadId}`,
             lead_id: leadId,
             phone: String(r.phone ?? "").trim() || null,
             status: stRec || "scheduled",
             professor_date: targetDate,
-            professor_time: effectiveProfessorTime,
+            professor_time: pTime,
             professor_start_at: startIso || null,
-            lead_date: resolvedLeadDate || targetDate,
-            lead_time:
-              resolvedLeadTime || String((r as any).recurring_class_lead_time ?? "").trim() || null,
-            lead_timezone:
-              String(
-                resolvedRecurringOccurrence?.leadTimeZone ??
-                  (r as any).recurring_class_lead_timezone ??
-                  "",
-              ).trim() || null,
-            professor_timezone:
-              String(
-                resolvedRecurringOccurrence?.professorTimeZone ??
-                  (r as any).recurring_class_professor_timezone ??
-                  "",
-              ).trim() || null,
+            lead_date: leadDate,
+            lead_time: String((r as any).recurring_class_lead_time ?? "").trim() || null,
+            lead_timezone: recurringLeadTimeZone,
+            professor_timezone: recurringProfessorTimeZone,
             assigned_professor_name: hasProfessor ? pName || null : null,
             assigned_professor_phone: hasProfessor ? pPhone || null : null,
             recurring_class_weekday: effectiveWeekday,
@@ -673,7 +642,8 @@ export async function GET(req: Request) {
             recurring_resolved_next_professor_date: resolvedNextProfessorDate || null,
             recurring_last_notified_matches_target_date:
               recurringLastNotifiedMatchesTargetDate,
-            recurring_has_advanced_past_target_date: recurringAdvancedPastTargetDate,
+            recurring_has_advanced_past_target_date:
+              recurringHasAdvancedPastTargetDate,
             __noProfessor: !hasProfessor,
             __type: "recurring",
           };
@@ -682,12 +652,14 @@ export async function GET(req: Request) {
       }
     }
   } catch {}
-  // Incluir lead IDs recorrentes no warmup (para prefetch de history / nomes iguais experimentais)
+
+  // Inclui IDs recorrentes no warmup para evitar múltiplas buscas repetidas.
   for (const b of recurringBookings) {
     const lid = String(b.lead_id ?? "").trim();
-    if (lid && !leadIds.includes(lid)) leadIds.push(lid);
+    if (lid) leadIds.push(lid);
   }
-  // JUNTAR AS DUAS LISTAS (experimentais + recorrentes). Mesma estrutura, mesmo código slot abaixo.
+
+  // Juntar as duas listas para a montagem do modal abaixo.
   if (recurringBookings.length > 0) {
     for (const rb of recurringBookings) bookings.push(rb);
   }

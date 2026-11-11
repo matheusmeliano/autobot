@@ -77,6 +77,55 @@ test("resolveTimeZoneFromStateInput identifica Madeira e Açores", () => {
   assert.equal(acores?.country, "PT");
 });
 
+test("resolveStudentTimezone identifica municipios adicionais de Portugal continental", () => {
+  const timeZone = resolveStudentTimezone({
+    city: "Algueirao-Mem Martins",
+    state: "Portugal",
+    phone: "+351 912 345 678",
+  });
+
+  assert.equal(timeZone, "Europe/Lisbon");
+});
+
+test("resolveTimeZoneFromCityInput reconhece freguesias de Portugal continental", () => {
+  const resolution = resolveTimeZoneFromCityInput({
+    city: "Freguesia de Massama",
+    state: "Lisboa",
+    phone: "+351 912 345 678",
+    allowPhoneCountryFallback: false,
+  });
+
+  assert.equal(resolution?.timeZone, "Europe/Lisbon");
+  assert.equal(resolution?.country, "PT");
+  assert.equal(resolution?.source, "extended_locality_match");
+});
+
+test("resolveTimeZoneFromCityInput reconhece freguesias da Madeira", () => {
+  const resolution = resolveTimeZoneFromCityInput({
+    city: "Freguesia de Santo Antonio",
+    state: "Madeira",
+    phone: "+351 912 345 678",
+    allowPhoneCountryFallback: false,
+  });
+
+  assert.equal(resolution?.timeZone, "Atlantic/Madeira");
+  assert.equal(resolution?.country, "PT");
+  assert.equal(resolution?.source, "extended_locality_match");
+});
+
+test("resolveTimeZoneFromCityInput reconhece freguesias dos Açores", () => {
+  const resolution = resolveTimeZoneFromCityInput({
+    city: "Freguesia de Rabo de Peixe",
+    state: "Açores",
+    phone: "+351 912 345 678",
+    allowPhoneCountryFallback: false,
+  });
+
+  assert.equal(resolution?.timeZone, "Atlantic/Azores");
+  assert.equal(resolution?.country, "PT");
+  assert.equal(resolution?.source, "extended_locality_match");
+});
+
 test("inferTimeZoneFromPhoneCountryCode usa Portugal como fallback para +351", () => {
   const resolution = inferTimeZoneFromPhoneCountryCode("+351 912 345 678");
 

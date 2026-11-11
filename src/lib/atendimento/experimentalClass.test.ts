@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {
+  EXPERIMENTAL_CLASS_SLOT_TIMES,
   calculateCurrentOrNextRecurringOccurrence,
   calculateDisplayRecurringOccurrence,
   calculateNextRecurringOccurrence,
@@ -31,12 +32,12 @@ test("listExperimentalClassAvailability comeca no dia seguinte ao domingo atual,
   });
 
   const firstDate = availability.dates[0];
-  const slots = availability.slotsByProfessorDate.get(firstDate.professorDate) ?? [];
+  const slots = availability.slotsByProfessorDate.get(firstDate.id) ?? [];
 
   assert.equal(firstDate.professorDate, "2026-07-13");
   assert.deepEqual(
     slots.map((slot) => slot.professorTime),
-    ["08:00", "09:30", "11:00", "12:30", "14:00", "15:30", "17:00", "18:30", "20:00"],
+    [...EXPERIMENTAL_CLASS_SLOT_TIMES],
   );
 });
 
@@ -44,39 +45,62 @@ test("listExperimentalClassAvailability remove slots que conflitam em 1h30 mante
   const availability = listExperimentalClassAvailability({
     now: new Date("2026-07-12T10:00:00.000Z"),
     leadTimeZone: "America/Cuiaba",
-    bookedProfessorStartAts: ["2026-07-24T17:30:00.000Z"],
+    bookedProfessorStartAts: ["2026-07-14T17:30:00.000Z"],
   });
 
-  const slots = availability.slotsByProfessorDate.get("2026-07-24") ?? [];
+  const slots = availability.slotsByProfessorDate.get("2026-07-14") ?? [];
   const times = slots.map((slot) => slot.professorTime);
 
   assert.equal(times.includes("13:00"), false);
-  assert.equal(times.includes("14:30"), true);
-  assert.equal(times.includes("16:00"), true);
+  assert.equal(times.includes("14:00"), false);
+  assert.equal(times.includes("12:00"), true);
+  assert.equal(times.includes("15:00"), true);
 });
 
-test("listExperimentalClassAvailability nao exibe domingos entre as datas restantes do mes", () => {
+test("listExperimentalClassAvailability nao inclui domingos nas datas emitidas", () => {
   const availability = listExperimentalClassAvailability({
     now: new Date("2026-07-24T10:00:00.000Z"),
     leadTimeZone: "America/Cuiaba",
     bookedProfessorStartAts: [],
   });
 
-  assert.deepEqual(
-    availability.dates.map((option) => option.professorDate),
-    ["2026-07-24", "2026-07-25", "2026-07-26", "2026-07-28", "2026-07-29", "2026-07-30", "2026-07-31"],
+  assert.equal(
+    availability.dates.some((option) => option.professorDate === "2026-07-26"),
+    false,
+  );
+  assert.equal(
+    availability.dates.some((option) => option.professorDate === "2026-08-02"),
+    false,
   );
 });
 
 test("listExperimentalClassAvailability vira automaticamente para o proximo mes quando nao ha mais slots no dia final", () => {
   const availability = listExperimentalClassAvailability({
-    now: new Date("2026-07-31T23:00:00.000Z"),
+    now: new Date("2026-08-01T03:30:00.000Z"),
     leadTimeZone: "America/Cuiaba",
     bookedProfessorStartAts: [],
   });
 
   assert.equal(availability.dates[0]?.professorDate, "2026-08-01");
   assert.equal(availability.dates.some((option) => option.professorDate === "2026-08-02"), false);
+});
+
+test("listExperimentalClassAvailability agrupa por data local do aluno sem duplicar o mesmo dia em Lisboa", () => {
+  const availability = listExperimentalClassAvailability({
+    now: new Date("2026-07-13T10:00:00.000Z"),
+    leadTimeZone: "Europe/Lisbon",
+    bookedProfessorStartAts: [],
+  });
+
+  const ids = availability.dates.map((option) => option.id);
+  assert.equal(new Set(ids).size, ids.length);
+
+  const localTuesday = availability.dates.find((option) => option.id === "2026-07-14");
+  assert.ok(localTuesday);
+
+  const slots = availability.slotsByProfessorDate.get(localTuesday.id) ?? [];
+  assert.ok(slots.some((slot) => slot.professorDate === "2026-07-13"));
+  assert.ok(slots.some((slot) => slot.professorDate === "2026-07-14"));
 });
 
 test("listExperimentalClassAvailability: sábado só mostra horários de início até 18:00 (disponibilidade do professor)", () => {
@@ -88,7 +112,7 @@ test("listExperimentalClassAvailability: sábado só mostra horários de início
   });
   const saturday = availability.dates.find((d) => d.professorDate === "2026-07-25");
   assert.ok(saturday, "Dia 2026-07-25 (sábado) deveria existir na lista");
-  const slots = availability.slotsByProfessorDate.get(saturday.professorDate) ?? [];
+  const slots = availability.slotsByProfessorDate.get(saturday.id) ?? [];
   const times = slots.map((s) => s.professorTime);
   // 08..18 inclusive = 11 slots de 1h (última aula começa 18:00)
   assert.deepEqual(times, [
@@ -111,7 +135,7 @@ test("listExperimentalClassAvailability: sábado só mostra horários de início
   // Segunda seguinte (2026-07-27) deve continuar com 08..22 (todos os slots)
   const monday = availability.dates.find((d) => d.professorDate === "2026-07-27");
   assert.ok(monday);
-  const mondaySlots = availability.slotsByProfessorDate.get(monday.professorDate) ?? [];
+  const mondaySlots = availability.slotsByProfessorDate.get(monday.id) ?? [];
   const mondayTimes = mondaySlots.map((s) => s.professorTime);
   assert.ok(mondayTimes.includes("08:00"));
   assert.ok(mondayTimes.includes("22:00"));
@@ -147,9 +171,30 @@ test("listRecurringWeekdayAvailability: sábados recorrentes só horários de in
   assert.equal(times.includes("22:00"), false);
   const monThisWeek = availability.dates.find((d) => d.weekday === "mon" && d.weekIndex === 0);
   assert.ok(monThisWeek);
-  const monSlots = availability.slotsByWeekdayDate[monThisWeek.id] ?? [];
+const monSlots = availability.slotsByWeekdayDate[monThisWeek.id] ?? [];
   const monTimes = monSlots.map((s) => s.professorTime);
+  assert.ok(monTimes.includes("08:00"));
   assert.ok(monTimes.includes("22:00"));
+});
+
+test("listRecurringWeekdayAvailability agrupa por data local do aluno e respeita lookAheadWeeks em Lisboa", () => {
+  const availability = listRecurringWeekdayAvailability({
+    now: new Date("2026-07-13T10:00:00.000Z"),
+    leadTimeZone: "Europe/Lisbon",
+    bookedProfessorStartAts: [],
+    lookAheadWeeks: 3,
+  });
+
+  const ids = availability.dates.map((option) => option.id);
+  assert.equal(new Set(ids).size, ids.length);
+  assert.ok(availability.dates.some((option) => option.weekIndex === 2));
+
+  const localTuesday = availability.dates.find((option) => option.id === "2026-07-14|tue");
+  assert.ok(localTuesday);
+
+  const slots = availability.slotsByWeekdayDate[localTuesday.id] ?? [];
+  assert.ok(slots.some((slot) => slot.professorDate === "2026-07-13"));
+  assert.ok(slots.some((slot) => slot.professorDate === "2026-07-14"));
 });
 
 test("buildExperimentalClassDatesMessages mostra as duas mensagens com conjuncao final", () => {
@@ -173,8 +218,8 @@ test("buildExperimentalClassDatesMessages mostra as duas mensagens com conjuncao
   ]);
 
   assert.deepEqual(messages, [
-    "As datas disponíveis são:\n\n13 e 14.",
-    "Responda apenas com a data desejada.",
+    "Os dias disponíveis são:\n\n13 e 14.",
+    "Responda apenas com o dia desejado.",
   ]);
 });
 
@@ -204,7 +249,7 @@ test("buildExperimentalClassTimesMessages mostra as duas mensagens de horario", 
   });
 
   assert.deepEqual(messages, [
-    "Perfeito! E os horários disponíveis são:\n\n13:00, 14:30",
+    "Perfeito! E os horários disponíveis são:\n\n13:00 e 14:30.",
     "Responda apenas com o horário desejado.",
   ]);
 });
@@ -221,28 +266,28 @@ test("buildExperimentalClassBookingChatMessages monta o novo fechamento com prim
 test("buildExperimentalClassAttendantWhatsAppMessage monta a notificacao do atendente com nome", () => {
   assert.equal(
     buildExperimentalClassAttendantWhatsAppMessage("Maria Souza"),
-    "Você recebeu um novo agendamento de aula experimental para Maria.\n\nAcesse o link abaixo e adicione o link da aula ao interessado.\n\nhttps://www.autobot.business/app/atendimento",
+    "Você recebeu um novo agendamento de aula experimental para Maria.\n\nAna já está adicionando o link da aula ao interessado.",
   );
 });
 
 test("buildExperimentalClassAttendantWhatsAppMessage usa fallback quando nome vazio", () => {
   assert.equal(
     buildExperimentalClassAttendantWhatsAppMessage(""),
-    "Você recebeu um novo agendamento de aula experimental para o interessado.\n\nAcesse o link abaixo e adicione o link da aula ao interessado.\n\nhttps://www.autobot.business/app/atendimento",
+    "Você recebeu um novo agendamento de aula experimental para o interessado.\n\nAna já está adicionando o link da aula ao interessado.",
   );
 });
 
 test("buildExperimentalClassStudentLessonReadyWhatsAppMessage monta a mensagem de inicio da aula para o aluno", () => {
   assert.equal(
     buildExperimentalClassStudentLessonReadyWhatsAppMessage("Pedro Henrique", "https://meet.google.com/abc-defg-hij"),
-    "Pedro, sua aula experimental já está disponível.\n\nLink da aula: https://meet.google.com/abc-defg-hij\n\nO professor Lucas Brum já está te aguardando.\n\nLembrando que ele aguardará por até 10 minutos. Após esse período, a aula será encerrada para dar continuidade aos demais agendamentos.",
+    "Pedro, sua aula experimental já está disponível.\n\nLink da aula: https://meet.google.com/abc-defg-hij\n\nO professor já está te aguardando.\n\nLembrando que ele aguardará por até 10 minutos. Após esse período, a aula será encerrada para dar continuidade aos demais agendamentos.",
   );
 });
 
 test("buildExperimentalClassAttendantStartReminderWhatsAppMessage monta o aviso do atendente antes da aula com nome", () => {
   assert.equal(
     buildExperimentalClassAttendantStartReminderWhatsAppMessage("Pedro Silva", "https://meet.google.com/abc-defg-hij"),
-    "A aula experimental de Pedro está perto de começar!\n\nLink da aula: https://meet.google.com/abc-defg-hij",
+    "Aviso: aula experimental de Pedro inicia em 5 minutos.\n\nLink da aula: https://meet.google.com/abc-defg-hij\n\nEntre na sala e aguarde a entrada do aluno.",
   );
 });
 
@@ -646,7 +691,7 @@ test("calculateDisplayRecurringOccurrence pula a proxima semana com horario loca
     fromDate: new Date("2026-10-13T12:00:00.000Z"),
     occupiedIntervals: [
       {
-        startAt: "2026-10-19T17:00:00.000Z",
+        startAt: "2026-10-19T15:00:00.000Z",
       },
     ],
   });

@@ -1151,6 +1151,7 @@ async function presentExperimentalClassTimeOptionsWhatsApp(params: {
   phone: string;
   leadTimeZone?: string | null;
   professorDate: string;
+  dateOptionId?: string;
   insertIntoConversation?: boolean;
   skipWhatsAppSend?: boolean;
 }) {
@@ -1169,10 +1170,15 @@ async function presentExperimentalClassTimeOptionsWhatsApp(params: {
     leadTimeZone: params.leadTimeZone,
     bookedProfessorStartAts: bookedProfessorStarts,
   });
-  const dateOption = availability.dates.find((o) => o.professorDate === params.professorDate) ?? null;
-  const slots = availability.slotsByProfessorDate.get(params.professorDate) ?? [];
+  const dateOption =
+    availability.dates.find((o) => String(o.id ?? "") === String(params.dateOptionId ?? "").trim()) ??
+    availability.dates.find((o) => o.professorDate === params.professorDate) ??
+    null;
+  const slots = dateOption
+    ? availability.slotsByProfessorDate.get(String(dateOption.id ?? "").trim()) ?? []
+    : [];
   const messagesRaw = buildExperimentalClassTimesMessages({
-    dayLabel: dateOption?.dayLabel ?? params.professorDate.slice(8, 10),
+    dayLabel: dateOption?.displayLabel ?? dateOption?.dayLabel ?? params.professorDate.slice(8, 10),
     options: slots,
   });
   const messages = [messagesRaw.filter(Boolean).join("\n\n")];
@@ -1199,6 +1205,8 @@ async function presentExperimentalClassTimeOptionsWhatsApp(params: {
         teacher_timezone: ATENDIMENTO_PROFESSOR_TIME_ZONE,
         lead_timezone: String(params.leadTimeZone ?? "").trim() || ATENDIMENTO_PROFESSOR_TIME_ZONE,
         professor_date: params.professorDate,
+        date_option_id: dateOption?.id ?? params.dateOptionId ?? null,
+        date_label: dateOption?.displayLabel ?? params.professorDate,
       },
       actorType: "system",
     });
@@ -5917,6 +5925,7 @@ export async function POST(req: Request) {
             phone: normalizedPhoneOnly,
             leadTimeZone: leadTz,
             professorDate: chosen.professorDate,
+            dateOptionId: chosen.id,
           });
           return Response.json({ ok: true, handled: true, flow: "whatsapp_time_presented" });
         }
@@ -5936,8 +5945,12 @@ export async function POST(req: Request) {
           let professorDate = String(
             (((latestTimeEvt as any)?.details ?? {}) as Record<string, unknown>).professor_date ?? "",
           ).trim();
+          const dateOptionId = String(
+            (((latestTimeEvt as any)?.details ?? {}) as Record<string, unknown>).date_option_id ?? "",
+          ).trim();
 
-          const hasAnyDateContext = Boolean(professorDate) ||
+          const hasAnyDateContext = Boolean(dateOptionId) ||
+            Boolean(professorDate) ||
             Boolean(String((lead as any)?.experimental_class_professor_date ?? "").trim()) ||
             Boolean(String((lead as any)?.experimental_class_lead_date ?? "").trim());
           if (!hasAnyDateContext) {
@@ -5960,6 +5973,7 @@ export async function POST(req: Request) {
             phone: normalizedPhoneOnly,
             leadTimeZone: leadTz,
             professorDate,
+            dateOptionId,
             skipWhatsAppSend: true,
           });
 
