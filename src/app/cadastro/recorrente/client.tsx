@@ -2553,11 +2553,9 @@ export default function CadastroRecorrenteBody() {
                                       <div className="text-2xl font-extrabold text-slate-900 tabular-nums break-words">
                                         {t.displayLabel}
                                       </div>
-                                      {String(t.professorTime ?? "") !== String(t.displayLabel ?? "") ? (
-                                        <div className="mt-1 text-xs text-slate-500">
-                                          Horário do professor: {t.professorTime}
-                                        </div>
-                                      ) : null}
+                                      <div className="mt-1 text-xs text-slate-500">
+                                        Horário do professor: {t.professorTime}
+                                      </div>
                                     </div>
                                     <div
                                       className={
@@ -3278,11 +3276,9 @@ export default function CadastroRecorrenteBody() {
                             <div className="text-2xl font-extrabold text-slate-900 tabular-nums">
                               {t.displayLabel}
                             </div>
-                            {t.professorTime !== t.displayLabel && (
-                              <div className="mt-1 text-xs text-slate-500">
-                                Horário do professor: {t.professorTime}
-                              </div>
-                            )}
+                            <div className="mt-1 text-xs text-slate-500">
+                              Horário do professor: {t.professorTime}
+                            </div>
                           </div>
                           <div
                             className={
