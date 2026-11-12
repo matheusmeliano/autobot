@@ -108,7 +108,7 @@ const ENROLLMENT_PAYMENT_CONFIGS: Record<EnrollmentPaymentCountry, EnrollmentPay
   },
   PT: {
     country: "PT",
-    onlinePaymentUrl: "https://buy.stripe.com/7sY8wQ4LQ3LC4x43AAcwg05",
+    onlinePaymentUrl: "https://buy.stripe.com/28E7sM9263LCfbI8UUcwg06",
     depositTitle: "Depósito internacional EUR",
     depositAmount: "€ 90,00",
     depositMethodSummary: "Wise US Inc · Conta Checking.",
