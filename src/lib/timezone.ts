@@ -3475,6 +3475,38 @@ export function resolveStudentTimezone(params: {
   return null;
 }
 
+export function resolveLeadTimeZoneFromRecord(params: {
+  lead?: Record<string, unknown> | null;
+  state?: string | null;
+  city?: string | null;
+  phone?: string | null;
+  browserTimeZone?: string | null;
+  fallbackTimeZone?: string | null;
+}): string {
+  const lead = (params.lead ?? {}) as Record<string, unknown>;
+  const resolved =
+    resolveStudentTimezone({
+      state: String(params.state ?? (lead as any)?.state ?? "").trim() || null,
+      city: String(params.city ?? (lead as any)?.city ?? "").trim() || null,
+      phone:
+        String(params.phone ?? (lead as any)?.phone ?? "").trim() || null,
+      browserTimeZone:
+        String(params.browserTimeZone ?? "").trim() || null,
+    }) || null;
+
+  if (resolved) return resolved;
+
+  const fallback = String(
+    params.fallbackTimeZone ??
+      (lead as any)?.recurring_class_lead_timezone ??
+      (lead as any)?.experimental_class_lead_timezone ??
+      (lead as any)?.timezone ??
+      "",
+  ).trim();
+
+  return fallback || PROFESSOR_TIME_ZONE;
+}
+
 export function formatUtcIsoInTimeZone(params: {
   iso: string;
   timeZone: string;

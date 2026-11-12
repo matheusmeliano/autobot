@@ -237,6 +237,14 @@ test("listRecurringWeekdayAvailability agrupa por data local do aluno e respeita
   const slots = availability.slotsByWeekdayDate[localTuesday.id] ?? [];
   assert.ok(slots.some((slot) => slot.professorDate === "2026-07-13"));
   assert.ok(slots.some((slot) => slot.professorDate === "2026-07-14"));
+  assert.ok(
+    slots.some((slot) => slot.leadTime !== slot.professorTime),
+    "em Lisboa ao menos um horário do aluno deve diferir do professor",
+  );
+  assert.ok(
+    slots.some((slot) => slot.displayLabel === slot.leadTime && slot.leadTime !== slot.professorTime),
+    "o horário exibido precisa refletir o fuso do aluno",
+  );
 });
 
 test("buildExperimentalClassDatesMessages mostra as duas mensagens com conjuncao final", () => {

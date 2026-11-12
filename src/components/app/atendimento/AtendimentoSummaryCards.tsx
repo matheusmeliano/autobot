@@ -44,6 +44,7 @@ import {
 } from "@/lib/atendimento/experimentalClass";
 import type { AtendimentoLeadListItem, AtendimentoSummary } from "@/lib/atendimento/types";
 import { atendimentoStageLabel, atendimentoStatusLabel, formatAtendimentoDate, formatAtendimentoDateTime, formatAtendimentoLocationName, leadMatchesSearchQuery, suggestClosestName } from "@/lib/atendimento/utils";
+import { resolveLeadTimeZoneFromRecord } from "@/lib/timezone";
 
 type SummarySectionId = "interessados" | "alunos" | "agendamentos" | "contratos";
 const PANEL_PAGE_SIZE = 10;
@@ -1770,6 +1771,11 @@ function BookingDetails({
           weekdayLabel: String((lead as any)?.recurring_class_next_weekday_label ?? "").trim() || null,
         }
       : null;
+  const effectiveLeadTimeZone = resolveLeadTimeZoneFromRecord({
+    lead: lead as Record<string, unknown>,
+    fallbackTimeZone:
+      String((lead as any)?.recurring_class_lead_timezone ?? lead.timezone ?? "").trim() || null,
+  });
   const nextRecurring =
     storedNextRecurring ??
     (hasRecurringClass && recurringWeekday && /^\d{2}:\d{2}$/.test(recurringTime)
@@ -1777,7 +1783,7 @@ function BookingDetails({
           weekday: recurringWeekday,
           professorTimeHHMM: recurringTime,
           professorTimeZone: ATENDIMENTO_PROFESSOR_TIME_ZONE,
-          leadTimeZone: lead.timezone || null,
+          leadTimeZone: effectiveLeadTimeZone,
           leadTimeHHMM: recurringLeadTimeRaw || recurringProfessorTime,
           fromDate: resolveRecurringOccurrenceSearchFromDate({
             firstClassAt: String((lead as any)?.recurring_class_first_class_at ?? "").trim() || null,
@@ -1799,7 +1805,7 @@ function BookingDetails({
       weekday: recurringWeekday,
       professorTimeHHMM: recurringTime,
       professorTimeZone: ATENDIMENTO_PROFESSOR_TIME_ZONE,
-      leadTimeZone: lead.timezone || null,
+      leadTimeZone: effectiveLeadTimeZone,
       leadTimeHHMM: recurringLeadTimeRaw || recurringProfessorTime,
       fromDate: String((lead as any).recurring_class_created_at ?? lead.created_at ?? "").trim(),
     });
@@ -1807,7 +1813,7 @@ function BookingDetails({
     hasRecurringClass,
     recurringWeekday,
     recurringTime,
-    lead.timezone,
+    effectiveLeadTimeZone,
     (lead as any).recurring_class_created_at,
     lead.created_at,
   ]);

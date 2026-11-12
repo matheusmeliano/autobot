@@ -15,6 +15,7 @@ import {
   resolveRecurringClassAssignedProfessorPhone,
 } from "@/lib/atendimento/experimentalClass";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
+import { resolveLeadTimeZoneFromRecord } from "@/lib/timezone";
 
 function fn(name: string | null | undefined) { const p = String(name ?? "").trim().split(/\s+/).filter(Boolean); return p[0] ?? "Aluno"; }
 function fl(name: string | null | undefined) { const c = String(name ?? "").trim(); return c || "Aluno sem identificacao"; }
@@ -95,8 +96,12 @@ export async function POST(req: Request, { params }: { params: Promise<{ leadId:
           professorTimeHHMM: recurringProfessorTime,
           professorTimeZone: String((lead as any)?.recurring_class_professor_timezone ?? "").trim() || null,
           leadTimeZone:
-            String((lead as any)?.recurring_class_lead_timezone ?? (lead as any)?.timezone ?? "").trim() ||
-            null,
+            resolveLeadTimeZoneFromRecord({
+              lead: lead as Record<string, unknown>,
+              fallbackTimeZone:
+                String((lead as any)?.recurring_class_lead_timezone ?? (lead as any)?.timezone ?? "").trim() ||
+                null,
+            }),
           leadTimeHHMM: recurringLeadTime || null,
           fromDate: resolveRecurringOccurrenceSearchFromDate({
             firstClassAt: String((lead as any)?.recurring_class_first_class_at ?? "").trim() || null,

@@ -48,7 +48,7 @@ import {
 } from "@/lib/atendimento/experimentalClass";
 import { buildAtendimentoPublicUrl, isAtendimentoEmail, makeConversationSessionSlug, summarizePreview } from "@/lib/atendimento/utils";
 import { isAtendimentoOnlyAccessScope, normalizeAccessScope } from "@/lib/auth/access";
-import { zonedDateTimeToUtcIso } from "@/lib/timezone";
+import { resolveLeadTimeZoneFromRecord, zonedDateTimeToUtcIso } from "@/lib/timezone";
 
 const ATENDIMENTO_DAILY_SUMMARY_TIME_ZONE = "America/Cuiaba";
 const ATENDIMENTO_DAILY_SUMMARY_LINK = "https://www.autobot.business/app/atendimento";
@@ -1552,7 +1552,10 @@ export async function sendExperimentalClassStartNotifications(now = new Date()) 
       attendance_status: null,
       attendance_checked_at: null,
       professor_timezone: PROF_TZ,
-      lead_timezone: String(row?.timezone ?? "").trim() || PROF_TZ,
+      lead_timezone: resolveLeadTimeZoneFromRecord({
+        lead: row as Record<string, unknown>,
+        fallbackTimeZone: String(row?.timezone ?? "").trim() || null,
+      }),
       professor_date: String(row?.experimental_class_professor_date ?? ""),
       professor_time: String(row?.experimental_class_professor_time ?? ""),
       professor_start_at: professorStart,
@@ -2078,7 +2081,11 @@ export async function sendRecurringClassStartNotifications(now = new Date()) {
         : "";
     const professorTz = String(row?.recurring_class_professor_timezone ?? "").trim() || PROF_TZ;
     const leadTz =
-      String(row?.recurring_class_lead_timezone ?? row?.timezone ?? "").trim() || professorTz;
+      resolveLeadTimeZoneFromRecord({
+        lead: row as Record<string, unknown>,
+        fallbackTimeZone:
+          String(row?.recurring_class_lead_timezone ?? row?.timezone ?? "").trim() || professorTz,
+      });
     const leadTimeHHMM = /^\d{2}:\d{2}$/.test(String(row?.recurring_class_lead_time ?? ""))
       ? String(row?.recurring_class_lead_time ?? "").trim()
       : professorTimeHHMM;
@@ -4057,8 +4064,12 @@ export async function loadRecurringCalendarOccupiedIntervals(params: {
             ATENDIMENTO_PROFESSOR_TIME_ZONE,
         ).trim();
       const leadTimeZone =
-        String((row as any)?.recurring_class_lead_timezone ?? (row as any)?.timezone ?? "").trim() ||
-        professorTimeZone;
+        resolveLeadTimeZoneFromRecord({
+          lead: row as Record<string, unknown>,
+          fallbackTimeZone:
+            String((row as any)?.recurring_class_lead_timezone ?? (row as any)?.timezone ?? "").trim() ||
+            professorTimeZone,
+        });
       const leadTimeHHMM = /^\d{2}:\d{2}$/.test(String((row as any)?.recurring_class_lead_time ?? ""))
         ? String((row as any)?.recurring_class_lead_time ?? "").trim()
         : professorTimeHHMM;
@@ -4176,8 +4187,12 @@ export async function resolveRecurringDisplayOccurrenceMap(params: {
       professorTimeZone:
         String((lead as any)?.recurring_class_professor_timezone ?? "").trim() || null,
       leadTimeZone:
-        String((lead as any)?.recurring_class_lead_timezone ?? (lead as any)?.timezone ?? "").trim() ||
-        null,
+        resolveLeadTimeZoneFromRecord({
+          lead: lead as Record<string, unknown>,
+          fallbackTimeZone:
+            String((lead as any)?.recurring_class_lead_timezone ?? (lead as any)?.timezone ?? "").trim() ||
+            null,
+        }),
       leadTimeHHMM:
         String((lead as any)?.recurring_class_lead_time ?? (lead as any)?.recurring_class_professor_time ?? "").trim() ||
         null,

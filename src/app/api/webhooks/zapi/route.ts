@@ -70,6 +70,7 @@ import {
   containsLocalityStructuralType,
   inferBrazilianLocationFromDdd,
   inferTimeZoneFromPhoneCountryCode,
+  resolveLeadTimeZoneFromRecord,
   resolveTimeZoneFromCityInput,
   resolveTimeZoneFromStateInput,
 } from "@/lib/timezone";
@@ -89,6 +90,22 @@ function formatResolvedCountryLabel(country: "BR" | "US" | "PT" | null | undefin
   if (country === "US") return "Estados Unidos";
   if (country === "PT") return "Portugal";
   return null;
+}
+
+function resolveScheduleLeadTimeZone(params: {
+  lead?: Record<string, unknown> | null;
+  state?: string | null;
+  city?: string | null;
+  phone?: string | null;
+  fallbackTimeZone?: string | null;
+}) {
+  return resolveLeadTimeZoneFromRecord({
+    lead: params.lead ?? null,
+    state: params.state ?? null,
+    city: params.city ?? null,
+    phone: params.phone ?? null,
+    fallbackTimeZone: params.fallbackTimeZone ?? null,
+  });
 }
 
 function normalizePhone(phone: string) {
@@ -2418,7 +2435,10 @@ export async function POST(req: Request) {
         now: new Date(nowIso),
       });
       const availability = listExperimentalClassAvailability({
-        leadTimeZone: String((nextLead as any)?.timezone ?? "").trim() || ATENDIMENTO_PROFESSOR_TIME_ZONE,
+        leadTimeZone: resolveScheduleLeadTimeZone({
+          lead: (nextLead ?? null) as Record<string, unknown> | null,
+          fallbackTimeZone: String((nextLead as any)?.timezone ?? "").trim() || null,
+        }),
         bookedProfessorStartAts: bookedProfessorStarts,
         occupiedIntervals: recurringOccupiedIntervals,
       });
@@ -2463,7 +2483,10 @@ export async function POST(req: Request) {
         title: "Datas disponíveis da aula experimental apresentadas",
         details: {
           teacher_timezone: ATENDIMENTO_PROFESSOR_TIME_ZONE,
-          lead_timezone: String((nextLead as any)?.timezone ?? "").trim() || ATENDIMENTO_PROFESSOR_TIME_ZONE,
+          lead_timezone: resolveScheduleLeadTimeZone({
+            lead: (nextLead ?? null) as Record<string, unknown> | null,
+            fallbackTimeZone: String((nextLead as any)?.timezone ?? "").trim() || null,
+          }),
           options: availability.dates,
         },
         actorType: "system",
@@ -3450,7 +3473,6 @@ export async function POST(req: Request) {
               flow: "nuclear_post_attendance_matricula_pendente_resposta_nao",
             });
           } else if (isYesNuclear) {
-            const leadTz = String((lead as any)?.timezone ?? "").trim() || ATENDIMENTO_PROFESSOR_TIME_ZONE;
             const safeFirstName = leadFirstName || leadFullNameRaw || "Aluno(a)";
             const safeFullNameForLink = leadFullNameRaw || safeFirstName || "Aluno(a)";
             const baseUrl = resolveBaseUrlFromHeaders(new Headers({ host: String(req.headers.get("host") ?? "") })) || "http://localhost:3000";
@@ -4137,7 +4159,6 @@ export async function POST(req: Request) {
           if (isYes) {
             historyEventType = "matricula_pendente_resposta_sim";
             historyTitle = "Matrícula pendente: lead respondeu SIM";
-            const leadTzGeneral = String((lead as any)?.timezone ?? "").trim() || ATENDIMENTO_PROFESSOR_TIME_ZONE;
             try {
               const safeFirstGeneral = leadFirstName || String((lead as any)?.full_name ?? "") || "Aluno(a)";
               const safeFullGeneral = String((lead as any)?.full_name ?? "").trim() || safeFirstGeneral || "Aluno(a)";
@@ -5019,7 +5040,14 @@ export async function POST(req: Request) {
         const leadStateValue =
           String((lead as any)?.state ?? "").trim() || histStateValue;
         const leadTimezoneValue =
-          String((lead as any)?.timezone ?? "").trim() || histTimezone;
+          resolveScheduleLeadTimeZone({
+            lead: lead as Record<string, unknown>,
+            state: leadStateValue || null,
+            city: String((lead as any)?.city ?? "").trim() || histCityValue || null,
+            phone: normalizedPhoneOnly || String((lead as any)?.phone ?? "").trim() || null,
+            fallbackTimeZone:
+              String((lead as any)?.timezone ?? "").trim() || histTimezone || null,
+          });
         const leadCityValue = String((lead as any)?.city ?? "").trim() || histCityValue;
         const leadFunnelStage = String((lead as any)?.funnel_stage ?? "").trim();
         const hasStateValidated = Boolean(leadStateValue && leadTimezoneValue);
@@ -5456,15 +5484,20 @@ export async function POST(req: Request) {
           const finalCityValue = resolved.city ? String(resolved.city).trim() : "";
           if (!finalCityValue) {
             const introMsgs = [] as string[];
+            const leadTimeZone = resolveScheduleLeadTimeZone({
+              lead: lead as Record<string, unknown>,
+              phone: normalizedPhoneOnly || null,
+              fallbackTimeZone:
+                String((lead as any)?.timezone ?? "").trim() ||
+                inferTimeZoneFromPhoneCountryCode(normalizedPhoneOnly)?.timeZone ||
+                null,
+            });
             const { messages: dateMessages, availability } = await presentExperimentalClassDateOptionsWhatsApp({
               admin,
               leadId,
               conversationId,
               phone: normalizedPhoneOnly,
-              leadTimeZone:
-                (String((lead as any)?.timezone ?? "").trim() ||
-                  inferTimeZoneFromPhoneCountryCode(normalizedPhoneOnly)?.timeZone ||
-                  ATENDIMENTO_PROFESSOR_TIME_ZONE) as string,
+              leadTimeZone,
               skipWhatsAppSend: true,
             });
             const introBuilder = buildExperimentalClassDatePromptMessages(
@@ -5485,10 +5518,7 @@ export async function POST(req: Request) {
               title: "Datas disponíveis da aula experimental apresentadas",
               details: {
                 teacher_timezone: ATENDIMENTO_PROFESSOR_TIME_ZONE,
-                lead_timezone:
-                  (String((lead as any)?.timezone ?? "").trim() ||
-                    inferTimeZoneFromPhoneCountryCode(normalizedPhoneOnly)?.timeZone ||
-                    ATENDIMENTO_PROFESSOR_TIME_ZONE) as string,
+                lead_timezone: leadTimeZone,
                 options: availability.dates,
               },
               actorType: "system",
@@ -5615,8 +5645,11 @@ export async function POST(req: Request) {
               reason: "quiet_no_schedule_question_received_non_date_input",
             });
           }
-          const leadTz =
-            String((lead as any)?.timezone ?? "").trim() || ATENDIMENTO_PROFESSOR_TIME_ZONE;
+          const leadTz = resolveScheduleLeadTimeZone({
+            lead: lead as Record<string, unknown>,
+            phone: normalizedPhoneOnly || null,
+            fallbackTimeZone: String((lead as any)?.timezone ?? "").trim() || null,
+          });
           const alreadyHasProfessorDate = String(
             (lead as any)?.experimental_class_professor_date ?? "",
           ).trim();
@@ -5864,8 +5897,11 @@ export async function POST(req: Request) {
         }
 
         if (expectedField === "date") {
-          const leadTz =
-            String((lead as any)?.timezone ?? "").trim() || ATENDIMENTO_PROFESSOR_TIME_ZONE;
+          const leadTz = resolveScheduleLeadTimeZone({
+            lead: lead as Record<string, unknown>,
+            phone: normalizedPhoneOnly || null,
+            fallbackTimeZone: String((lead as any)?.timezone ?? "").trim() || null,
+          });
           const { availability } = await presentExperimentalClassDateOptionsWhatsApp({
             admin,
             leadId,
@@ -5973,8 +6009,11 @@ export async function POST(req: Request) {
         }
 
         if (expectedField === "time") {
-          const leadTz =
-            String((lead as any)?.timezone ?? "").trim() || ATENDIMENTO_PROFESSOR_TIME_ZONE;
+          const leadTz = resolveScheduleLeadTimeZone({
+            lead: lead as Record<string, unknown>,
+            phone: normalizedPhoneOnly || null,
+            fallbackTimeZone: String((lead as any)?.timezone ?? "").trim() || null,
+          });
           const { data: latestTimeEvt } = await admin
             .from("atendimento_history_events")
             .select("details")

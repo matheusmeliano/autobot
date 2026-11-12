@@ -13,6 +13,7 @@ import {
   loadHiddenWhatsAppPhoneBlocklist,
   phoneIsInHiddenBrazilianBlocklist,
 } from "@/lib/painelHiddenPhones";
+import { resolveLeadTimeZoneFromRecord } from "@/lib/timezone";
 
 function isExperimentalClassBookingsTableUnavailable(error: unknown) {
   const code = String((error as any)?.code ?? "").trim();
@@ -918,8 +919,10 @@ function sectionTimestampMs(row: any, sectionName: "interessados" | "alunos" | "
                 ATENDIMENTO_PROFESSOR_TIME_ZONE,
               lead_timezone:
                 snapLeadTimezone ||
-                String((row as any)?.timezone ?? "").trim() ||
-                ATENDIMENTO_PROFESSOR_TIME_ZONE,
+                resolveLeadTimeZoneFromRecord({
+                  lead: row as Record<string, unknown>,
+                  fallbackTimeZone: String((row as any)?.timezone ?? "").trim() || null,
+                }),
               professor_date: snapProfessorDate || "",
               professor_time: snapProfessorTime || "",
               professor_start_at: snapProfessorStartAt || "",
@@ -1020,8 +1023,12 @@ function sectionTimestampMs(row: any, sectionName: "interessados" | "alunos" | "
         String((row as any)?.recurring_class_professor_timezone ?? "").trim() ||
         ATENDIMENTO_PROFESSOR_TIME_ZONE;
       const recLeadTimeZone =
-        String((row as any)?.recurring_class_lead_timezone ?? (row as any)?.timezone ?? "").trim() ||
-        recProfessorTimeZone;
+        resolveLeadTimeZoneFromRecord({
+          lead: row as Record<string, unknown>,
+          fallbackTimeZone:
+            String((row as any)?.recurring_class_lead_timezone ?? (row as any)?.timezone ?? "").trim() ||
+            recProfessorTimeZone,
+        });
       const recurringDisplayFallback =
         recWeekdayOk && recTimeOk
           ? calculateDisplayRecurringOccurrence({
@@ -1084,7 +1091,10 @@ function sectionTimestampMs(row: any, sectionName: "interessados" | "alunos" | "
               attendance_status: synthAttendance,
               attendance_checked_at: synthAttendanceChecked,
               professor_timezone: ATENDIMENTO_PROFESSOR_TIME_ZONE,
-              lead_timezone: String((row as any)?.timezone ?? "").trim() || ATENDIMENTO_PROFESSOR_TIME_ZONE,
+              lead_timezone: resolveLeadTimeZoneFromRecord({
+                lead: row as Record<string, unknown>,
+                fallbackTimeZone: String((row as any)?.timezone ?? "").trim() || null,
+              }),
               professor_date: mergedProfessorDate,
               professor_time: mergedProfessorTime,
               professor_start_at: mergedProfessorStartAt,

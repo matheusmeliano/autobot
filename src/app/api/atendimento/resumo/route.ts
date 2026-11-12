@@ -5,6 +5,7 @@ import {
   loadHiddenWhatsAppPhoneBlocklist,
   phoneIsInHiddenBrazilianBlocklist,
 } from "@/lib/painelHiddenPhones";
+import { resolveLeadTimeZoneFromRecord } from "@/lib/timezone";
 
 function isExperimentalClassBookingsTableUnavailable(error: unknown) {
   const code = String((error as any)?.code ?? "").trim();
@@ -459,7 +460,12 @@ export async function GET() {
           student_start_notification_sent_at: null, attendant_start_notification_sent_at: null,
           attendance_status: null, attendance_checked_at: null,
           professor_timezone: snapProfessorTimezone || ATENDIMENTO_PROFESSOR_TIME_ZONE,
-          lead_timezone: snapLeadTimezone || String((row as any)?.timezone ?? "").trim() || ATENDIMENTO_PROFESSOR_TIME_ZONE,
+          lead_timezone:
+            snapLeadTimezone ||
+            resolveLeadTimeZoneFromRecord({
+              lead: row as Record<string, unknown>,
+              fallbackTimeZone: String((row as any)?.timezone ?? "").trim() || null,
+            }),
           professor_date: snapProfessorDate || "", professor_time: snapProfessorTime || "",
           professor_start_at: snapProfessorStartAt || "",
           lead_date: snapLeadDate || "", lead_time: snapLeadTime || "",
@@ -487,7 +493,12 @@ export async function GET() {
             attendance_status: null,
             attendance_checked_at: null,
             professor_timezone: snapProfessorTimezone || ATENDIMENTO_PROFESSOR_TIME_ZONE,
-            lead_timezone: snapLeadTimezone || String((row as any)?.timezone ?? "").trim() || ATENDIMENTO_PROFESSOR_TIME_ZONE,
+            lead_timezone:
+              snapLeadTimezone ||
+              resolveLeadTimeZoneFromRecord({
+                lead: row as Record<string, unknown>,
+                fallbackTimeZone: String((row as any)?.timezone ?? "").trim() || null,
+              }),
             professor_date: cleanDraftTime.professor_date || cleanDraftDate?.professor_date || "",
             professor_time: cleanDraftTime.professor_time || "",
             professor_start_at: cleanDraftTime.professor_start_at || "",
@@ -511,7 +522,12 @@ export async function GET() {
             attendance_status: null,
             attendance_checked_at: null,
             professor_timezone: snapProfessorTimezone || ATENDIMENTO_PROFESSOR_TIME_ZONE,
-            lead_timezone: snapLeadTimezone || String((row as any)?.timezone ?? "").trim() || ATENDIMENTO_PROFESSOR_TIME_ZONE,
+            lead_timezone:
+              snapLeadTimezone ||
+              resolveLeadTimeZoneFromRecord({
+                lead: row as Record<string, unknown>,
+                fallbackTimeZone: String((row as any)?.timezone ?? "").trim() || null,
+              }),
             professor_date: cleanDraftDate.professor_date || "",
             professor_time: "",
             professor_start_at: "",

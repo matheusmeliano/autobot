@@ -63,7 +63,11 @@ import {
 import { getAtendimentoConversationPreviewText } from "@/lib/atendimento/files";
 import { resolveBaseUrlFromHeaders } from "@/lib/site-url";
 import type { CapturedFieldName } from "@/lib/atendimento/types";
-import { resolveTimeZoneFromCityInput, resolveTimeZoneFromStateInput } from "@/lib/timezone";
+import {
+  resolveLeadTimeZoneFromRecord,
+  resolveTimeZoneFromCityInput,
+  resolveTimeZoneFromStateInput,
+} from "@/lib/timezone";
 
 const POST_LEAD_REPLY_DELAY_MS = 2500;
 const MAX_PHONE_FORMAT_ATTEMPTS = 3;
@@ -78,6 +82,22 @@ const WHATSAPP_INVALID_FORMAT_MESSAGE =
 const WHATSAPP_INVALID_FORMAT_FINAL_MESSAGE = ATENDIMENTO_BLOCKED_FINAL_MESSAGE;
 const NUMERIC_ONLY_TEXT_MESSAGE =
   "Essa resposta não me parece válida. Responda somente com números.";
+
+function resolvePublicLeadTimeZone(params: {
+  lead?: Record<string, unknown> | null;
+  state?: string | null;
+  city?: string | null;
+  phone?: string | null;
+  fallbackTimeZone?: string | null;
+}) {
+  return resolveLeadTimeZoneFromRecord({
+    lead: params.lead ?? null,
+    state: params.state ?? null,
+    city: params.city ?? null,
+    phone: params.phone ?? null,
+    fallbackTimeZone: params.fallbackTimeZone ?? null,
+  });
+}
 const NUMERIC_ONLY_MIXED_MESSAGE =
   "Por favor, responda somente com números.";
 const PHONE_CONFIRMATION_PROMPT_MESSAGE =
@@ -2880,7 +2900,10 @@ export async function POST(req: Request) {
   if (!expectedField && String((lead as any)?.phone ?? "").trim()) {
     const leadId = String(lead.id);
     const conversationId = String(conversation.id);
-    const leadTimeZone = String((lead as any)?.timezone ?? "").trim() || ATENDIMENTO_PROFESSOR_TIME_ZONE;
+    const leadTimeZone = resolvePublicLeadTimeZone({
+      lead: lead as Record<string, unknown>,
+      fallbackTimeZone: String((lead as any)?.timezone ?? "").trim() || null,
+    });
     const lastBotText = String(lastBotMessage?.content_text ?? "").trim();
 
     await admin
@@ -3462,7 +3485,21 @@ export async function POST(req: Request) {
         admin,
         leadId: String(lead.id),
         conversationId: String(conversation.id),
-        leadTimeZone: String((persistedLeadValues.timezone as string | undefined) ?? (lead as any)?.timezone ?? "").trim(),
+        leadTimeZone: resolvePublicLeadTimeZone({
+          lead: lead as Record<string, unknown>,
+          state:
+            String((persistedLeadValues.state as string | undefined) ?? (lead as any)?.state ?? "").trim() ||
+            null,
+          city:
+            String((persistedLeadValues.city as string | undefined) ?? (lead as any)?.city ?? "").trim() ||
+            null,
+          phone:
+            String(((persistedLeadValues as Record<string, unknown>).phone as string | undefined) ?? (lead as any)?.phone ?? "").trim() ||
+            null,
+          fallbackTimeZone:
+            String((persistedLeadValues.timezone as string | undefined) ?? (lead as any)?.timezone ?? "").trim() ||
+            null,
+        }),
       });
 
       return Response.json({
@@ -3521,7 +3558,21 @@ export async function POST(req: Request) {
       admin,
       leadId: String(lead.id),
       conversationId: String(conversation.id),
-      leadTimeZone: String((persistedLeadValues.timezone as string | undefined) ?? (lead as any)?.timezone ?? "").trim(),
+      leadTimeZone: resolvePublicLeadTimeZone({
+        lead: lead as Record<string, unknown>,
+        state:
+          String((persistedLeadValues.state as string | undefined) ?? (lead as any)?.state ?? "").trim() ||
+          null,
+        city:
+          String((persistedLeadValues.city as string | undefined) ?? (lead as any)?.city ?? "").trim() ||
+          null,
+        phone:
+          String(((persistedLeadValues as Record<string, unknown>).phone as string | undefined) ?? (lead as any)?.phone ?? "").trim() ||
+          null,
+        fallbackTimeZone:
+          String((persistedLeadValues.timezone as string | undefined) ?? (lead as any)?.timezone ?? "").trim() ||
+          null,
+      }),
     });
     finalOutbound = dateOptionsPresentation.outbound;
   }

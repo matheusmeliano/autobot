@@ -1,6 +1,7 @@
 import { requireAtendimentoUser, appendHistoryEvent } from "@/lib/atendimento/server";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { resolveExperimentalClassAssignedProfessorPhone } from "@/lib/atendimento/experimentalClass";
+import { resolveLeadTimeZoneFromRecord } from "@/lib/timezone";
 
 function isExperimentalClassBookingsTableUnavailable(error: unknown) {
   const code = String((error as any)?.code ?? "").trim();
@@ -295,7 +296,10 @@ export async function POST(
       ).trim() || String((lead as any)?.experimental_class_professor_start_at ?? "").trim() || null;
     const snapLeadTimezone =
       String((resolvedBooking as any)?.lead_timezone ?? "").trim() ||
-      String((lead as any)?.timezone ?? "").trim() ||
+      resolveLeadTimeZoneFromRecord({
+        lead: lead as Record<string, unknown>,
+        fallbackTimeZone: String((lead as any)?.timezone ?? "").trim() || null,
+      }) ||
       null;
     const snapProfessorTimezone =
       String((resolvedBooking as any)?.professor_timezone ?? "").trim() || null;

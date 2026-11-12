@@ -14,6 +14,7 @@ import {
 } from "@/lib/atendimento/experimentalClass";
 import {
   inferTimeZoneFromPhoneCountryCode,
+  resolveLeadTimeZoneFromRecord,
   resolveTimeZoneFromCityInput,
   resolveTimeZoneFromStateInput,
 } from "@/lib/timezone";
@@ -491,8 +492,10 @@ export async function GET(request: Request, context: { params: Promise<{ leadId:
             professor_timezone: snapProfessorTimezone || ATENDIMENTO_PROFESSOR_TIME_ZONE,
             lead_timezone:
               snapLeadTimezone ||
-              String((lead as any)?.timezone ?? "").trim() ||
-              ATENDIMENTO_PROFESSOR_TIME_ZONE,
+              resolveLeadTimeZoneFromRecord({
+                lead: lead as Record<string, unknown>,
+                fallbackTimeZone: String((lead as any)?.timezone ?? "").trim() || null,
+              }),
             professor_date: snapProfessorDate || "",
             professor_time: snapProfessorTime || "",
             professor_start_at: snapProfessorStartAt || "",
@@ -574,8 +577,12 @@ export async function GET(request: Request, context: { params: Promise<{ leadId:
       String((lead as any)?.recurring_class_professor_timezone ?? "").trim() ||
       ATENDIMENTO_PROFESSOR_TIME_ZONE;
     const recLeadTimeZone =
-      String((lead as any)?.recurring_class_lead_timezone ?? (lead as any)?.timezone ?? "").trim() ||
-      recProfessorTimeZone;
+      resolveLeadTimeZoneFromRecord({
+        lead: lead as Record<string, unknown>,
+        fallbackTimeZone:
+          String((lead as any)?.recurring_class_lead_timezone ?? (lead as any)?.timezone ?? "").trim() ||
+          recProfessorTimeZone,
+      });
     const recurringDisplayFallback =
       recWeekdayOk && recTimeOk
         ? calculateDisplayRecurringOccurrence({
@@ -605,7 +612,10 @@ export async function GET(request: Request, context: { params: Promise<{ leadId:
             attendance_status: synthAttendance,
             attendance_checked_at: synthAttendanceChecked,
             professor_timezone: ATENDIMENTO_PROFESSOR_TIME_ZONE,
-            lead_timezone: String((lead as any)?.timezone ?? "").trim() || ATENDIMENTO_PROFESSOR_TIME_ZONE,
+            lead_timezone: resolveLeadTimeZoneFromRecord({
+              lead: lead as Record<string, unknown>,
+              fallbackTimeZone: String((lead as any)?.timezone ?? "").trim() || null,
+            }),
             professor_date: mergedProfessorDate,
             professor_time: mergedProfessorTime,
             professor_start_at: mergedProfessorStartAt,

@@ -10,7 +10,7 @@ import {
 } from "../../../lib/atendimento/experimentalClass";
 import { ATENDIMENTO_PROFESSOR_TIME_ZONE } from "../../../lib/atendimento/constants";
 import { formatPhoneNumber } from "@/lib/phone";
-import { resolveStudentTimezone } from "../../../lib/timezone";
+import { resolveLeadTimeZoneFromRecord, resolveStudentTimezone } from "../../../lib/timezone";
 import { AppModal } from "@/components/app/AppModal";
 import { Info, X, Eye, EyeOff, Copy, Check } from "lucide-react";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
@@ -246,15 +246,10 @@ function buildAlunoRecurringScheduleLabel(lead: Record<string, unknown> | null |
     typeof Intl !== "undefined" && Intl?.DateTimeFormat?.().resolvedOptions?.().timeZone
       ? Intl.DateTimeFormat().resolvedOptions().timeZone
       : null;
-  const effectiveLeadTimeZone =
-    resolveStudentTimezone({
-      state: String(lead?.state ?? "").trim() || null,
-      city: String(lead?.city ?? "").trim() || null,
-      phone: String(lead?.phone ?? "").trim() || null,
-      browserTimeZone,
-    }) ||
-    String(lead?.timezone ?? "").trim() ||
-    ATENDIMENTO_PROFESSOR_TIME_ZONE;
+  const effectiveLeadTimeZone = resolveLeadTimeZoneFromRecord({
+    lead: (lead ?? null) as Record<string, unknown> | null,
+    browserTimeZone,
+  });
 
   if (storedOccurrenceDate && storedOccurrenceTime) {
     const [, , month = "", day = ""] = storedOccurrenceDate.match(/^(\d{4})-(\d{2})-(\d{2})$/) ?? [];
@@ -706,15 +701,15 @@ export default function CadastroRecorrenteBody() {
     setAlunoSchedLoading(true);
     setAlunoSchedError("");
     try {
-      const tzLead = String(alunoLeadFull?.timezone ?? "").trim();
-      const st = String(alunoLeadFull?.state ?? "").trim();
-      const ct = String(alunoLeadFull?.city ?? "").trim();
       const tzBrowser = typeof Intl !== "undefined" && Intl?.DateTimeFormat?.().resolvedOptions?.().timeZone
         ? Intl.DateTimeFormat().resolvedOptions().timeZone
         : "";
-      let tzUse = tzLead;
-      if (!tzUse && (st || ct)) tzUse = tzBrowser;
-      if (!tzUse) tzUse = tzBrowser || "America/Cuiaba";
+      const tzUse = resolveLeadTimeZoneFromRecord({
+        lead: (alunoLeadFull ?? null) as Record<string, unknown> | null,
+        phone: String(alunoLeadFull?.phone ?? phoneField ?? "").trim() || null,
+        browserTimeZone: tzBrowser || null,
+        fallbackTimeZone: String(alunoLeadFull?.timezone ?? "").trim() || null,
+      });
       const qs = new URLSearchParams();
       qs.set("lead_timezone", tzUse);
       if (tzBrowser) qs.set("timezone", tzBrowser);
@@ -732,7 +727,11 @@ export default function CadastroRecorrenteBody() {
       const slotsMap = (j.slotsByWeekdayDate ?? j.slotsByWeekday ?? {}) as Record<string, RecurringWeekdayTimeOption[]>;
       const slotsByWeekdayDate: Record<string, RecurringWeekdayTimeOption[]> = {};
       for (const [k, v] of Object.entries(slotsMap)) slotsByWeekdayDate[k] = Array.isArray(v) ? v : [];
-      setAlunoSchedAvail({ dates, slotsByWeekdayDate, timeZone: String(j.timeZone ?? tzUse) });
+      const resolvedTimeZone = String(j.timeZone ?? tzUse).trim() || tzUse;
+      setAlunoSchedAvail({ dates, slotsByWeekdayDate, timeZone: resolvedTimeZone });
+      if (resolvedTimeZone && resolvedTimeZone !== String(alunoLeadFull?.timezone ?? "").trim()) {
+        setAlunoLeadFull((prev: any) => (prev ? { ...prev, timezone: resolvedTimeZone } : prev));
+      }
       setAlunoSchedDayId(null);
       setAlunoSchedTimeOpt(null);
     } catch (e) {
@@ -1640,7 +1639,14 @@ export default function CadastroRecorrenteBody() {
       const tzBrowser = typeof Intl !== "undefined" && Intl?.DateTimeFormat?.().resolvedOptions?.().timeZone
         ? Intl.DateTimeFormat().resolvedOptions().timeZone
         : "";
-      const tzLead = leadTimezone;
+      const tzLead = resolveLeadTimeZoneFromRecord({
+        lead: (alunoLeadFull ?? null) as Record<string, unknown> | null,
+        state: stateField || null,
+        city: cityField || null,
+        phone: String(alunoLeadFull?.phone ?? phoneField ?? "").trim() || null,
+        browserTimeZone: tzBrowser || null,
+        fallbackTimeZone: leadTimezone || null,
+      });
       const params = new URLSearchParams();
       if (tzLead) params.set("lead_timezone", tzLead);
       if (tzBrowser) params.set("timezone", tzBrowser);
@@ -1658,6 +1664,10 @@ export default function CadastroRecorrenteBody() {
         throw new Error(toErrorMessage(json?.error, "Falha ao carregar disponibilidade."));
       }
       setAvailability(json);
+      const resolvedTimeZone = String(json.timeZone ?? tzLead).trim();
+      if (resolvedTimeZone && resolvedTimeZone !== leadTimezone) {
+        setLeadTimezone(resolvedTimeZone);
+      }
     } catch (e) {
       setAvailError(toErrorMessage(e, "Erro ao carregar disponibilidade."));
     } finally {

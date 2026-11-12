@@ -6,6 +6,7 @@ import {
   loadRecurringCalendarOccupiedIntervals,
   normalizeRecurringSchedulePhoneDigits,
 } from "@/lib/atendimento/server";
+import { resolveLeadTimeZoneFromRecord } from "@/lib/timezone";
 
 function toErrorMessage(raw: unknown, fallback = "Erro desconhecido."): string {
   if (raw === null || raw === undefined) return fallback;
@@ -46,7 +47,6 @@ export async function GET(req: NextRequest) {
       Number.isFinite(lookAheadWeeksRaw) && lookAheadWeeksRaw >= 2
         ? Math.min(Math.trunc(lookAheadWeeksRaw), 6)
         : 2;
-    const tzRaw = tzLead || tzBrowser || ATENDIMENTO_PROFESSOR_TIME_ZONE;
     const admin = createSupabaseAdminClient();
     const now = new Date();
     const occupiedIntervals = await loadRecurringCalendarOccupiedIntervals({
@@ -72,6 +72,16 @@ export async function GET(req: NextRequest) {
         currentLead = (data as Record<string, unknown> | null) ?? null;
       }
     }
+
+    const effectiveLeadTimeZone = resolveLeadTimeZoneFromRecord({
+      lead: currentLead,
+      phone: leadPhone || String(currentLead?.phone ?? "").trim() || null,
+      browserTimeZone: tzBrowser || null,
+      fallbackTimeZone:
+        tzLead ||
+        String(currentLead?.recurring_class_lead_timezone ?? currentLead?.timezone ?? "").trim() ||
+        null,
+    });
 
     const currentLeadId = String(currentLead?.id ?? leadId ?? "").trim();
     const currentLeadPhoneDigits = normalizeRecurringSchedulePhoneDigits(
@@ -113,7 +123,7 @@ export async function GET(req: NextRequest) {
 
     const result = listRecurringWeekdayAvailability({
       now,
-      leadTimeZone: tzRaw,
+      leadTimeZone: effectiveLeadTimeZone,
       occupiedIntervals: relevantIntervals,
       lookAheadWeeks,
     });
@@ -129,7 +139,7 @@ export async function GET(req: NextRequest) {
       dates: result.dates,
       slotsByWeekday: slotsObj,
       slotsByWeekdayDate: slotsObj,
-      timeZone: tzRaw,
+      timeZone: effectiveLeadTimeZone,
       generatedAt: now.toISOString(),
     });
   } catch (err) {

@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {
   inferTimeZoneFromPhoneCountryCode,
+  resolveLeadTimeZoneFromRecord,
   resolveStudentTimezone,
   resolveTimeZoneFromCityInput,
   resolveTimeZoneFromStateInput,
@@ -131,4 +132,39 @@ test("inferTimeZoneFromPhoneCountryCode usa Portugal como fallback para +351", (
 
   assert.equal(resolution?.timeZone, "Europe/Lisbon");
   assert.equal(resolution?.country, "PT");
+});
+
+test("resolveLeadTimeZoneFromRecord recalcula Portugal a partir de estado/cidade mesmo com timezone salvo incorreto", () => {
+  const timeZone = resolveLeadTimeZoneFromRecord({
+    lead: {
+      state: "Distrito de Lisboa",
+      city: "Lisboa",
+      phone: "+351 912 345 678",
+      timezone: "America/Cuiaba",
+    },
+  });
+
+  assert.equal(timeZone, "Europe/Lisbon");
+});
+
+test("resolveLeadTimeZoneFromRecord identifica Madeira e Açores sem depender do timezone salvo", () => {
+  const madeira = resolveLeadTimeZoneFromRecord({
+    lead: {
+      state: "Madeira",
+      city: "Funchal",
+      phone: "+351 912 345 678",
+      timezone: "America/Cuiaba",
+    },
+  });
+  const acores = resolveLeadTimeZoneFromRecord({
+    lead: {
+      state: "Açores",
+      city: "Ponta Delgada",
+      phone: "+351 912 345 678",
+      timezone: "America/Cuiaba",
+    },
+  });
+
+  assert.equal(madeira, "Atlantic/Madeira");
+  assert.equal(acores, "Atlantic/Azores");
 });
