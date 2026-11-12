@@ -1,6 +1,7 @@
 import type { Viewport } from "next";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { getSafeAuthenticatedPath, normalizeAccessScope } from "@/lib/auth/access";
+import { formatPhoneNumber, normalizePhoneDigits } from "@/lib/phone";
 import { redirect } from "next/navigation";
 import { LoginForm } from "@/components/auth/LoginForm";
 
@@ -13,22 +14,11 @@ export const viewport: Viewport = {
 };
 
 function digitsOnly(v: string | null | undefined): string {
-  return String(v ?? "").replace(/\D/g, "");
+  return normalizePhoneDigits(v);
 }
 
 function formatPhoneMasked(raw: string | null | undefined): string {
-  const d = String(raw ?? "").replace(/\D/g, "").slice(0, 13);
-  if (!d) return "";
-  if (d.length <= 10) {
-    let out = "(" + d.slice(0, 2);
-    if (d.length > 2) out += ") " + d.slice(2, 6);
-    if (d.length > 6) out += "-" + d.slice(6, 10);
-    return out;
-  }
-  if (d.length <= 11) {
-    return `(${d.slice(0, 2)}) ${d.slice(2, 7)}-${d.slice(7, 11)}`;
-  }
-  return `+${d.slice(0, 2)} (${d.slice(2, 4)}) ${d.slice(4, 9)}-${d.slice(9, 13)}`;
+  return formatPhoneNumber(raw, { defaultCountry: "BR", includeCountryCode: true });
 }
 
 async function resolveInitialLoginFromParams(

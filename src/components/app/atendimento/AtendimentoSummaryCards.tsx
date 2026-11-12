@@ -6,6 +6,7 @@ import { AlertTriangle, CalendarDays, Check, CheckCircle2, ChevronDown, Copy, Do
 import { modalToast } from "@/lib/modalToast";
 import { AppModal } from "@/components/app/AppModal";
 import { ATENDIMENTO_PROFESSOR_TIME_ZONE } from "@/lib/atendimento/constants";
+import { formatPhoneNumber } from "@/lib/phone";
 
 function isLeadRecurringRegistrationConcludedClient(lead: unknown): boolean {
   const obj = (lead ?? {}) as Record<string, unknown>;
@@ -1213,9 +1214,9 @@ function LeadDetails({
           <div className="flex flex-wrap min-w-0 items-center gap-2.5">
             <div
               className="min-w-0 truncate text-lg font-semibold text-[var(--app-text-85)]"
-              title={lead.phone || "Interessado sem telefone"}
+              title={formatPhoneNumber(lead.phone, { defaultCountry: "BR", includeCountryCode: true }) || "Interessado sem telefone"}
             >
-              {lead.phone || "Interessado sem telefone"}
+              {formatPhoneNumber(lead.phone, { defaultCountry: "BR", includeCountryCode: true }) || "Interessado sem telefone"}
             </div>
             <button
               type="button"
@@ -1481,9 +1482,9 @@ function ContractDetails({
           <div className="flex flex-wrap min-w-0 items-center gap-2.5">
             <div
               className="min-w-0 truncate text-lg font-semibold text-[var(--app-text-85)]"
-              title={lead.phone || "Lead sem telefone"}
+              title={formatPhoneNumber(lead.phone, { defaultCountry: "BR", includeCountryCode: true }) || "Lead sem telefone"}
             >
-              {lead.phone || "Lead sem telefone"}
+              {formatPhoneNumber(lead.phone, { defaultCountry: "BR", includeCountryCode: true }) || "Lead sem telefone"}
             </div>
             {lead.phone ? (
               <button
@@ -1857,9 +1858,9 @@ function BookingDetails({
           <div className="flex flex-wrap min-w-0 items-center gap-2.5">
             <div
               className="min-w-0 truncate text-lg font-semibold text-[var(--app-text-85)]"
-              title={lead.phone || "Agendamento"}
+              title={formatPhoneNumber(lead.phone, { defaultCountry: "BR", includeCountryCode: true }) || "Agendamento"}
             >
-              {lead.phone || "Agendamento"}
+              {formatPhoneNumber(lead.phone, { defaultCountry: "BR", includeCountryCode: true }) || "Agendamento"}
             </div>
             <button
               type="button"
@@ -4099,7 +4100,7 @@ function isRecurringContractFormalized(lead: AtendimentoLeadListItem): boolean {
     const Label = isAluno ? "Aluno" : "Interessado";
 
     const name = String(lead.full_name ?? "").trim() || `${Label} sem nome`;
-    const phone = String(lead.phone ?? "").trim() || "-";
+    const phone = formatPhoneNumber(lead.phone, { defaultCountry: "BR", includeCountryCode: true }) || "-";
     if (!window.confirm(`Excluir ${label}?\n\n${name}\n${phone}\n\nEsta ação é permanente.`)) {
       return;
     }
@@ -5288,9 +5289,15 @@ function isRecurringContractFormalized(lead: AtendimentoLeadListItem): boolean {
                       ) : null}
                       <div
                         className="pr-20 truncate text-sm font-semibold text-[var(--app-text-85)]"
-                        title={lead.phone || lead.full_name || "Interessado sem telefone"}
+                        title={
+                          formatPhoneNumber(lead.phone, { defaultCountry: "BR", includeCountryCode: true }) ||
+                          lead.full_name ||
+                          "Interessado sem telefone"
+                        }
                       >
-                        {String(lead.full_name ?? "").trim() || lead.phone || "Interessado sem telefone"}
+                        {String(lead.full_name ?? "").trim() ||
+                          formatPhoneNumber(lead.phone, { defaultCountry: "BR", includeCountryCode: true }) ||
+                          "Interessado sem telefone"}
                       </div>
                       {(() => {
                         const warnings: JSX.Element[] = [];

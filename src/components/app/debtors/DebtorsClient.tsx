@@ -6,6 +6,7 @@ import { FileText, KeyRound, Loader2, Pencil, Plus, Settings2, Trash2, UserRound
 import { AppModal } from "@/components/app/AppModal";
 import { useAppTheme } from "@/components/app/AppThemeProvider";
 import { modalToast } from "@/lib/modalToast";
+import { formatPhoneNumber, normalizePhoneDigits } from "@/lib/phone";
 import {
   createDebtorAction,
   deleteDebtorAction,
@@ -364,99 +365,28 @@ function maskCnpj(v: string) {
 }
 
 function maskPhone(v: string) {
-  const d0 = digitsOnly(v);
-  if (d0.startsWith("55")) {
-    const d = d0.slice(2);
-    const dd = d.slice(0, 2);
-    const rest = d.slice(2);
-    if (!dd) return d0;
-    if (rest.length <= 4) return `(${dd}) ${rest}`;
-    if (rest.length <= 8) return `(${dd}) ${rest.slice(0, 4)}-${rest.slice(4)}`;
-    return `(${dd}) ${rest.slice(0, 5)}-${rest.slice(5, 9)}`;
-  }
-  if (d0.startsWith("1")) {
-    const d = d0.slice(1).slice(0, 10);
-    const ac = d.slice(0, 3);
-    const p1 = d.slice(3, 6);
-    const p2 = d.slice(6, 10);
-    if (!ac) return `+1 ${d0}`;
-    if (d.length <= 3) return `(${ac}`;
-    if (d.length <= 6) return `(${ac}) ${p1}`;
-    return `(${ac}) ${p1}-${p2}`;
-  }
-  const d = d0;
-  const dd = d.slice(0, 2);
-  const rest = d.slice(2);
-  if (!dd) return d0;
-  if (rest.length <= 4) return `(${dd}) ${rest}`;
-  if (rest.length <= 8) return `(${dd}) ${rest.slice(0, 4)}-${rest.slice(4)}`;
-  return `(${dd}) ${rest.slice(0, 5)}-${rest.slice(5, 9)}`;
+  return formatPhoneNumber(v, { defaultCountry: "BR", includeCountryCode: false });
 }
 
 function maskPhoneUS(v: string) {
-  const d0 = digitsOnly(v);
-  const dNorm = d0.startsWith("1") ? d0.slice(1) : d0;
-  const d = dNorm.slice(0, 10);
-  const ac = d.slice(0, 3);
-  const p1 = d.slice(3, 6);
-  const p2 = d.slice(6, 10);
-  if (!ac) return "+1 ";
-  if (d.length <= 3) return `+1 (${ac}`;
-  if (d.length <= 6) return `+1 (${ac}) ${p1}`;
-  return `+1 (${ac}) ${p1}-${p2}`;
+  return formatPhoneNumber(v, { defaultCountry: "US", includeCountryCode: true });
 }
 
 function maskPixPhone(v: string) {
-  const raw = v.trimStart();
-  if (!raw.startsWith("+")) return v;
-  const d = digitsOnly(raw);
-  if (d.startsWith("55")) {
-    const local = d.slice(2);
-    if (!local) return "+55";
-    if (local.length <= 2) return `+55 ${local}`;
-    const dd = local.slice(0, 2);
-    const rest = local.slice(2);
-    if (!rest) return `+55 (${dd})`;
-    if (rest.length <= 4) return `+55 (${dd}) ${rest}`;
-    if (rest.length <= 8) return `+55 (${dd}) ${rest.slice(0, 4)}-${rest.slice(4)}`;
-    return `+55 (${dd}) ${rest.slice(0, 5)}-${rest.slice(5, 9)}`;
-  }
-  if (d.startsWith("1")) {
-    const local = d.slice(1).slice(0, 10);
-    if (!local) return "+1";
-    if (local.length <= 3) return `+1 (${local}`;
-    const ac = local.slice(0, 3);
-    const p1 = local.slice(3, 6);
-    const p2 = local.slice(6, 10);
-    if (local.length <= 6) return `+1 (${ac}) ${p1}`;
-    return `+1 (${ac}) ${p1}-${p2}`;
-  }
-  return v;
+  return formatPhoneNumber(v, { defaultCountry: "BR" });
 }
 
 function maskPixPhoneUS(v: string) {
-  const raw = v.trimStart();
-  const d = digitsOnly(raw);
-  const local = (d.startsWith("1") ? d.slice(1) : d).slice(0, 10);
-  if (!local) return "+1";
-  if (local.length <= 3) return `+1 (${local}`;
-  const ac = local.slice(0, 3);
-  const p1 = local.slice(3, 6);
-  const p2 = local.slice(6, 10);
-  if (local.length <= 6) return `+1 (${ac}) ${p1}`;
-  return `+1 (${ac}) ${p1}-${p2}`;
+  return formatPhoneNumber(v, { defaultCountry: "US", includeCountryCode: true });
 }
 
 function formatPhoneDisplayForEmail(rawPhone: string | null | undefined, usaMusicAccount: boolean) {
   const val = String(rawPhone ?? "").trim();
   if (!val) return "-";
-  if (!usaMusicAccount) return val;
-  const digits = digitsOnly(val);
-  if (!digits) return val;
-  if (val.startsWith("+1") || digits.startsWith("11")) {
-    return maskPixPhoneUS(val);
-  }
-  return maskPhoneUS(val);
+  return formatPhoneNumber(val, {
+    defaultCountry: usaMusicAccount ? "US" : "BR",
+    includeCountryCode: true,
+  });
 }
 
 type PixKeyType = "cpf" | "cnpj" | "email" | "telefone" | "aleatoria" | "desconhecida";
@@ -466,12 +396,13 @@ function detectPixKeyType(raw: string): PixKeyType {
   if (!v) return "desconhecida";
   if (v.includes("@")) return "email";
   if (isUuidLike(v)) return "aleatoria";
-  const d = digitsOnly(v);
+  const d = normalizePhoneDigits(v);
   if (v.startsWith("+")) {
-    if (d.startsWith("55") || d.startsWith("1")) return "telefone";
+    if (d.startsWith("55") || d.startsWith("1") || d.startsWith("351")) return "telefone";
   }
   if (d.length === 14) return "cnpj";
   if (d.length === 11) return "cpf";
+  if (d.length === 9 && d.startsWith("9")) return "telefone";
   if (d.length === 10) return "telefone";
   return "desconhecida";
 }

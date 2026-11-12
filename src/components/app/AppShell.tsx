@@ -27,6 +27,7 @@ import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 import { normalizePlan, type PlanKey } from "@/lib/plans";
 import { updateThemeAction } from "@/app/app/configuracoes/actions";
 import { modalToast } from "@/lib/modalToast";
+import { formatPhoneNumber } from "@/lib/phone";
 import { AppThemeProvider, type AppTheme } from "@/components/app/AppThemeProvider";
 import { getThemeStorageKey, normalizeStoredTheme } from "@/lib/theme";
 import { getDefaultAuthenticatedPath, isAtendimentoOnlyAccessScope } from "@/lib/auth/access";
@@ -873,7 +874,9 @@ export function AppShell({
                   </div>
                 ) : null}
                 <div className={`${pendingPayment?.debtor?.nome ? "mt-2" : ""} text-xs text-[var(--app-text-60)]`}>
-                  {pendingPayment?.from_phone ? `Telefone: ${pendingPayment.from_phone}` : null}
+                  {pendingPayment?.from_phone
+                    ? `Telefone: ${formatPhoneNumber(pendingPayment.from_phone, { defaultCountry: "BR", includeCountryCode: true })}`
+                    : null}
                 </div>
                 {pendingPayment?.ai_reason ? (
                   <div className="mt-2 text-xs text-[var(--app-text-60)]">

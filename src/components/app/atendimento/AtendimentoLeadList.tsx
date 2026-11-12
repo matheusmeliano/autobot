@@ -7,6 +7,7 @@ import { AtendimentoFileGallery } from "@/components/atendimento/AtendimentoFile
 import { AtendimentoPresenceBadge } from "@/components/app/atendimento/AtendimentoPresenceBadge";
 import type { AtendimentoFileRecord, AtendimentoLeadListItem } from "@/lib/atendimento/types";
 import { atendimentoStageLabel, atendimentoStatusLabel, formatAtendimentoDateTime, leadMatchesSearchQuery, suggestClosestName } from "@/lib/atendimento/utils";
+import { formatPhoneNumber } from "@/lib/phone";
 
 const PAGE_SIZE = 3;
 
@@ -262,7 +263,7 @@ export function AtendimentoLeadList({
                         Telefone
                       </div>
                       <div className="mt-1 truncate text-[15px] font-semibold text-[var(--app-text-85)]">
-                        {lead.phone || "-"}
+                        {formatPhoneNumber(lead.phone, { defaultCountry: "BR", includeCountryCode: true }) || "-"}
                       </div>
                     </div>
 
@@ -443,7 +444,10 @@ export function AtendimentoLeadList({
         {profileLead ? (
           <div className="mt-4 grid gap-3 md:grid-cols-2">
             <Field label="Nome" value={profileLead.full_name} />
-            <Field label="Telefone" value={profileLead.phone} />
+            <Field
+              label="Telefone"
+              value={formatPhoneNumber(profileLead.phone, { defaultCountry: "BR", includeCountryCode: true })}
+            />
             <Field label="E-mail" value={profileLead.email} />
             <Field label="Cidade" value={profileLead.city} />
             <Field label="Estado" value={profileLead.state} />

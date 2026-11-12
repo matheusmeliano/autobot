@@ -737,7 +737,7 @@ const SUPPORT_FINAL_MESSAGE = `Não foi possível concluir este agendamento.
 
 Para continuar, entre em contato com nosso suporte pelo WhatsApp:
 
-+55 (65) 9 9693-3336
++55 (65) 99693-3336
 
 Nossa equipe dará continuidade ao seu atendimento o mais breve possível.`;
 

@@ -4,6 +4,7 @@ import {
   EXPERIMENTAL_CLASS_SLOT_TIMES,
 } from "@/lib/atendimento/experimentalClass";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
+import { formatPhoneNumber } from "@/lib/phone";
 import {
   requireAtendimentoUser,
   resolveRecurringDisplayOccurrenceMap,
@@ -325,35 +326,8 @@ export async function GET(req: Request) {
   } catch {}
 
   // Util: formatação de telefone p/ exibição no modal (sempre com +<codigo pais> (area) 9XXXX-XXXX
-  const digitsOnly = (s: string | null | undefined): string => String(s ?? "").replace(/\D+/g, "");
   const formatPhoneDisplay = (rawPhone: string | null | undefined): string => {
-    const raw = String(rawPhone ?? "").trim();
-    if (!raw) return "";
-    const d = digitsOnly(raw);
-    if (!d) return raw;
-    // USA: +55 BR: 10 ou 11 digitos locais
-    if (d.startsWith("55")) {
-      const local = d.slice(2);
-      const dd = local.slice(0, 2);
-      const rest = local.slice(2);
-      if (!dd) return "+55";
-      if (!rest.length) return `+55 (${dd})`;
-      if (rest.length <= 4) return `+55 (${dd}) ${rest}`;
-      if (rest.length <= 8) return `+55 (${dd}) ${rest.slice(0, 4)}-${rest.slice(4)}`;
-      return `+55 (${dd}) ${rest.slice(0, 5)}-${rest.slice(5, 9)}`;
-    }
-    // USA: 10 ou 11 digitos locais (com 1 na frente)
-    if (d.startsWith("1") || d.length === 10 || d.length === 11) {
-      const local = d.startsWith("1") ? d.slice(1).slice(0, 10) : d.slice(0, 10);
-      const ac = local.slice(0, 3);
-      const p1 = local.slice(3, 6);
-      const p2 = local.slice(6, 10);
-      if (!ac) return "+1";
-      if (local.length <= 3) return `+1 (${ac}`;
-      if (local.length <= 6) return `+1 (${ac}) ${p1}`;
-      return `+1 (${ac}) ${p1}-${p2}`;
-    }
-    return raw;
+    return formatPhoneNumber(rawPhone, { defaultCountry: "BR", includeCountryCode: true });
   };
   //
   const leadIds = bookings

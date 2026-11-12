@@ -2,6 +2,7 @@
 
 import type { AtendimentoHistoryEvent, AtendimentoLead } from "@/lib/atendimento/types";
 import { atendimentoStageLabel, atendimentoStatusLabel, formatAtendimentoDate, formatAtendimentoDateTime } from "@/lib/atendimento/utils";
+import { formatPhoneNumber } from "@/lib/phone";
 
 function Field({ label, value }: { label: string; value: string | null | undefined }) {
   return (
@@ -35,7 +36,7 @@ export function AtendimentoLeadSidebar({
         <div className="text-sm font-semibold text-[var(--app-text-85)]">Perfil do aluno</div>
         <div className="mt-4 grid gap-3">
           <Field label="Nome" value={lead.full_name} />
-          <Field label="Telefone" value={lead.phone} />
+          <Field label="Telefone" value={formatPhoneNumber(lead.phone, { defaultCountry: "BR", includeCountryCode: true })} />
           <Field label="E-mail" value={lead.email} />
           <Field label="Cidade" value={lead.city} />
           <Field label="Estado" value={lead.state} />

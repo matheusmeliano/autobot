@@ -13,6 +13,7 @@ import {
 } from "@/lib/timezone";
 import type { AtendimentoLeadListItem, AtendimentoSummary } from "@/lib/atendimento/types";
 import { modalToast } from "@/lib/modalToast";
+import { formatPhoneNumber } from "@/lib/phone";
 import { formatAtendimentoDate, formatAtendimentoDateTime, leadMatchesSearchQuery } from "@/lib/atendimento/utils";
 import {
   buildExperimentalClassPostAttendanceWhatsAppMessages,
@@ -380,69 +381,7 @@ function hasActiveExperimentalDisplaySignal(lead: AtendimentoLeadListItem | null
 }
 
 function applyPhoneMask(input: string): string {
-  const digits = String(input ?? "").replace(/\D/g, "");
-  if (!digits) return "";
-
-  if (digits.startsWith("55")) {
-    const rest = digits.slice(2);
-    if (rest.length === 0) return "+55";
-    if (rest.length <= 2) return `+55 ${rest}`;
-    const ddd = rest.slice(0, 2);
-    const local = rest.slice(2);
-    const has9 = local.length >= 9 && local.startsWith("9");
-    if (rest.length === 3) return `+55 ${ddd} ${local}`;
-    if (has9) {
-      if (local.length <= 5) return `+55 (${ddd}) 9 ${local.slice(1)}`;
-      if (local.length <= 9)
-        return `+55 (${ddd}) 9 ${local.slice(1, 5)}-${local.slice(5)}`;
-      const extra = local.slice(10);
-      return `+55 (${ddd}) 9 ${local.slice(1, 5)}-${local.slice(5, 9)} ${extra}`;
-    } else {
-      if (local.length <= 4) return `+55 ${ddd} ${local}`;
-      if (local.length <= 8) return `+55 ${ddd} ${local.slice(0, 4)}-${local.slice(4)}`;
-      const extra = local.slice(8);
-      return `+55 ${ddd} ${local.slice(0, 4)}-${local.slice(4, 8)} ${extra}`;
-    }
-  }
-
-  if (digits.startsWith("1")) {
-    const rest = digits.slice(1);
-    if (rest.length === 0) return "+1";
-    if (rest.length <= 3) return `+1 ${rest}`;
-    const area = rest.slice(0, 3);
-    const local = rest.slice(3);
-    if (rest.length === 4) return `+1 ${area} ${local}`;
-    if (rest.length <= 6) return `+1 ${area} ${local}`;
-    if (rest.length === 7) return `+1 ${area} ${local.slice(0, 3)}-${local.slice(3)}`;
-    if (rest.length <= 10)
-      return `+1 ${area} ${local.slice(0, 3)}-${local.slice(3)}`;
-    const extra = rest.slice(10);
-    return `+1 ${area} ${local.slice(0, 3)}-${local.slice(3, 7)} ${extra}`;
-  }
-
-  if (digits.startsWith("7")) {
-    const rest = digits.slice(1);
-    if (rest.length === 0) return "+7";
-    if (rest.length <= 3) return `+7 ${rest}`;
-    const area = rest.slice(0, 3);
-    const local = rest.slice(3);
-    if (rest.length <= 6) return `+7 ${area} ${local}`;
-    if (rest.length <= 10) return `+7 ${area} ${local.slice(0, 3)}-${local.slice(3)}`;
-    const extra = rest.slice(10);
-    return `+7 ${area} ${local.slice(0, 3)}-${local.slice(3, 7)} ${extra}`;
-  }
-
-  if (digits.length <= 3) return `+${digits}`;
-  if (digits.length <= 4) return `+${digits.slice(0, 2)} ${digits.slice(2)}`;
-  const country = digits.slice(0, 2);
-  const num = digits.slice(2);
-  if (num.length <= 4) return `+${country} ${num}`;
-  if (num.length <= 8) return `+${country} ${num.slice(0, 4)}-${num.slice(4)}`;
-  const groups: string[] = [];
-  groups.push(num.slice(0, 4));
-  const restG = num.slice(4);
-  for (let i = 0; i < restG.length; i += 4) groups.push(restG.slice(i, i + 4));
-  return `+${country} ${groups.join("-")}`;
+  return formatPhoneNumber(input, { defaultCountry: "BR", includeCountryCode: true });
 }
 
 function normalizeRecurringWeekdayToken(raw: unknown): string {
@@ -4332,7 +4271,7 @@ export function AtendimentoClient() {
     if (!selectedLead || deletingSelectedLoading) return;
     const sl = selectedLead;
     const name = String(sl.full_name ?? "").trim() || "Registro sem nome";
-    const phone = String(sl.phone ?? "").trim() || "Sem telefone";
+    const phone = formatPhoneNumber(sl.phone, { defaultCountry: "BR", includeCountryCode: true }) || "Sem telefone";
     if (!window.confirm(`Excluir Registro?\n\n${name}\n${phone}\n\nEsta ação é permanente.`)) {
       return;
     }
@@ -4712,12 +4651,12 @@ export function AtendimentoClient() {
                 required
                 value={createLeadPhone}
                 onChange={(e) => setCreateLeadPhone(applyPhoneMask(e.target.value))}
-                placeholder="+99 (99) 9 9999-9999"
+                placeholder="+55 (65) 99693-3336"
                 disabled={createLeadSaving}
                 className="mt-1.5 w-full !bg-white rounded-xl border border-[var(--app-border)] px-4 py-2.5 text-[14px] font-medium text-[var(--app-text-85)] placeholder:text-[var(--app-text-45)] focus:border-[var(--app-accent-color)]/35 focus:ring-0 outline-none disabled:cursor-not-allowed disabled:opacity-60"
               />
               <div className="mt-1.5 text-[11px] text-[var(--app-text-50)]">
-                Preencha ou cole o número. Formata automático: +55 (65) 9 9693-3336 / +1 (415) 555-9876
+                Preencha ou cole o número. Formata automático: +55 (65) 99693-3336 / +1 (415) 555-9876 / +351 912 345 678
               </div>
             </div>
 
@@ -4813,7 +4752,7 @@ export function AtendimentoClient() {
                   required
                   value={editLeadPhone}
                   onChange={(e) => setEditLeadPhone(applyPhoneMask(e.target.value))}
-                  placeholder="+99 (99) 9 9999-9999"
+                  placeholder="+55 (65) 99693-3336"
                   disabled={editLeadSaving}
                   className="mt-1.5 w-full !bg-white rounded-xl border border-[var(--app-border)] px-4 py-2.5 text-[14px] font-medium text-[var(--app-text-85)] placeholder:text-[var(--app-text-45)] focus:border-[var(--app-accent-color)]/35 focus:ring-0 outline-none disabled:cursor-not-allowed disabled:opacity-60"
                 />

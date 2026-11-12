@@ -9,6 +9,7 @@ import {
   resolveRecurringOccurrenceSearchFromDate,
 } from "../../../lib/atendimento/experimentalClass";
 import { ATENDIMENTO_PROFESSOR_TIME_ZONE } from "../../../lib/atendimento/constants";
+import { formatPhoneNumber } from "@/lib/phone";
 import { resolveStudentTimezone } from "../../../lib/timezone";
 import { AppModal } from "@/components/app/AppModal";
 import { Info, X, Eye, EyeOff, Copy, Check } from "lucide-react";
@@ -504,40 +505,7 @@ export default function CadastroRecorrenteBody() {
   }
 
   function formatPhoneMasked(v: string | null | undefined): string {
-    const d = digitsOnly(v).slice(0, 13);
-    if (!d) return "";
-    if (d.startsWith("1")) {
-      const rest = d.slice(1);
-      if (!rest) return "+1";
-      if (rest.length <= 3) return `+1 ${rest}`;
-      const area = rest.slice(0, 3);
-      const local = rest.slice(3);
-      if (!local) return `+1 ${area}`;
-      if (local.length <= 3) return `+1 ${area} ${local}`;
-      if (local.length <= 7) return `+1 ${area} ${local.slice(0, 3)}-${local.slice(3)}`;
-      return `+1 ${area} ${local.slice(0, 3)}-${local.slice(3, 7)} ${local.slice(7)}`.trim();
-    }
-    if (d.startsWith("55")) {
-      const rest = d.slice(2);
-      if (!rest) return "+55";
-      if (rest.length <= 2) return `+55 (${rest}`;
-      const ddd = rest.slice(0, 2);
-      const local = rest.slice(2);
-      if (!local) return `+55 (${ddd})`;
-      if (local.length <= 4) return `+55 (${ddd}) ${local}`;
-      if (local.length <= 9) return `+55 (${ddd}) ${local.slice(0, 5)}-${local.slice(5)}`;
-      return `+55 (${ddd}) ${local.slice(0, 5)}-${local.slice(5, 9)} ${local.slice(9)}`.trim();
-    }
-    if (d.length <= 10) {
-      let out = "(" + d.slice(0, 2);
-      if (d.length > 2) out += ") " + d.slice(2, 6);
-      if (d.length > 6) out += "-" + d.slice(6, 10);
-      return out;
-    }
-    if (d.length <= 11) {
-      return `(${d.slice(0, 2)}) ${d.slice(2, 7)}-${d.slice(7, 11)}`;
-    }
-    return `+${d.slice(0, 2)} (${d.slice(2, 4)}) ${d.slice(4, 9)}-${d.slice(9, 13)}`;
+    return formatPhoneNumber(v, { defaultCountry: "BR", includeCountryCode: true });
   }
 
   function formatFieldValue(name: string, raw: string | null | undefined): string {
@@ -2030,37 +1998,7 @@ export default function CadastroRecorrenteBody() {
   }
 
   function alunoFormatPhoneMasked(raw: unknown): string {
-    const d = String(raw ?? "").replace(/\D/g, "").trim();
-    if (!d) return "";
-    if (d.startsWith("1")) {
-      const rest = d.slice(1);
-      if (!rest) return "+1";
-      if (rest.length <= 3) return `+1 ${rest}`;
-      const area = rest.slice(0, 3);
-      const local = rest.slice(3);
-      if (!local) return `+1 ${area}`;
-      if (local.length <= 3) return `+1 ${area} ${local}`;
-      if (local.length <= 7) return `+1 ${area} ${local.slice(0, 3)}-${local.slice(3)}`;
-      return `+1 ${area} ${local.slice(0, 3)}-${local.slice(3, 7)} ${local.slice(7)}`.trim();
-    }
-    if (d.startsWith("55")) {
-      const rest = d.slice(2);
-      if (rest.length === 10) {
-        return `+55 ${rest.slice(0, 2)} ${rest.slice(2, 6)}-${rest.slice(6)}`;
-      }
-      if (rest.length === 11) {
-        return `+55 ${rest.slice(0, 2)} ${rest.slice(2, 3)} ${rest.slice(3, 7)}-${rest.slice(7)}`;
-      }
-      if (rest.length <= 2) return `+55 ${rest}`;
-      return `+55 ${rest.slice(0, 2)} ${rest.slice(2)}`;
-    }
-    if (d.length === 10) {
-      return `(${d.slice(0,2)}) ${d.slice(2,6)}-${d.slice(6)}`;
-    }
-    if (d.length === 11) {
-      return `(${d.slice(0,2)}) ${d.slice(2,3)} ${d.slice(3,7)}-${d.slice(7)}`;
-    }
-    return d;
+    return formatPhoneNumber(raw, { defaultCountry: "BR", includeCountryCode: true });
   }
 
   function alunoBuildEmailFromLead(lead: any): string {
@@ -3954,7 +3892,7 @@ export default function CadastroRecorrenteBody() {
               </div>
 
               <div className="pt-2 max-w-2xl mx-auto text-center text-sm text-slate-500">
-                <p>Qualquer dúvida, entre em contato pelo WhatsApp <a href="https://wa.me/5565996933336" target="_blank" rel="noopener noreferrer" className="font-semibold text-slate-700 hover:text-indigo-600 transition-colors">(65) 9 9693-3336</a>.</p>
+                <p>Qualquer dúvida, entre em contato pelo WhatsApp <a href="https://wa.me/5565996933336" target="_blank" rel="noopener noreferrer" className="font-semibold text-slate-700 hover:text-indigo-600 transition-colors">+55 (65) 99693-3336</a>.</p>
               </div>
             </section>
           )}
