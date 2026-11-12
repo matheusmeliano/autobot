@@ -4651,12 +4651,12 @@ export function AtendimentoClient() {
                 required
                 value={createLeadPhone}
                 onChange={(e) => setCreateLeadPhone(applyPhoneMask(e.target.value))}
-                placeholder="+55 (65) 99693-3336"
+                placeholder="+55 (65) 99999-9999"
                 disabled={createLeadSaving}
                 className="mt-1.5 w-full !bg-white rounded-xl border border-[var(--app-border)] px-4 py-2.5 text-[14px] font-medium text-[var(--app-text-85)] placeholder:text-[var(--app-text-45)] focus:border-[var(--app-accent-color)]/35 focus:ring-0 outline-none disabled:cursor-not-allowed disabled:opacity-60"
               />
               <div className="mt-1.5 text-[11px] text-[var(--app-text-50)]">
-                Preencha ou cole o número. Formata automático: +55 (65) 99693-3336 / +1 (415) 555-9876 / +351 912 345 678
+                Preencha ou cole o número. Formata automático: +55 (65) 99999-9999 / +1 (555) 555-1234 / +351 912 345 678
               </div>
             </div>
 
@@ -4752,7 +4752,7 @@ export function AtendimentoClient() {
                   required
                   value={editLeadPhone}
                   onChange={(e) => setEditLeadPhone(applyPhoneMask(e.target.value))}
-                  placeholder="+55 (65) 99693-3336"
+                  placeholder="+55 (65) 99999-9999"
                   disabled={editLeadSaving}
                   className="mt-1.5 w-full !bg-white rounded-xl border border-[var(--app-border)] px-4 py-2.5 text-[14px] font-medium text-[var(--app-text-85)] placeholder:text-[var(--app-text-45)] focus:border-[var(--app-accent-color)]/35 focus:ring-0 outline-none disabled:cursor-not-allowed disabled:opacity-60"
                 />
