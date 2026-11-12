@@ -62,6 +62,114 @@ type SubmitResponse = {
   error?: string;
 };
 
+type EnrollmentPaymentCountry = "US" | "PT";
+
+type EnrollmentPaymentConfig = {
+  country: EnrollmentPaymentCountry;
+  onlinePaymentUrl: string;
+  depositTitle: string;
+  depositAmount: string;
+  depositMethodSummary: string;
+  depositCurrencyLabel: string;
+  pixTotal: string;
+  pixRate: string;
+  pixCode: string;
+  pixQrSrc: string;
+  promoLabel: string;
+  promoPromotionalPeriod: string;
+  promoPromotionalAmount: string;
+  promoRegularPeriod: string;
+  promoRegularAmount: string;
+};
+
+const US_ENROLLMENT_PIX_CODE =
+  "00020126360014br.gov.bcb.pix0114+55659998511425204000053039865406495.005802BR5920Loivo de Brum Castro6009SAO PAULO62070503***6304E2C4";
+const PT_ENROLLMENT_PIX_CODE =
+  "00020126360014br.gov.bcb.pix0114+55659998511425204000053039865406540.005802BR5920Loivo de Brum Castro6009SAO PAULO62070503***63047BF7";
+
+const ENROLLMENT_PAYMENT_CONFIGS: Record<EnrollmentPaymentCountry, EnrollmentPaymentConfig> = {
+  US: {
+    country: "US",
+    onlinePaymentUrl: "https://buy.stripe.com/7sY8wQ4LQ3LC4x43AAcwg05",
+    depositTitle: "Depósito internacional USD",
+    depositAmount: "US$ 99,00",
+    depositMethodSummary: "Wise US Inc · Conta Checking (USD).",
+    depositCurrencyLabel: "Dólar americano",
+    pixTotal: "R$ 495,00",
+    pixRate: "US$ 1,00 = R$ 5,00",
+    pixCode: US_ENROLLMENT_PIX_CODE,
+    pixQrSrc: "/qr-code-3.jpeg",
+    promoLabel: "Condição especial · 3 primeiros meses",
+    promoPromotionalPeriod: "nos 3 primeiros meses",
+    promoPromotionalAmount: "US$ 99",
+    promoRegularPeriod: "4º mês",
+    promoRegularAmount: "US$ 119",
+  },
+  PT: {
+    country: "PT",
+    onlinePaymentUrl: "https://buy.stripe.com/7sY8wQ4LQ3LC4x43AAcwg05",
+    depositTitle: "Depósito internacional EUR",
+    depositAmount: "€ 90,00",
+    depositMethodSummary: "Wise US Inc · Conta Checking.",
+    depositCurrencyLabel: "Euro",
+    pixTotal: "R$ 540,00",
+    pixRate: "€ 1,00 = R$ 6,00",
+    pixCode: PT_ENROLLMENT_PIX_CODE,
+    pixQrSrc: "/qr-code-portugal.png",
+    promoLabel: "Condição especial · 6 primeiros meses",
+    promoPromotionalPeriod: "nos 6 primeiros meses",
+    promoPromotionalAmount: "€ 90",
+    promoRegularPeriod: "7º mês",
+    promoRegularAmount: "€ 120",
+  },
+};
+
+function normalizeEnrollmentPaymentCountry(value: unknown): EnrollmentPaymentCountry | null {
+  const normalized = String(value ?? "").trim().toLowerCase();
+  if (!normalized) return null;
+  if (
+    normalized === "pt" ||
+    normalized === "prt" ||
+    normalized.includes("portugal")
+  ) {
+    return "PT";
+  }
+  if (
+    normalized === "us" ||
+    normalized === "usa" ||
+    normalized === "eua" ||
+    normalized.includes("estados unidos") ||
+    normalized.includes("united states")
+  ) {
+    return "US";
+  }
+  return null;
+}
+
+function detectEnrollmentPaymentCountry(params: {
+  phone?: string | null;
+  country?: string | null;
+  state?: string | null;
+  city?: string | null;
+  timeZone?: string | null;
+}): EnrollmentPaymentCountry {
+  const digits = String(params.phone ?? "").replace(/\D/g, "").trim();
+  if (digits.startsWith("351")) return "PT";
+  if (digits.startsWith("1")) return "US";
+
+  const explicitCountry = normalizeEnrollmentPaymentCountry(params.country);
+  if (explicitCountry) return explicitCountry;
+
+  const inferredCountry = normalizeEnrollmentPaymentCountry(
+    inferCountry(
+      String(params.state ?? "").trim() || null,
+      String(params.city ?? "").trim() || null,
+      String(params.timeZone ?? "").trim() || null,
+    ),
+  );
+  return inferredCountry ?? "US";
+}
+
 type ContractFieldMeta = {
   name: "full_name" | "cpf" | "phone" | "legal_responsible_name" | "legal_responsible_cpf";
   label: string;
@@ -508,6 +616,34 @@ export default function CadastroRecorrenteBody() {
   const [alunoLoginMostrarSenha, setAlunoLoginMostrarSenha] = useState(false);
   const [alunoLoginErro, setAlunoLoginErro] = useState("");
   const [alunoLoginLoading, setAlunoLoginLoading] = useState(false);
+  const enrollmentPaymentCountry = useMemo<EnrollmentPaymentCountry>(() => {
+    return detectEnrollmentPaymentCountry({
+      phone: String(alunoLeadFull?.phone ?? phoneField ?? "").trim() || null,
+      country:
+        String(alunoLeadFull?.country ?? "").trim() ||
+        null,
+      state:
+        String(alunoLeadFull?.state ?? stateField ?? "").trim() ||
+        null,
+      city:
+        String(alunoLeadFull?.city ?? cityField ?? "").trim() ||
+        null,
+      timeZone:
+        String(alunoLeadFull?.timezone ?? leadTimezone ?? "").trim() ||
+        null,
+    });
+  }, [
+    alunoLeadFull?.phone,
+    alunoLeadFull?.country,
+    alunoLeadFull?.state,
+    alunoLeadFull?.city,
+    alunoLeadFull?.timezone,
+    phoneField,
+    stateField,
+    cityField,
+    leadTimezone,
+  ]);
+  const enrollmentPaymentConfig = ENROLLMENT_PAYMENT_CONFIGS[enrollmentPaymentCountry];
   const [alunoEnrollmentCopied, setAlunoEnrollmentCopied] = useState(false);
   const [alunoEnrollmentBackfillDone, setAlunoEnrollmentBackfillDone] = useState(false);
   const [alunoStatusDismissed, setAlunoStatusDismissed] = useState<null | boolean>(null);
@@ -3421,12 +3557,12 @@ export default function CadastroRecorrenteBody() {
                           </div>
                           <div className="min-w-0 flex-1">
                             <div className="text-base sm:text-lg font-bold text-slate-900 leading-snug">2. Depósito bancário</div>
-                            <div className="text-sm text-slate-500 mt-1 leading-relaxed">Wise US Inc · Conta Checking (USD).</div>
+                            <div className="text-sm text-slate-500 mt-1 leading-relaxed">{enrollmentPaymentConfig.depositMethodSummary}</div>
                           </div>
                         </div>
                         <div className="sm:text-right sm:shrink-0 self-start sm:self-center">
-                          <div className="text-2xl sm:text-3xl font-black text-slate-900 leading-none">US$ 99,00</div>
-                          <div className="text-xs sm:text-sm text-slate-500 mt-1">Dólar americano</div>
+                          <div className="text-2xl sm:text-3xl font-black text-slate-900 leading-none">{enrollmentPaymentConfig.depositAmount}</div>
+                          <div className="text-xs sm:text-sm text-slate-500 mt-1">{enrollmentPaymentConfig.depositCurrencyLabel}</div>
                         </div>
                       </div>
                     </button>
@@ -3448,8 +3584,8 @@ export default function CadastroRecorrenteBody() {
                           </div>
                         </div>
                         <div className="sm:text-right sm:shrink-0 self-start sm:self-center">
-                          <div className="text-2xl sm:text-3xl font-black text-emerald-700 leading-none">R$ 495,00</div>
-                          <div className="text-xs sm:text-sm text-slate-500 mt-1">US$ 1,00 = R$ 5,00</div>
+                          <div className="text-2xl sm:text-3xl font-black text-emerald-700 leading-none">{enrollmentPaymentConfig.pixTotal}</div>
+                          <div className="text-xs sm:text-sm text-slate-500 mt-1">{enrollmentPaymentConfig.pixRate}</div>
                         </div>
                       </div>
                     </button>
@@ -3464,10 +3600,10 @@ export default function CadastroRecorrenteBody() {
                       </div>
                       <div className="min-w-0 flex-1 space-y-1.5">
                         <div className="text-xs sm:text-sm font-bold uppercase tracking-wider text-emerald-800">
-                          Condição especial · 3 primeiros meses
+                          {enrollmentPaymentConfig.promoLabel}
                         </div>
                         <div className="text-sm sm:text-base text-emerald-900 leading-relaxed">
-                          Para você que participou da aula experimental, oferecemos uma condição especial: nos 3 primeiros meses, a mensalidade será de <strong className="font-extrabold">US$ 99</strong>. A partir do 4º mês, será aplicado o valor regular de <strong className="font-extrabold">US$ 119</strong> por mês.
+                          Para você que participou da aula experimental, oferecemos uma condição especial: {enrollmentPaymentConfig.promoPromotionalPeriod}, a mensalidade será de <strong className="font-extrabold">{enrollmentPaymentConfig.promoPromotionalAmount}</strong>. A partir do {enrollmentPaymentConfig.promoRegularPeriod}, será aplicado o valor regular de <strong className="font-extrabold">{enrollmentPaymentConfig.promoRegularAmount}</strong> por mês.
                         </div>
                       </div>
                     </div>
@@ -3545,7 +3681,7 @@ export default function CadastroRecorrenteBody() {
                   </div>
 
                   <a
-                    href="https://buy.stripe.com/7sY8wQ4LQ3LC4x43AAcwg05"
+                    href={enrollmentPaymentConfig.onlinePaymentUrl}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-2xl px-5 sm:px-8 py-4 bg-sky-600 text-white font-bold text-base sm:text-xl shadow-lg shadow-sky-200 hover:bg-sky-700 transition w-full max-w-2xl mx-auto min-w-0"
@@ -3601,10 +3737,10 @@ export default function CadastroRecorrenteBody() {
                     </svg>
                   </div>
                   <div>
-                    <h2 className="text-2xl sm:text-3xl font-extrabold text-slate-900">Depósito internacional USD</h2>
+                    <h2 className="text-2xl sm:text-3xl font-extrabold text-slate-900">{enrollmentPaymentConfig.depositTitle}</h2>
                     <div className="mt-4 inline-flex items-center gap-2 rounded-full border border-slate-300 bg-slate-50 px-5 py-2">
                       <div className="text-base sm:text-sm font-semibold text-slate-700">Valor:</div>
-                      <div className="text-2xl sm:text-3xl font-black text-slate-900">US$ 99,00</div>
+                      <div className="text-2xl sm:text-3xl font-black text-slate-900">{enrollmentPaymentConfig.depositAmount}</div>
                     </div>
                   </div>
 
@@ -3640,10 +3776,16 @@ export default function CadastroRecorrenteBody() {
                         </svg>
                         Recomendado
                       </span>
-                      <strong className="font-bold block">Preferencialmente, utilize ACH Transfer para realizar o pagamento.</strong>
+                      <strong className="font-bold block">
+                        {enrollmentPaymentCountry === "PT"
+                          ? "Utilize os dados bancários informados exatamente como exibidos acima para realizar o depósito internacional."
+                          : "Preferencialmente, utilize ACH Transfer para realizar o pagamento."}
+                      </strong>
                     </p>
                     <p className="text-xs sm:text-sm text-sky-800/90 leading-relaxed">
-                      Transferências ACH são processadas em dólares americanos diretamente entre contas bancárias dos EUA, com tarifas menores e liberação mais rápida.
+                      {enrollmentPaymentCountry === "PT"
+                        ? "Confira atentamente a moeda e o valor antes de concluir a transferência para evitar divergências na confirmação do pagamento."
+                        : "Transferências ACH são processadas em dólares americanos diretamente entre contas bancárias dos EUA, com tarifas menores e liberação mais rápida."}
                     </p>
                   </div>
 
@@ -3700,7 +3842,7 @@ export default function CadastroRecorrenteBody() {
                             Câmbio utilizado
                           </div>
                           <div className="text-lg sm:text-2xl font-black text-slate-800 leading-none whitespace-nowrap overflow-hidden text-ellipsis w-full">
-                            US$ 1,00 = R$ 5,00
+                            {enrollmentPaymentConfig.pixRate}
                           </div>
                         </div>
                         <div className="hidden sm:flex self-stretch w-px bg-emerald-300/70" />
@@ -3712,7 +3854,7 @@ export default function CadastroRecorrenteBody() {
                             Total a pagar
                           </div>
                           <div className="text-2xl sm:text-4xl font-black tracking-tight leading-none whitespace-nowrap overflow-hidden text-ellipsis w-full">
-                            R$ 495,00
+                            {enrollmentPaymentConfig.pixTotal}
                           </div>
                         </div>
                       </div>
@@ -3724,8 +3866,8 @@ export default function CadastroRecorrenteBody() {
                       <div className="text-sm font-bold uppercase tracking-wider text-emerald-800 mb-3">QR Code</div>
                       <div className="w-full aspect-square max-w-[280px] rounded-2xl bg-white border-2 border-emerald-100 p-3 flex items-center justify-center mx-auto overflow-hidden">
                         <img
-                          src="/qr-code-3.jpeg"
-                          alt="QR Code PIX"
+                          src={enrollmentPaymentConfig.pixQrSrc}
+                          alt={enrollmentPaymentCountry === "PT" ? "QR Code PIX Portugal" : "QR Code PIX"}
                           className="w-full h-full object-contain"
                         />
                       </div>
@@ -3737,12 +3879,12 @@ export default function CadastroRecorrenteBody() {
                     <div className="rounded-3xl border-2 border-emerald-200 bg-white p-5 sm:p-6 flex flex-col shadow-sm">
                       <div className="text-sm font-bold uppercase tracking-wider text-emerald-800 mb-3">PIX Copia e Cola</div>
                       <div className="w-full rounded-2xl bg-slate-50 border border-slate-200 p-3 sm:p-4 break-all font-mono text-[11px] sm:text-xs leading-relaxed text-slate-800 select-all">
-                        00020126360014br.gov.bcb.pix0114+55659998511425204000053039865406495.005802BR5920Loivo de Brum Castro6009SAO PAULO62070503***6304E2C4
+                        {enrollmentPaymentConfig.pixCode}
                       </div>
                       <button
                         onClick={async () => {
                           try {
-                            const code = "00020126360014br.gov.bcb.pix0114+55659998511425204000053039865406495.005802BR5920Loivo de Brum Castro6009SAO PAULO62070503***6304E2C4";
+                            const code = enrollmentPaymentConfig.pixCode;
                             if (navigator?.clipboard?.writeText) {
                               await navigator.clipboard.writeText(code);
                             }
@@ -3862,19 +4004,21 @@ export default function CadastroRecorrenteBody() {
               <li className="rounded-2xl border border-indigo-500/15 bg-indigo-500/5 px-4 sm:px-5 py-4">
                 <div className="text-sm font-bold text-indigo-900 mb-1">Cartão de crédito</div>
                 <p className="text-slate-700">
-                  US$ 116,00 por mês, mantendo esse mesmo valor nas mensalidades seguintes.
+                  {enrollmentPaymentCountry === "PT"
+                    ? `€ 90,00 ${enrollmentPaymentConfig.promoPromotionalPeriod}. A partir do ${enrollmentPaymentConfig.promoRegularPeriod}, a mensalidade passa a ser de ${enrollmentPaymentConfig.promoRegularAmount} por mês.`
+                    : "US$ 99,00 nos 3 primeiros meses. A partir do 4º mês, a mensalidade passa a ser de US$ 119,00."}
                 </p>
               </li>
               <li className="rounded-2xl border border-sky-500/15 bg-sky-500/5 px-4 sm:px-5 py-4">
                 <div className="text-sm font-bold text-sky-900 mb-1">Depósito bancário</div>
                 <p className="text-slate-700">
-                  US$ 100,00 no primeiro mês. A partir do segundo mês, a mensalidade passa a ser de US$ 119,00.
+                  {enrollmentPaymentConfig.depositAmount} {enrollmentPaymentConfig.promoPromotionalPeriod}. A partir do {enrollmentPaymentConfig.promoRegularPeriod}, a mensalidade passa a ser de {enrollmentPaymentConfig.promoRegularAmount}.
                 </p>
               </li>
               <li className="rounded-2xl border border-emerald-500/20 bg-emerald-500/10 px-4 sm:px-5 py-4">
                 <div className="text-sm font-bold text-emerald-800 mb-1">Pix</div>
                 <p className="text-slate-800">
-                  US$ 100,00 ou R$ 500,00 no primeiro mês, considerando a cotação de US$ 1,00 = R$ 5,00. A partir do segundo mês, a mensalidade passa a ser de US$ 119,00.
+                  {enrollmentPaymentConfig.depositAmount} ou {enrollmentPaymentConfig.pixTotal} {enrollmentPaymentConfig.promoPromotionalPeriod}, considerando a cotação de {enrollmentPaymentConfig.pixRate}. A partir do {enrollmentPaymentConfig.promoRegularPeriod}, a mensalidade passa a ser de {enrollmentPaymentConfig.promoRegularAmount}.
                 </p>
               </li>
             </ul>
