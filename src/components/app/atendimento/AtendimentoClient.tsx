@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { AlertCircle, AlertTriangle, BarChart3, Bot, Calendar as CalendarIcon, Check, CheckCircle2, ChevronDown, ChevronLeft, ChevronRight, Copy, Eraser, ExternalLink, FileText, GraduationCap, Info, Loader2, MapPin, Palette, Pencil, Plus, RefreshCw, Save, Search, Sparkles, Trash2, UserRound, X, Zap } from "lucide-react";
+import { AlertCircle, AlertTriangle, BarChart3, Bot, Calendar as CalendarIcon, Check, CheckCircle2, ChevronDown, ChevronLeft, ChevronRight, Copy, Eraser, ExternalLink, FileText, Info, Loader2, MapPin, Palette, Pencil, Plus, RefreshCw, Save, Search, Sparkles, Trash2, UserRound, Users, X, Zap } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { ATENDIMENTO_PROFESSOR_TIME_ZONE, STAGE_LABELS, STATUS_LABELS } from "@/lib/atendimento/constants";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
@@ -5388,7 +5388,7 @@ export function AtendimentoClient() {
           <div className="flex shrink-0 items-center justify-between gap-3 px-5 pt-5 pb-4 border-b border-[var(--app-border)]">
             <div className="flex items-center gap-3 min-w-0">
               <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-[rgba(234,88,12,0.20)] bg-[rgba(234,88,12,0.08)] text-[#9a3412]">
-                <GraduationCap className="h-5 w-5" strokeWidth={2} />
+                <Users className="h-5 w-5" strokeWidth={2} />
               </div>
               <div className="min-w-0">
                 <h3 className="truncate text-[17px] font-bold leading-tight text-[var(--app-text-95)]">
@@ -5767,7 +5767,7 @@ export function AtendimentoClient() {
                 onClick={() => void handleOpenExperimentalGroupSettings()}
                 className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] text-[var(--app-text-75)] transition-all hover:bg-[var(--app-hover)] disabled:cursor-not-allowed disabled:opacity-60"
               >
-                <GraduationCap className="h-5 w-5" strokeWidth={1.75} />
+                <Users className="h-5 w-5" strokeWidth={1.75} />
               </button>
             </div>
             <div className="relative shrink-0">
@@ -7354,7 +7354,7 @@ export function AtendimentoClient() {
                             >
                               <div className="flex items-start justify-between gap-3">
                                 <div className="flex items-center gap-2 min-w-0">
-                                  <GraduationCap className="h-5 w-5 shrink-0 text-[var(--app-text-70)]" />
+                                  <Users className="h-5 w-5 shrink-0 text-[var(--app-text-70)]" />
                                   <div className="min-w-0">
                                     <div className="truncate text-[15px] font-bold text-[var(--app-text-85)]">
                                       Aula Experimental em Grupo
@@ -8936,7 +8936,7 @@ export function AtendimentoClient() {
                           >
                             <div className="flex items-start justify-between gap-3">
                               <div className="flex items-center gap-2 min-w-0">
-                                <GraduationCap className="h-5 w-5 shrink-0 text-[var(--app-text-70)]" />
+                                <Users className="h-5 w-5 shrink-0 text-[var(--app-text-70)]" />
                                 <div className="min-w-0">
                                   <div className="truncate text-[15px] font-bold text-[var(--app-text-85)]">
                                     Aula Experimental em Grupo
