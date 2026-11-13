@@ -9266,13 +9266,20 @@ export function AtendimentoClient() {
                 >
                   <span
                     className={[
-                      "flex h-6 w-6 items-center justify-center rounded-full transition",
+                      "relative flex h-7 w-12 shrink-0 items-center rounded-full border transition",
                       experimentalGroupFormEnabled
-                        ? "bg-emerald-600 text-white"
-                        : "bg-[var(--app-solid-surface)] text-[var(--app-text-55)]",
+                        ? "border-emerald-500/30 bg-emerald-500/20"
+                        : "border-[var(--app-border)] bg-[var(--app-solid-surface)]",
                     ].join(" ")}
                   >
-                    <Check className="h-3.5 w-3.5" />
+                    <span
+                      className={[
+                        "absolute h-5 w-5 rounded-full shadow-sm transition-all",
+                        experimentalGroupFormEnabled
+                          ? "left-[22px] bg-emerald-600"
+                          : "left-1 bg-[var(--app-text-45)]",
+                      ].join(" ")}
+                    />
                   </span>
                   <span className="text-[13px] font-semibold">
                     {experimentalGroupFormEnabled ? "Ativada" : "Desativada"}
