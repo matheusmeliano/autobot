@@ -9247,9 +9247,7 @@ export function AtendimentoClient() {
             <div className="rounded-2xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] p-4">
               <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <div>
-                  <div className="text-[14px] font-bold text-[var(--app-text-85)]">
-                    Ativar turmas experimentais em grupo
-                  </div>
+                  <div className="text-[14px] font-bold text-[var(--app-text-85)]">Ativar turmas</div>
                   <div className="mt-1 text-[12px] text-[var(--app-text-55)]">
                     Quando ligado, o Atendimento pode usar os dois dias e horarios definidos abaixo.
                   </div>
