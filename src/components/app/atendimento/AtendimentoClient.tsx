@@ -9315,7 +9315,7 @@ export function AtendimentoClient() {
                 ].join(" ")}
               >
                 <div className="space-y-4">
-                  <div className="flex items-center justify-between gap-3">
+                  <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                     <div>
                       <div className="text-[14px] font-bold text-[var(--app-text-85)]">
                         {card.title}
@@ -9340,7 +9340,7 @@ export function AtendimentoClient() {
                         Selecione 1 dia
                       </div>
                     </div>
-                    <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 md:grid-cols-7">
+                    <div className="grid grid-cols-2 gap-2 min-[520px]:grid-cols-3 sm:grid-cols-4">
                       {experimentalGroupWeekdayOptions.map((option) => {
                         const isSelected = card.selectedWeekday === option.value;
                         const shortLabel =
@@ -9352,7 +9352,7 @@ export function AtendimentoClient() {
                             disabled={!experimentalGroupFormEnabled}
                             onClick={() => card.setWeekday(option.value)}
                             className={[
-                              "flex min-h-[76px] flex-col items-center justify-center gap-1 rounded-2xl border px-2 py-2 text-center transition duration-150 disabled:cursor-not-allowed disabled:opacity-60",
+                              "flex min-h-[64px] flex-col items-center justify-center gap-0.5 rounded-2xl border px-2 py-2 text-center transition duration-150 disabled:cursor-not-allowed disabled:opacity-60 sm:min-h-[70px]",
                               isSelected
                                 ? "!border-transparent !bg-[#ea580c] !text-white shadow-md"
                                 : "border-[var(--app-border)] bg-[var(--app-solid-surface)] text-[var(--app-text-85)] hover:border-[#ea580c]/35 hover:bg-[var(--app-hover)] hover:text-[var(--app-text-90)]",
@@ -9361,7 +9361,14 @@ export function AtendimentoClient() {
                             <div className={isSelected ? "text-[11px] font-semibold uppercase tracking-wide !text-white/95" : "text-[11px] font-semibold uppercase tracking-wide text-[var(--app-text-50)]"}>
                               {shortLabel}
                             </div>
-                            <div className={isSelected ? "text-[12px] font-semibold leading-none !text-white" : "text-[12px] font-semibold leading-none text-[var(--app-text-92)]"}>
+                            <div
+                              className={
+                                isSelected
+                                  ? "max-w-full truncate px-1 text-[11px] font-semibold leading-tight !text-white/95 sm:text-[12px]"
+                                  : "max-w-full truncate px-1 text-[11px] font-semibold leading-tight text-[var(--app-text-92)] sm:text-[12px]"
+                              }
+                              title={option.label}
+                            >
                               {option.label}
                             </div>
                           </button>
@@ -9379,7 +9386,7 @@ export function AtendimentoClient() {
                         Fuso: {String(experimentalGroupSettings?.professor_timezone ?? ATENDIMENTO_PROFESSOR_TIME_ZONE)}
                       </div>
                     </div>
-                    <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 md:grid-cols-5">
+                    <div className="grid grid-cols-2 gap-2 min-[520px]:grid-cols-3 sm:grid-cols-4">
                       {EXPERIMENTAL_CLASS_SLOT_TIMES.map((time) => {
                         const isSelected = card.selectedTime === time;
                         return (
@@ -9389,7 +9396,7 @@ export function AtendimentoClient() {
                             disabled={!experimentalGroupFormEnabled}
                             onClick={() => card.setTime(time)}
                             className={[
-                              "flex h-12 items-center justify-center rounded-2xl border px-2 text-[15px] font-semibold transition duration-150 disabled:cursor-not-allowed disabled:opacity-60",
+                              "flex h-11 items-center justify-center rounded-2xl border px-2 text-[14px] font-semibold transition duration-150 disabled:cursor-not-allowed disabled:opacity-60 sm:h-12 sm:text-[15px]",
                               isSelected
                                 ? "!border-transparent !bg-[#ea580c] !text-white shadow-md"
                                 : "border-[var(--app-border)] bg-[var(--app-solid-surface)] text-[var(--app-text-85)] hover:border-[#ea580c]/35 hover:bg-[var(--app-hover)] hover:text-[var(--app-text-90)]",
