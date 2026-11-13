@@ -6115,21 +6115,36 @@ export function AtendimentoClient() {
                     {/* MOBILE (< sm): botões Editar/Excluir OCUPAM TUDO centralizados lado a lado (X já tá no topo direito!) */}
                     {/* DESKTOP (sm+): 3 botões Editar/Excluir/X lado a lado normal */}
                     <div className="flex w-full shrink-0 items-center justify-center gap-2 sm:justify-end overflow-x-auto overflow-y-visible overscroll-contain sm:w-auto sm:overflow-visible">
-                    <button
-                      type="button"
-                      aria-label="Selecionar aula experimental em grupo"
-                      aria-pressed={isLeadMarkedForExperimentalGroup(sl)}
-                      onClick={() => void handleOpenExperimentalGroupModal(sl)}
-                      className={[
-                        "inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border transition-all shadow-none disabled:cursor-not-allowed disabled:opacity-60",
-                        isLeadMarkedForExperimentalGroup(sl)
-                          ? "border-emerald-500/35 bg-emerald-500/15 text-emerald-700 hover:bg-emerald-500/20"
-                          : "border-[var(--app-border)] bg-[var(--app-solid-surface)] text-[var(--app-text-75)] hover:bg-[var(--app-hover)]",
-                      ].join(" ")}
-                      title="Selecionar este registro para aula experimental em grupo"
-                    >
-                      <Users className="h-5 w-5" strokeWidth={1.75} />
-                    </button>
+                      {(() => {
+                        const groupShortcutLocked = leadHasScheduledExperimentalClassForGroupCard(sl);
+                        return (
+                          <button
+                            type="button"
+                            aria-label="Selecionar aula experimental em grupo"
+                            aria-pressed={isLeadMarkedForExperimentalGroup(sl)}
+                            onClick={() => {
+                              if (groupShortcutLocked) return;
+                              void handleOpenExperimentalGroupModal(sl);
+                            }}
+                            disabled={groupShortcutLocked}
+                            className={[
+                              "inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border transition-all shadow-none disabled:cursor-not-allowed disabled:opacity-60",
+                              groupShortcutLocked
+                                ? "border-[var(--app-border)] bg-[var(--app-solid-surface)] text-[var(--app-text-45)]"
+                                : isLeadMarkedForExperimentalGroup(sl)
+                                  ? "border-emerald-500/35 bg-emerald-500/15 text-emerald-700 hover:bg-emerald-500/20"
+                                  : "border-[var(--app-border)] bg-[var(--app-solid-surface)] text-[var(--app-text-75)] hover:bg-[var(--app-hover)]",
+                            ].join(" ")}
+                            title={
+                              groupShortcutLocked
+                                ? "Esse registro já possui aula experimental agendada."
+                                : "Selecionar este registro para aula experimental em grupo"
+                            }
+                          >
+                            <Users className="h-5 w-5" strokeWidth={1.75} />
+                          </button>
+                        );
+                      })()}
                       <button
                         type="button"
                         onClick={() => handleOpenEditSelected()}
@@ -7703,21 +7718,36 @@ export function AtendimentoClient() {
                   {/* MOBILE (< sm): botões Editar/Excluir OCUPAM TUDO centralizados lado a lado (X já tá no topo direito!) */}
                   {/* DESKTOP (sm+): 3 botões Editar/Excluir/X lado a lado normal */}
                   <div className="flex w-full shrink-0 items-center justify-center gap-2 sm:justify-end overflow-x-auto overflow-y-visible overscroll-contain sm:w-auto sm:overflow-visible">
-                    <button
-                      type="button"
-                      aria-label="Selecionar aula experimental em grupo"
-                      aria-pressed={isLeadMarkedForExperimentalGroup(sl)}
-                      onClick={() => void handleOpenExperimentalGroupModal(sl)}
-                      className={[
-                        "inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border transition-all shadow-none disabled:cursor-not-allowed disabled:opacity-60",
-                        isLeadMarkedForExperimentalGroup(sl)
-                          ? "border-emerald-500/35 bg-emerald-500/15 text-emerald-700 hover:bg-emerald-500/20"
-                          : "border-[var(--app-border)] bg-[var(--app-solid-surface)] text-[var(--app-text-75)] hover:bg-[var(--app-hover)]",
-                      ].join(" ")}
-                      title="Selecionar este registro para aula experimental em grupo"
-                    >
-                      <Users className="h-5 w-5" strokeWidth={1.75} />
-                    </button>
+                    {(() => {
+                      const groupShortcutLocked = leadHasScheduledExperimentalClassForGroupCard(sl);
+                      return (
+                        <button
+                          type="button"
+                          aria-label="Selecionar aula experimental em grupo"
+                          aria-pressed={isLeadMarkedForExperimentalGroup(sl)}
+                          onClick={() => {
+                            if (groupShortcutLocked) return;
+                            void handleOpenExperimentalGroupModal(sl);
+                          }}
+                          disabled={groupShortcutLocked}
+                          className={[
+                            "inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border transition-all shadow-none disabled:cursor-not-allowed disabled:opacity-60",
+                            groupShortcutLocked
+                              ? "border-[var(--app-border)] bg-[var(--app-solid-surface)] text-[var(--app-text-45)]"
+                              : isLeadMarkedForExperimentalGroup(sl)
+                                ? "border-emerald-500/35 bg-emerald-500/15 text-emerald-700 hover:bg-emerald-500/20"
+                                : "border-[var(--app-border)] bg-[var(--app-solid-surface)] text-[var(--app-text-75)] hover:bg-[var(--app-hover)]",
+                          ].join(" ")}
+                          title={
+                            groupShortcutLocked
+                              ? "Esse registro já possui aula experimental agendada."
+                              : "Selecionar este registro para aula experimental em grupo"
+                          }
+                        >
+                          <Users className="h-5 w-5" strokeWidth={1.75} />
+                        </button>
+                      );
+                    })()}
                     <button
                       type="button"
                       onClick={() => handleOpenEditSelected()}
