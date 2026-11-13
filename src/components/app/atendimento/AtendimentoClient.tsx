@@ -9323,9 +9323,6 @@ export function AtendimentoClient() {
                             ].join(" ")}
                           />
                         </span>
-                        <span className="text-[13px] font-semibold">
-                          {card.enabled ? "Ativada" : "Desativada"}
-                        </span>
                       </button>
                     </div>
                   </div>
