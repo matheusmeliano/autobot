@@ -6116,7 +6116,9 @@ export function AtendimentoClient() {
                     {/* DESKTOP (sm+): 3 botões Editar/Excluir/X lado a lado normal */}
                     <div className="flex w-full shrink-0 items-center justify-center gap-2 sm:justify-end overflow-x-auto overflow-y-visible overscroll-contain sm:w-auto sm:overflow-visible">
                       {(() => {
-                        const groupShortcutLocked = leadHasScheduledExperimentalClassForGroupCard(sl);
+                        const groupShortcutLocked =
+                          leadHasScheduledExperimentalClassForGroupCard(sl) ||
+                          isLeadMatriculaConcluida(sl);
                         return (
                           <button
                             type="button"
@@ -6137,7 +6139,9 @@ export function AtendimentoClient() {
                             ].join(" ")}
                             title={
                               groupShortcutLocked
-                                ? "Esse registro já possui aula experimental agendada."
+                                ? isLeadMatriculaConcluida(sl)
+                                  ? "Esse registro já é aluno."
+                                  : "Esse registro já possui aula experimental agendada."
                                 : "Selecionar este registro para aula experimental em grupo"
                             }
                           >
@@ -7719,7 +7723,9 @@ export function AtendimentoClient() {
                   {/* DESKTOP (sm+): 3 botões Editar/Excluir/X lado a lado normal */}
                   <div className="flex w-full shrink-0 items-center justify-center gap-2 sm:justify-end overflow-x-auto overflow-y-visible overscroll-contain sm:w-auto sm:overflow-visible">
                     {(() => {
-                      const groupShortcutLocked = leadHasScheduledExperimentalClassForGroupCard(sl);
+                      const groupShortcutLocked =
+                        leadHasScheduledExperimentalClassForGroupCard(sl) ||
+                        isLeadMatriculaConcluida(sl);
                       return (
                         <button
                           type="button"
@@ -7740,7 +7746,9 @@ export function AtendimentoClient() {
                           ].join(" ")}
                           title={
                             groupShortcutLocked
-                              ? "Esse registro já possui aula experimental agendada."
+                              ? isLeadMatriculaConcluida(sl)
+                                ? "Esse registro já é aluno."
+                                : "Esse registro já possui aula experimental agendada."
                               : "Selecionar este registro para aula experimental em grupo"
                           }
                         >
