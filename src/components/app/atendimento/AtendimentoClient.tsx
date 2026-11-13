@@ -9291,14 +9291,14 @@ export function AtendimentoClient() {
 
             {[
               {
-                title: "Dia 1",
+                title: "Turma 1",
                 selectedWeekday: experimentalGroupFormDayOneWeekday,
                 setWeekday: setExperimentalGroupFormDayOneWeekday,
                 selectedTime: experimentalGroupFormDayOneTime,
                 setTime: setExperimentalGroupFormDayOneTime,
               },
               {
-                title: "Dia 2",
+                title: "Turma 2",
                 selectedWeekday: experimentalGroupFormDayTwoWeekday,
                 setWeekday: setExperimentalGroupFormDayTwoWeekday,
                 selectedTime: experimentalGroupFormDayTwoTime,
