@@ -4,7 +4,10 @@ import {
   buildExperimentalGroupClassSlotsForLead,
   loadExperimentalGroupClassSettings,
 } from "@/lib/atendimento/experimentalGroupClassServer";
-import { isLeadPhoneEligibleForExperimentalGroup } from "@/lib/atendimento/experimentalGroupClass";
+import {
+  isLeadPhoneEligibleForExperimentalGroup,
+  resolveExperimentalGroupProfessorFromLead,
+} from "@/lib/atendimento/experimentalGroupClass";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -46,6 +49,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ leadId:
 
     const { settings, updatedAt } = await loadExperimentalGroupClassSettings({ admin });
     const hasPhone = isLeadPhoneEligibleForExperimentalGroup((lead as any)?.phone ?? null);
+    const assignedProfessor = resolveExperimentalGroupProfessorFromLead(lead as any);
 
     const { data: activeIndividualBookings, error: activeIndividualBookingsError } = await admin
       .from("atendimento_experimental_class_bookings")
@@ -76,12 +80,14 @@ export async function GET(_req: Request, { params }: { params: Promise<{ leadId:
     const reasons: string[] = [];
     if (!settings.enabled) reasons.push("feature_disabled");
     if (!hasPhone) reasons.push("missing_valid_phone");
+    if (!assignedProfessor) reasons.push("missing_assigned_professor");
     if (hasScheduledIndividual) reasons.push("individual_experimental_already_scheduled");
 
     return Response.json({
       ok: true,
       settings,
       settings_updated_at: updatedAt,
+      assigned_professor: assignedProfessor,
       lead: {
         id: String((lead as any)?.id ?? ""),
         experimental_class_mode_preference:

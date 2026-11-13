@@ -3,6 +3,7 @@ import {
   getDefaultExperimentalGroupClassSettings,
   listExperimentalGroupClassSlots,
   normalizeExperimentalGroupClassSettings,
+  resolveExperimentalGroupProfessorFromLead,
   type ExperimentalGroupClassRecord,
   type ExperimentalGroupClassSettings,
   type ExperimentalGroupClassMemberSummary,
@@ -236,6 +237,7 @@ export async function buildExperimentalGroupClassSlotsForLead(params: {
   return listExperimentalGroupClassSlots({
     settings,
     lead: params.lead ?? null,
+    assignedProfessor: resolveExperimentalGroupProfessorFromLead(params.lead ?? null),
     existingClasses,
     occupiedIntervals,
     bookedIndividualProfessorStartAts: bookedStarts,

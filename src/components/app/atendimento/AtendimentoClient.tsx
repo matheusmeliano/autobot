@@ -36,8 +36,6 @@ const EMPTY_SUMMARY: AtendimentoSummary = {
 
 type ExperimentalGroupSettingsPayload = {
   enabled: boolean;
-  professor_name: string | null;
-  professor_phone: string | null;
   professor_timezone?: string | null;
   capacity?: number;
   slots: Array<{ weekday: string; professor_time: string }>;
@@ -313,6 +311,7 @@ function deriveExperimentalGroupCardState(params: {
     /^1\d{10}$/.test(phoneDigits) ||
     /^351\d{9}$/.test(phoneDigits) ||
     phoneDigits.length >= 10;
+  const hasAssignedProfessor = Boolean(experimentalAssignedProfessorForLead(lead));
   const assignedGroupId = String((lead as any)?.experimental_class_group_class_id ?? "").trim();
   const assignedStatus = String((lead as any)?.experimental_class_group_status ?? "").trim().toLowerCase();
   const alreadyAssignedToGroup = Boolean(
@@ -322,6 +321,9 @@ function deriveExperimentalGroupCardState(params: {
 
   if (!params.settingsEnabled) reasons.push("Funcionalidade desativada.");
   if (!hasValidPhone) reasons.push("Registro sem telefone válido.");
+  if (!hasAssignedProfessor && !alreadyAssignedToGroup) {
+    reasons.push("Selecione primeiro o professor deste registro.");
+  }
   if (hasScheduledExperimentalClass && !alreadyAssignedToGroup) {
     reasons.push("O aluno já possui aula experimental definida.");
   }
@@ -332,6 +334,13 @@ function deriveExperimentalGroupCardState(params: {
     alreadyAssignedToGroup,
     interestRegistered: Boolean((lead as any)?.experimental_class_group_interest),
   };
+}
+
+function isLeadAssignedToExperimentalGroup(lead: AtendimentoLeadListItem | null | undefined): boolean {
+  if (!lead) return false;
+  const assignedGroupId = String((lead as any)?.experimental_class_group_class_id ?? "").trim();
+  const assignedStatus = String((lead as any)?.experimental_class_group_status ?? "").trim().toLowerCase();
+  return Boolean(assignedGroupId && assignedStatus !== "removed");
 }
 
 function hasLeadConfirmedPaymentForRecurringNotificationsClient(
@@ -1494,9 +1503,6 @@ export function AtendimentoClient() {
   const [experimentalGroupPreviewSlots, setExperimentalGroupPreviewSlots] = useState<
     ExperimentalGroupSlotPayload[]
   >([]);
-  const [experimentalGroupProfessorOptions, setExperimentalGroupProfessorOptions] = useState<
-    Array<{ name: string; phone: string; short?: string }>
-  >(EXPERIMENTAL_PROFESSOR_OPTIONS_CLIENT);
   const [experimentalGroupWeekdayOptions, setExperimentalGroupWeekdayOptions] = useState<
     Array<{ value: string; label: string }>
   >([]);
@@ -1504,7 +1510,6 @@ export function AtendimentoClient() {
   const [experimentalGroupSettingsLoading, setExperimentalGroupSettingsLoading] = useState(false);
   const [experimentalGroupSettingsSaving, setExperimentalGroupSettingsSaving] = useState(false);
   const [experimentalGroupFormEnabled, setExperimentalGroupFormEnabled] = useState(false);
-  const [experimentalGroupFormProfessorPhone, setExperimentalGroupFormProfessorPhone] = useState("");
   const [experimentalGroupFormDayOneWeekday, setExperimentalGroupFormDayOneWeekday] = useState("");
   const [experimentalGroupFormDayOneTime, setExperimentalGroupFormDayOneTime] = useState("");
   const [experimentalGroupFormDayTwoWeekday, setExperimentalGroupFormDayTwoWeekday] = useState("");
@@ -1547,6 +1552,10 @@ export function AtendimentoClient() {
     ExperimentalGroupSlotPayload[]
   >([]);
   const [experimentalGroupCanOpenModal, setExperimentalGroupCanOpenModal] = useState(false);
+  const [experimentalGroupAssignedProfessor, setExperimentalGroupAssignedProfessor] = useState<{
+    name: string;
+    phone: string;
+  } | null>(null);
   const [experimentalGroupSelectedSlotId, setExperimentalGroupSelectedSlotId] = useState<
     string | null
   >(null);
@@ -3415,16 +3424,10 @@ export function AtendimentoClient() {
     setExperimentalGroupPreviewSlots(
       Array.isArray(json?.preview_slots) ? (json.preview_slots as ExperimentalGroupSlotPayload[]) : [],
     );
-    setExperimentalGroupProfessorOptions(
-      Array.isArray(json?.professor_options) && json.professor_options.length > 0
-        ? (json.professor_options as Array<{ name: string; phone: string; short?: string }>)
-        : EXPERIMENTAL_PROFESSOR_OPTIONS_CLIENT,
-    );
     setExperimentalGroupWeekdayOptions(
       Array.isArray(json?.weekday_options) ? (json.weekday_options as Array<{ value: string; label: string }>) : [],
     );
     setExperimentalGroupFormEnabled(Boolean(settings?.enabled));
-    setExperimentalGroupFormProfessorPhone(String(settings?.professor_phone ?? "").trim());
     setExperimentalGroupFormDayOneWeekday(String(settings?.slots?.[0]?.weekday ?? "").trim());
     setExperimentalGroupFormDayOneTime(String(settings?.slots?.[0]?.professor_time ?? "").trim());
     setExperimentalGroupFormDayTwoWeekday(String(settings?.slots?.[1]?.weekday ?? "").trim());
@@ -3462,10 +3465,6 @@ export function AtendimentoClient() {
 
   async function handleSaveExperimentalGroupSettings() {
     if (experimentalGroupSettingsSaving) return;
-    if (!experimentalGroupFormProfessorPhone) {
-      modalToast.warning("Selecione o professor responsável.");
-      return;
-    }
     if (!experimentalGroupFormDayOneWeekday || !experimentalGroupFormDayOneTime || !experimentalGroupFormDayTwoWeekday || !experimentalGroupFormDayTwoTime) {
       modalToast.warning("Configure os dois dias e horários da turma.");
       return;
@@ -3474,14 +3473,6 @@ export function AtendimentoClient() {
       modalToast.warning("Escolha dois dias diferentes da semana.");
       return;
     }
-    const professor =
-      experimentalGroupProfessorOptions.find((item) => item.phone === experimentalGroupFormProfessorPhone) ??
-      null;
-    if (!professor) {
-      modalToast.warning("Professor inválido para a configuração.");
-      return;
-    }
-
     setExperimentalGroupSettingsSaving(true);
     try {
       const res = await fetch("/api/atendimento/settings/experimental-group-classes", {
@@ -3489,8 +3480,6 @@ export function AtendimentoClient() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           enabled: experimentalGroupFormEnabled,
-          professor_name: professor.name,
-          professor_phone: professor.phone,
           slots: [
             { weekday: experimentalGroupFormDayOneWeekday, professor_time: experimentalGroupFormDayOneTime },
             { weekday: experimentalGroupFormDayTwoWeekday, professor_time: experimentalGroupFormDayTwoTime },
@@ -3528,6 +3517,7 @@ export function AtendimentoClient() {
       }
       const slots = Array.isArray(json?.slots) ? (json.slots as ExperimentalGroupSlotPayload[]) : [];
       setExperimentalGroupCanOpenModal(Boolean(json?.can_open_modal));
+      setExperimentalGroupAssignedProfessor((json?.assigned_professor ?? null) as { name: string; phone: string } | null);
       setExperimentalGroupSlots(slots);
       const firstAssigned = slots.find((slot) => slot.is_current_lead_assigned) ?? slots[0] ?? null;
       setExperimentalGroupSelectedSlotId(firstAssigned ? String(firstAssigned.id) : null);
@@ -6916,6 +6906,7 @@ export function AtendimentoClient() {
                         const expTone = buildExperimentalMetaForList(sl).tone;
                         if (expTone === "success") {
                           const expAssigned = experimentalAssignedProfessorForLead(sl);
+                          const expIsGroupAssigned = isLeadAssignedToExperimentalGroup(sl);
                           const expSavedLink = experimentalLessonLinkForLead(sl);
                           const expHasPhone = Boolean(String(sl?.phone ?? "").trim());
                           const expBestBooking =
@@ -6952,7 +6943,7 @@ export function AtendimentoClient() {
                                 <div className="flex items-center gap-2 shrink-0 min-w-[190px] max-w-full min-[1201px]:self-center">
                                   <CalendarIcon className="h-5 w-5 shrink-0 text-[var(--app-text-70)]" />
                                   <div className="text-[15px] font-bold text-[var(--app-text-85)] truncate">
-                                    Aula experimental
+                                    {expIsGroupAssigned ? "Aula experimental em grupo" : "Aula experimental"}
                                   </div>
                                 </div>
                                 <div className="flex flex-wrap items-stretch justify-start sm:justify-end gap-2 sm:gap-3 w-full sm:w-auto min-w-0 sm:mt-0 mt-6">
@@ -7019,13 +7010,19 @@ export function AtendimentoClient() {
                                   <div className="flex w-full sm:w-auto shrink-0">
                                     <button
                                       type="button"
-                                      onClick={() => handleOpenExperimentalBooking(sl)}
+                                      onClick={() => {
+                                        if (expIsGroupAssigned) {
+                                          void handleOpenExperimentalGroupModal(sl);
+                                          return;
+                                        }
+                                        handleOpenExperimentalBooking(sl);
+                                      }}
                                       disabled={false}
-                                      title="Reagendar esta aula experimental."
+                                      title={expIsGroupAssigned ? "Gerenciar turma desta aula experimental em grupo." : "Reagendar esta aula experimental."}
                                       className="inline-flex h-10 w-full items-center justify-center gap-2 rounded-full border border-[var(--app-border)] bg-[var(--app-solid-surface)] px-4 text-[13px] font-semibold text-[var(--app-text-85)] hover:bg-[var(--app-hover)] disabled:cursor-not-allowed disabled:opacity-55 sm:w-auto"
                                     >
                                       <Plus className="h-4 w-4" />
-                                      Reagendar
+                                      {expIsGroupAssigned ? "Gerenciar turma" : "Reagendar"}
                                     </button>
                                   </div>
                                   <div className="relative w-full sm:w-auto shrink-0 min-w-0 sm:max-w-[320px]">
@@ -7313,12 +7310,17 @@ export function AtendimentoClient() {
                             </div>
                           );
                         }
-                        return (
+                        return (() => {
+                          const groupCardState = deriveExperimentalGroupCardState({
+                            lead: sl,
+                            settingsEnabled: Boolean(experimentalGroupSettings?.enabled),
+                          });
+                          return (
                           <div className="overflow-hidden rounded-2xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] p-5 shadow-none">
                             <div className="flex items-center gap-2">
                               <CalendarIcon className="h-5 w-5 text-[var(--app-text-70)]" />
                               <div className="text-[15px] font-bold text-[var(--app-text-85)]">
-                                Aula experimental
+                                {isLeadAssignedToExperimentalGroup(sl) ? "Aula experimental em grupo" : "Aula experimental"}
                               </div>
                             </div>
                             <div className="mt-4 rounded-xl border border-[var(--app-border)] bg-[var(--app-solid-surface-2)] px-4 py-3 text-center">
@@ -7326,71 +7328,22 @@ export function AtendimentoClient() {
                                 Esse registro não possuí agendamentos em aberto.
                               </div>
                             </div>
+                            <div className="mt-4 flex justify-end">
+                              <button
+                                type="button"
+                                onClick={() => void handleOpenExperimentalGroupModal(sl)}
+                                disabled={groupCardState.disabled}
+                                title={groupCardState.disabled ? groupCardState.reasons[0] ?? "Turma em grupo indisponível." : "Gerenciar turma em grupo deste registro."}
+                                className="inline-flex min-h-[42px] items-center justify-center gap-2 rounded-xl border border-[var(--app-border)] bg-[var(--app-solid-surface-2)] px-4 text-[13px] font-semibold text-[var(--app-text-85)] transition hover:bg-[var(--app-hover)] disabled:cursor-not-allowed disabled:opacity-55"
+                              >
+                                <Users className="h-4 w-4" />
+                                Gerenciar turma em grupo
+                              </button>
+                            </div>
                           </div>
-                        );
-                      })()}
-                      {!showRecurringCard ? (
-                        (() => {
-                          const groupCardState = deriveExperimentalGroupCardState({
-                            lead: sl,
-                            settingsEnabled: Boolean(experimentalGroupSettings?.enabled),
-                          });
-                          const assignedGroupId = String((sl as any)?.experimental_class_group_class_id ?? "").trim();
-                          const groupStatus = String((sl as any)?.experimental_class_group_status ?? "").trim();
-                          return (
-                            <button
-                              type="button"
-                              onClick={() => {
-                                if (groupCardState.disabled) return;
-                                void handleOpenExperimentalGroupModal(sl);
-                              }}
-                              disabled={groupCardState.disabled}
-                              className={[
-                                "w-full overflow-hidden rounded-2xl border bg-[var(--app-solid-surface)] p-5 text-left shadow-none transition",
-                                groupCardState.disabled
-                                  ? "cursor-not-allowed border-[var(--app-border)] opacity-55"
-                                  : "border-[var(--app-border)] hover:bg-[var(--app-hover)]",
-                              ].join(" ")}
-                            >
-                              <div className="flex items-start justify-between gap-3">
-                                <div className="flex items-center gap-2 min-w-0">
-                                  <Users className="h-5 w-5 shrink-0 text-[var(--app-text-70)]" />
-                                  <div className="min-w-0">
-                                    <div className="truncate text-[15px] font-bold text-[var(--app-text-85)]">
-                                      Aula Experimental em Grupo
-                                    </div>
-                                    <div className="mt-1 text-[13px] text-[var(--app-text-60)]">
-                                      {assignedGroupId
-                                        ? `Turma vinculada${groupStatus ? ` (${groupStatus})` : ""}.`
-                                        : groupCardState.interestRegistered
-                                          ? "Interesse já registrado. Selecione a turma para concluir a formação."
-                                          : groupCardState.disabled
-                                            ? groupCardState.reasons[0] ?? "Indisponível no momento."
-                                            : "Selecione uma turma disponível e gerencie as vagas."}
-                                    </div>
-                                  </div>
-                                </div>
-                                <div
-                                  className={[
-                                    "shrink-0 rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.12em]",
-                                    groupCardState.disabled
-                                      ? "border border-[var(--app-border)] text-[var(--app-text-45)]"
-                                      : assignedGroupId
-                                        ? "border border-emerald-500/25 bg-emerald-500/10 text-emerald-700"
-                                        : "border border-[#ea580c]/25 bg-[#ea580c]/10 text-[#9a3412]",
-                                  ].join(" ")}
-                                >
-                                  {groupCardState.disabled
-                                    ? "Indisponível"
-                                    : assignedGroupId
-                                      ? "Turma ativa"
-                                      : "Abrir"}
-                                </div>
-                              </div>
-                            </button>
                           );
-                        })()
-                      ) : null}
+                        })();
+                      })()}
                     </div>
                   ) : null}
 
@@ -8474,6 +8427,7 @@ export function AtendimentoClient() {
                       const expTone = buildExperimentalMetaForList(sl).tone;
                       if (expTone === "success") {
                         const expAssigned = experimentalAssignedProfessorForLead(sl);
+                        const expIsGroupAssigned = isLeadAssignedToExperimentalGroup(sl);
                         const expSavedLink = experimentalLessonLinkForLead(sl);
                         const expHasPhone = Boolean(String(sl?.phone ?? "").trim());
                         const expBestBooking =
@@ -8527,7 +8481,7 @@ export function AtendimentoClient() {
                               <div className="flex items-center gap-2 shrink-0 min-w-[190px] max-w-full min-[1201px]:self-center">
                                 <CalendarIcon className="h-5 w-5 shrink-0 text-[var(--app-text-70)]" />
                                 <div className="text-[15px] font-bold text-[var(--app-text-85)] truncate">
-                                  Aula experimental
+                                  {expIsGroupAssigned ? "Aula experimental em grupo" : "Aula experimental"}
                                 </div>
                               </div>
                               <div className="flex flex-wrap items-stretch justify-start sm:justify-end gap-2 sm:gap-3 w-full sm:w-auto min-w-0 sm:mt-0 mt-6">
@@ -8594,12 +8548,18 @@ export function AtendimentoClient() {
                                 <div className="flex w-full sm:w-auto shrink-0">
                                   <button
                                     type="button"
-                                    onClick={() => handleOpenExperimentalBooking(sl)}
-                                      title="Reagendar esta aula experimental."
+                                    onClick={() => {
+                                      if (expIsGroupAssigned) {
+                                        void handleOpenExperimentalGroupModal(sl);
+                                        return;
+                                      }
+                                      handleOpenExperimentalBooking(sl);
+                                    }}
+                                      title={expIsGroupAssigned ? "Gerenciar turma desta aula experimental em grupo." : "Reagendar esta aula experimental."}
                                     className="inline-flex h-10 w-full items-center justify-center gap-2 rounded-full border border-[var(--app-border)] bg-[var(--app-solid-surface)] px-4 text-[13px] font-semibold text-[var(--app-text-85)] hover:bg-[var(--app-hover)] disabled:cursor-not-allowed disabled:opacity-55 sm:w-auto"
                                   >
                                     <Plus className="h-4 w-4" />
-                                    Reagendar
+                                    {expIsGroupAssigned ? "Gerenciar turma" : "Reagendar"}
                                   </button>
                                 </div>
                                 <div className="relative w-full sm:w-auto shrink-0 sm:shrink sm:max-w-[320px]">
@@ -8895,84 +8855,40 @@ export function AtendimentoClient() {
                           </div>
                         );
                       }
-                      return (
-                        <div className="overflow-hidden rounded-2xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] p-5 shadow-none">
-                          <div className="flex items-center gap-2">
-                            <CalendarIcon className="h-5 w-5 text-[var(--app-text-70)]" />
-                            <div className="text-[15px] font-bold text-[var(--app-text-85)]">
-                              Aula experimental
-                            </div>
-                          </div>
-                          <div className="mt-4 rounded-xl border border-[var(--app-border)] bg-[var(--app-solid-surface-2)] px-4 py-3 text-center">
-                            <div className="text-[13px] font-semibold text-[var(--app-text-60)]">
-                              Esse registro não possuí agendamentos em aberto.
-                            </div>
-                          </div>
-                        </div>
-                      );
-                    })()}
-                    {!showRecurringCard ? (
-                      (() => {
+                      return (() => {
                         const groupCardState = deriveExperimentalGroupCardState({
                           lead: sl,
                           settingsEnabled: Boolean(experimentalGroupSettings?.enabled),
                         });
-                        const assignedGroupId = String((sl as any)?.experimental_class_group_class_id ?? "").trim();
-                        const groupStatus = String((sl as any)?.experimental_class_group_status ?? "").trim();
                         return (
-                          <button
-                            type="button"
-                            onClick={() => {
-                              if (groupCardState.disabled) return;
-                              void handleOpenExperimentalGroupModal(sl);
-                            }}
-                            disabled={groupCardState.disabled}
-                            className={[
-                              "w-full overflow-hidden rounded-2xl border bg-[var(--app-solid-surface)] p-5 text-left shadow-none transition",
-                              groupCardState.disabled
-                                ? "cursor-not-allowed border-[var(--app-border)] opacity-55"
-                                : "border-[var(--app-border)] hover:bg-[var(--app-hover)]",
-                            ].join(" ")}
-                          >
-                            <div className="flex items-start justify-between gap-3">
-                              <div className="flex items-center gap-2 min-w-0">
-                                <Users className="h-5 w-5 shrink-0 text-[var(--app-text-70)]" />
-                                <div className="min-w-0">
-                                  <div className="truncate text-[15px] font-bold text-[var(--app-text-85)]">
-                                    Aula Experimental em Grupo
-                                  </div>
-                                  <div className="mt-1 text-[13px] text-[var(--app-text-60)]">
-                                    {assignedGroupId
-                                      ? `Turma vinculada${groupStatus ? ` (${groupStatus})` : ""}.`
-                                      : groupCardState.interestRegistered
-                                        ? "Interesse já registrado. Selecione a turma para concluir a formação."
-                                        : groupCardState.disabled
-                                          ? groupCardState.reasons[0] ?? "Indisponível no momento."
-                                          : "Selecione uma turma disponível e gerencie as vagas."}
-                                  </div>
-                                </div>
-                              </div>
-                              <div
-                                className={[
-                                  "shrink-0 rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.12em]",
-                                  groupCardState.disabled
-                                    ? "border border-[var(--app-border)] text-[var(--app-text-45)]"
-                                    : assignedGroupId
-                                      ? "border border-emerald-500/25 bg-emerald-500/10 text-emerald-700"
-                                      : "border border-[#ea580c]/25 bg-[#ea580c]/10 text-[#9a3412]",
-                                ].join(" ")}
-                              >
-                                {groupCardState.disabled
-                                  ? "Indisponível"
-                                  : assignedGroupId
-                                    ? "Turma ativa"
-                                    : "Abrir"}
+                          <div className="overflow-hidden rounded-2xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] p-5 shadow-none">
+                            <div className="flex items-center gap-2">
+                              <CalendarIcon className="h-5 w-5 text-[var(--app-text-70)]" />
+                              <div className="text-[15px] font-bold text-[var(--app-text-85)]">
+                                {isLeadAssignedToExperimentalGroup(sl) ? "Aula experimental em grupo" : "Aula experimental"}
                               </div>
                             </div>
-                          </button>
+                            <div className="mt-4 rounded-xl border border-[var(--app-border)] bg-[var(--app-solid-surface-2)] px-4 py-3 text-center">
+                              <div className="text-[13px] font-semibold text-[var(--app-text-60)]">
+                                Esse registro não possuí agendamentos em aberto.
+                              </div>
+                            </div>
+                            <div className="mt-4 flex justify-end">
+                              <button
+                                type="button"
+                                onClick={() => void handleOpenExperimentalGroupModal(sl)}
+                                disabled={groupCardState.disabled}
+                                title={groupCardState.disabled ? groupCardState.reasons[0] ?? "Turma em grupo indisponível." : "Gerenciar turma em grupo deste registro."}
+                                className="inline-flex min-h-[42px] items-center justify-center gap-2 rounded-xl border border-[var(--app-border)] bg-[var(--app-solid-surface-2)] px-4 text-[13px] font-semibold text-[var(--app-text-85)] transition hover:bg-[var(--app-hover)] disabled:cursor-not-allowed disabled:opacity-55"
+                              >
+                                <Users className="h-4 w-4" />
+                                Gerenciar turma em grupo
+                              </button>
+                            </div>
+                          </div>
                         );
-                      })()
-                    ) : null}
+                      })();
+                    })()}
                   </div>
                 ) : null}
 
@@ -9194,21 +9110,6 @@ export function AtendimentoClient() {
               </select>
             </label>
             <label className="rounded-2xl border border-[var(--app-border)] bg-[var(--app-solid-surface-2)] px-4 py-3 text-[13px] font-semibold text-[var(--app-text-85)]">
-              Professor
-              <select
-                value={experimentalGroupFormProfessorPhone}
-                onChange={(e) => setExperimentalGroupFormProfessorPhone(e.target.value)}
-                className="mt-2 w-full rounded-xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] px-3 py-2 text-[13px] font-medium text-[var(--app-text-85)] outline-none"
-              >
-                <option value="">Selecione</option>
-                {experimentalGroupProfessorOptions.map((option) => (
-                  <option key={option.phone} value={option.phone}>
-                    {option.name}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label className="rounded-2xl border border-[var(--app-border)] bg-[var(--app-solid-surface-2)] px-4 py-3 text-[13px] font-semibold text-[var(--app-text-85)]">
               Dia 1
               <select
                 value={experimentalGroupFormDayOneWeekday}
@@ -9259,7 +9160,7 @@ export function AtendimentoClient() {
             <div className="mt-3 space-y-2">
               {experimentalGroupPreviewSlots.length === 0 ? (
                 <div className="text-[13px] text-[var(--app-text-55)]">
-                  Nenhuma turma disponível na prévia atual.
+                  A prévia global mostra apenas os dias e horários. O professor será definido por registro, no card de Aula experimental.
                 </div>
               ) : (
                 experimentalGroupPreviewSlots.map((slot) => (
@@ -9333,6 +9234,16 @@ export function AtendimentoClient() {
             </div>
           ) : (
             <>
+              <div className="rounded-2xl border border-[var(--app-border)] bg-[var(--app-solid-surface-2)] px-4 py-3">
+                <div className="text-[13px] font-semibold text-[var(--app-text-85)]">
+                  Professor do registro
+                </div>
+                <div className="mt-1 text-[12px] text-[var(--app-text-55)]">
+                  {experimentalGroupAssignedProfessor?.name
+                    ? `${experimentalGroupAssignedProfessor.name} (${experimentalGroupAssignedProfessor.phone})`
+                    : "Selecione primeiro o professor no card de Aula experimental para liberar as turmas em grupo."}
+                </div>
+              </div>
               <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
                 {experimentalGroupSlots.length === 0 ? (
                   <div className="rounded-2xl border border-[var(--app-border)] bg-[var(--app-solid-surface-2)] px-4 py-6 text-[13px] text-[var(--app-text-55)]">

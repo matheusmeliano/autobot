@@ -3,7 +3,6 @@ import { resolveLeadTimeZoneFromRecord, zonedDateTimeToUtcIso } from "@/lib/time
 import { ATENDIMENTO_PROFESSOR_TIME_ZONE } from "./constants";
 import {
   EXPERIMENTAL_CLASS_DURATION_MINUTES,
-  EXPERIMENTAL_CLASS_PROFESSOR_ASSIGNMENT_ALLOWLIST,
   normalizarExperimentalProfessorParaAllowlist,
   type RecurringOccupiedInterval,
 } from "./experimentalClass";
@@ -24,8 +23,6 @@ export type ExperimentalGroupConfiguredSlot = {
 
 export type ExperimentalGroupClassSettings = {
   enabled: boolean;
-  professor_name: string | null;
-  professor_phone: string | null;
   professor_timezone: string;
   capacity: number;
   slots: ExperimentalGroupConfiguredSlot[];
@@ -104,8 +101,6 @@ const WEEKDAY_LABELS_PT_BR: Record<ExperimentalGroupWeekdayKey, string> = {
 export function getDefaultExperimentalGroupClassSettings(): ExperimentalGroupClassSettings {
   return {
     enabled: false,
-    professor_name: null,
-    professor_phone: null,
     professor_timezone: ATENDIMENTO_PROFESSOR_TIME_ZONE,
     capacity: 4,
     slots: [],
@@ -137,10 +132,6 @@ export function normalizeExperimentalGroupClassSettings(
   const base = getDefaultExperimentalGroupClassSettings();
   if (!raw || typeof raw !== "object") return base;
   const value = raw as Record<string, unknown>;
-  const professorNormalized = normalizarExperimentalProfessorParaAllowlist({
-    name: String(value.professor_name ?? "").trim() || null,
-    phone: String(value.professor_phone ?? "").trim() || null,
-  });
 
   const rawSlots = Array.isArray(value.slots) ? value.slots : [];
   const normalizedSlots: ExperimentalGroupConfiguredSlot[] = [];
@@ -164,13 +155,46 @@ export function normalizeExperimentalGroupClassSettings(
       value.enabled === "true" ||
       value.enabled === 1 ||
       value.enabled === "1",
-    professor_name: professorNormalized?.name ?? null,
-    professor_phone: professorNormalized?.phone ?? null,
     professor_timezone:
       String(value.professor_timezone ?? "").trim() || ATENDIMENTO_PROFESSOR_TIME_ZONE,
     capacity: 4,
     slots: normalizedSlots.slice(0, 2),
   };
+}
+
+export function resolveExperimentalGroupProfessorFromLead(lead: Record<string, unknown> | null): {
+  name: string;
+  phone: string;
+} | null {
+  if (!lead) return null;
+  const flatName = String((lead as any)?.experimental_class_professor_name ?? "").trim();
+  const flatPhone = String((lead as any)?.experimental_class_professor_phone ?? "").trim();
+  const normalizedFlat = normalizarExperimentalProfessorParaAllowlist({
+    name: flatName || null,
+    phone: flatPhone || null,
+  });
+  if (normalizedFlat?.name && normalizedFlat?.phone) {
+    return {
+      name: normalizedFlat.name,
+      phone: normalizedFlat.phone,
+    };
+  }
+
+  const booking = (lead as any)?.experimental_class_booking ?? null;
+  const bookingName = String(booking?.assigned_professor_name ?? "").trim();
+  const bookingPhone = String(booking?.assigned_professor_phone ?? "").trim();
+  const normalizedBooking = normalizarExperimentalProfessorParaAllowlist({
+    name: bookingName || null,
+    phone: bookingPhone || null,
+  });
+  if (normalizedBooking?.name && normalizedBooking?.phone) {
+    return {
+      name: normalizedBooking.name,
+      phone: normalizedBooking.phone,
+    };
+  }
+
+  return null;
 }
 
 export function experimentalGroupWeekdayLabel(weekday: ExperimentalGroupWeekdayKey): string {
@@ -275,6 +299,7 @@ export function buildExperimentalGroupClassConfirmationMessage(params: {
 export function listExperimentalGroupClassSlots(params: {
   settings: ExperimentalGroupClassSettings;
   lead: Record<string, unknown> | null;
+  assignedProfessor?: { name: string; phone: string } | null;
   existingClasses: ExperimentalGroupClassRecord[];
   occupiedIntervals: RecurringOccupiedInterval[];
   bookedIndividualProfessorStartAts: string[];
@@ -282,16 +307,13 @@ export function listExperimentalGroupClassSlots(params: {
   lookAheadDays?: number;
 }): ExperimentalGroupSlotSummary[] {
   const settings = normalizeExperimentalGroupClassSettings(params.settings);
-  if (
-    !settings.enabled ||
-    !settings.professor_name ||
-    !settings.professor_phone ||
-    !settings.slots.length
-  ) {
+  if (!settings.enabled || !settings.slots.length) {
     return [];
   }
 
   const professorTimeZone = settings.professor_timezone || ATENDIMENTO_PROFESSOR_TIME_ZONE;
+  const assignedProfessor =
+    params.assignedProfessor ?? resolveExperimentalGroupProfessorFromLead(params.lead ?? null);
   const leadTimeZone = resolveLeadTimeZoneFromRecord({
     lead: params.lead ?? null,
     fallbackTimeZone: professorTimeZone,
@@ -356,6 +378,9 @@ export function listExperimentalGroupClassSlots(params: {
       if (!existingClass && (blockedByRecurring || blockedByIndividual)) {
         continue;
       }
+      if (!existingClass && !assignedProfessor?.name && !assignedProfessor?.phone) {
+        continue;
+      }
 
       const statusRaw = String(existingClass?.status ?? "").trim().toLowerCase();
       const status =
@@ -368,8 +393,8 @@ export function listExperimentalGroupClassSlots(params: {
       slots.push({
         id: existingClass?.id ?? professorStartAt,
         group_class_id: existingClass?.id ?? null,
-        professor_name: existingClass?.professor_name ?? settings.professor_name,
-        professor_phone: existingClass?.professor_phone ?? settings.professor_phone,
+        professor_name: existingClass?.professor_name ?? assignedProfessor?.name ?? null,
+        professor_phone: existingClass?.professor_phone ?? assignedProfessor?.phone ?? null,
         professor_timezone: professorTimeZone,
         professor_weekday: configuredSlot.weekday,
         professor_weekday_label: experimentalGroupWeekdayLabel(configuredSlot.weekday),
