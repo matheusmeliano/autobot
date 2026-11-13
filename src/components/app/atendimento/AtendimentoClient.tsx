@@ -39,7 +39,13 @@ type ExperimentalGroupSettingsPayload = {
   enabled: boolean;
   professor_timezone?: string | null;
   capacity?: number;
-  slots: Array<{ weekday: string; professor_time: string }>;
+  slots: Array<{ enabled?: boolean; weekday?: string | null; professor_time?: string | null }>;
+};
+
+type ExperimentalGroupFormSlot = {
+  enabled: boolean;
+  weekday: string;
+  professor_time: string;
 };
 
 type ExperimentalGroupSlotPayload = {
@@ -1518,20 +1524,21 @@ export function AtendimentoClient() {
   const [botExperimentalLoading, setBotExperimentalLoading] = useState<boolean>(false);
   const [experimentalGroupSettings, setExperimentalGroupSettings] =
     useState<ExperimentalGroupSettingsPayload | null>(null);
-  const [experimentalGroupPreviewSlots, setExperimentalGroupPreviewSlots] = useState<
-    ExperimentalGroupSlotPayload[]
-  >([]);
   const [experimentalGroupWeekdayOptions, setExperimentalGroupWeekdayOptions] = useState<
     Array<{ value: string; label: string }>
   >([]);
   const [experimentalGroupSettingsOpen, setExperimentalGroupSettingsOpen] = useState(false);
   const [experimentalGroupSettingsLoading, setExperimentalGroupSettingsLoading] = useState(false);
   const [experimentalGroupSettingsSaving, setExperimentalGroupSettingsSaving] = useState(false);
-  const [experimentalGroupFormEnabled, setExperimentalGroupFormEnabled] = useState(false);
-  const [experimentalGroupFormDayOneWeekday, setExperimentalGroupFormDayOneWeekday] = useState("");
-  const [experimentalGroupFormDayOneTime, setExperimentalGroupFormDayOneTime] = useState("");
-  const [experimentalGroupFormDayTwoWeekday, setExperimentalGroupFormDayTwoWeekday] = useState("");
-  const [experimentalGroupFormDayTwoTime, setExperimentalGroupFormDayTwoTime] = useState("");
+  const [experimentalGroupFormSlots, setExperimentalGroupFormSlots] = useState<
+    ExperimentalGroupFormSlot[]
+  >(
+    Array.from({ length: 4 }, () => ({
+      enabled: false,
+      weekday: "",
+      professor_time: "",
+    })),
+  );
   const [editLeadOpen, setEditLeadOpen] = useState(false);
   const [editLeadName, setEditLeadName] = useState("");
   const [editLeadPhone, setEditLeadPhone] = useState("");
@@ -3439,17 +3446,19 @@ export function AtendimentoClient() {
   function syncExperimentalGroupSettingsFromPayload(json: any) {
     const settings = (json?.settings ?? null) as ExperimentalGroupSettingsPayload | null;
     setExperimentalGroupSettings(settings);
-    setExperimentalGroupPreviewSlots(
-      Array.isArray(json?.preview_slots) ? (json.preview_slots as ExperimentalGroupSlotPayload[]) : [],
-    );
     setExperimentalGroupWeekdayOptions(
       Array.isArray(json?.weekday_options) ? (json.weekday_options as Array<{ value: string; label: string }>) : [],
     );
-    setExperimentalGroupFormEnabled(Boolean(settings?.enabled));
-    setExperimentalGroupFormDayOneWeekday(String(settings?.slots?.[0]?.weekday ?? "").trim());
-    setExperimentalGroupFormDayOneTime(String(settings?.slots?.[0]?.professor_time ?? "").trim());
-    setExperimentalGroupFormDayTwoWeekday(String(settings?.slots?.[1]?.weekday ?? "").trim());
-    setExperimentalGroupFormDayTwoTime(String(settings?.slots?.[1]?.professor_time ?? "").trim());
+    const rawSlots = Array.isArray(settings?.slots) ? settings!.slots : [];
+    const normalizedSlots: ExperimentalGroupFormSlot[] = Array.from({ length: 4 }, (_, index) => {
+      const slot = rawSlots[index];
+      return {
+        enabled: Boolean(slot?.enabled),
+        weekday: String(slot?.weekday ?? "").trim(),
+        professor_time: String(slot?.professor_time ?? "").trim(),
+      };
+    });
+    setExperimentalGroupFormSlots(normalizedSlots);
   }
 
   async function loadExperimentalGroupSettings(silent = false) {
@@ -3483,21 +3492,16 @@ export function AtendimentoClient() {
 
   async function handleSaveExperimentalGroupSettings() {
     if (experimentalGroupSettingsSaving) return;
+    const enabledSlots = experimentalGroupFormSlots.filter((slot) => slot.enabled);
     if (
-      experimentalGroupFormEnabled &&
-      (!experimentalGroupFormDayOneWeekday ||
-        !experimentalGroupFormDayOneTime ||
-        !experimentalGroupFormDayTwoWeekday ||
-        !experimentalGroupFormDayTwoTime)
+      enabledSlots.some((slot) => !slot.weekday || !slot.professor_time)
     ) {
-      modalToast.warning("Configure os dois dias e horários da turma.");
+      modalToast.warning("Configure dia e horario em cada turma ativada.");
       return;
     }
-    if (
-      experimentalGroupFormEnabled &&
-      experimentalGroupFormDayOneWeekday === experimentalGroupFormDayTwoWeekday
-    ) {
-      modalToast.warning("Escolha dois dias diferentes da semana.");
+    const activeCombinations = enabledSlots.map((slot) => `${slot.weekday}-${slot.professor_time}`);
+    if (new Set(activeCombinations).size !== activeCombinations.length) {
+      modalToast.warning("Nao repita a mesma combinacao de dia e horario entre as turmas.");
       return;
     }
     setExperimentalGroupSettingsSaving(true);
@@ -3506,11 +3510,11 @@ export function AtendimentoClient() {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          enabled: experimentalGroupFormEnabled,
-          slots: [
-            { weekday: experimentalGroupFormDayOneWeekday, professor_time: experimentalGroupFormDayOneTime },
-            { weekday: experimentalGroupFormDayTwoWeekday, professor_time: experimentalGroupFormDayTwoTime },
-          ],
+          slots: experimentalGroupFormSlots.map((slot) => ({
+            enabled: slot.enabled,
+            weekday: slot.weekday || null,
+            professor_time: slot.professor_time || null,
+          })),
         }),
       });
       if (handleForbiddenResponse(res)) return;
@@ -3527,6 +3531,22 @@ export function AtendimentoClient() {
     } finally {
       setExperimentalGroupSettingsSaving(false);
     }
+  }
+
+  function updateExperimentalGroupFormSlot(
+    index: number,
+    patch: Partial<ExperimentalGroupFormSlot>,
+  ) {
+    setExperimentalGroupFormSlots((prev) =>
+      prev.map((slot, slotIndex) =>
+        slotIndex === index
+          ? {
+              ...slot,
+              ...patch,
+            }
+          : slot,
+      ),
+    );
   }
 
   async function loadExperimentalGroupLeadData(lead: AtendimentoLeadListItem) {
@@ -9244,72 +9264,12 @@ export function AtendimentoClient() {
           </div>
 
           <div className="mt-5 space-y-4">
-            <div className="rounded-2xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] p-4">
-              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                <div>
-                  <div className="text-[14px] font-bold text-[var(--app-text-85)]">Ativar turmas</div>
-                  <div className="mt-1 text-[12px] text-[var(--app-text-55)]">
-                    Quando ligado podera usar os dias e horarios definidos abaixo.
-                  </div>
-                </div>
-                <button
-                  type="button"
-                  role="switch"
-                  aria-checked={experimentalGroupFormEnabled}
-                  onClick={() => setExperimentalGroupFormEnabled((prev) => !prev)}
-                  className={[
-                    "inline-flex h-12 min-w-[136px] shrink-0 items-center gap-2 rounded-full border px-3 transition",
-                    experimentalGroupFormEnabled
-                      ? "border-emerald-500/35 bg-emerald-500/12 text-emerald-800"
-                      : "border-[var(--app-border)] bg-[var(--app-solid-surface-2)] text-[var(--app-text-70)]",
-                  ].join(" ")}
-                >
-                  <span
-                    className={[
-                      "relative flex h-7 w-12 shrink-0 items-center rounded-full border transition",
-                      experimentalGroupFormEnabled
-                        ? "border-emerald-500/30 bg-emerald-500/20"
-                        : "border-[var(--app-border)] bg-[var(--app-solid-surface)]",
-                    ].join(" ")}
-                  >
-                    <span
-                      className={[
-                        "absolute h-5 w-5 rounded-full shadow-sm transition-all",
-                        experimentalGroupFormEnabled
-                          ? "left-[22px] bg-emerald-600"
-                          : "left-1 bg-[var(--app-text-45)]",
-                      ].join(" ")}
-                    />
-                  </span>
-                  <span className="text-[13px] font-semibold">
-                    {experimentalGroupFormEnabled ? "Ativada" : "Desativada"}
-                  </span>
-                </button>
-              </div>
-
-            </div>
-
-            {[
-              {
-                title: "Turma 1",
-                selectedWeekday: experimentalGroupFormDayOneWeekday,
-                setWeekday: setExperimentalGroupFormDayOneWeekday,
-                selectedTime: experimentalGroupFormDayOneTime,
-                setTime: setExperimentalGroupFormDayOneTime,
-              },
-              {
-                title: "Turma 2",
-                selectedWeekday: experimentalGroupFormDayTwoWeekday,
-                setWeekday: setExperimentalGroupFormDayTwoWeekday,
-                selectedTime: experimentalGroupFormDayTwoTime,
-                setTime: setExperimentalGroupFormDayTwoTime,
-              },
-            ].map((card) => (
+            {experimentalGroupFormSlots.map((card, index) => (
               <div
-                key={card.title}
+                key={`group-slot-${index}`}
                 className={[
                   "rounded-2xl border p-4 transition",
-                  experimentalGroupFormEnabled
+                  card.enabled
                     ? "border-[var(--app-border)] bg-[var(--app-solid-surface)]"
                     : "border-[var(--app-border)] bg-[var(--app-solid-surface)] opacity-60",
                 ].join(" ")}
@@ -9318,17 +9278,56 @@ export function AtendimentoClient() {
                   <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                     <div>
                       <div className="text-[14px] font-bold text-[var(--app-text-85)]">
-                        {card.title}
+                        {`Turma ${index + 1}`}
                       </div>
                       <div className="mt-0.5 text-[12px] text-[var(--app-text-55)]">
                         Escolha o dia da semana e o horario da turma.
                       </div>
                     </div>
-                    {card.selectedWeekday && card.selectedTime ? (
-                      <div className="inline-flex items-center gap-1 rounded-full border border-[#ea580c]/25 bg-[rgba(234,88,12,0.10)] px-3 py-1 text-[11px] font-bold text-[#9a3412]">
-                        {experimentalGroupWeekdayOptions.find((option) => option.value === card.selectedWeekday)?.label ?? card.selectedWeekday} as {card.selectedTime}
-                      </div>
-                    ) : null}
+                    <div className="flex items-center gap-2 self-start sm:self-auto">
+                      {card.enabled && card.weekday && card.professor_time ? (
+                        <div className="inline-flex items-center gap-1 rounded-full border border-[#ea580c]/25 bg-[rgba(234,88,12,0.10)] px-3 py-1 text-[11px] font-bold text-[#9a3412]">
+                          {experimentalGroupWeekdayOptions.find((option) => option.value === card.weekday)?.label ?? card.weekday} as {card.professor_time}
+                        </div>
+                      ) : null}
+                      <button
+                        type="button"
+                        role="switch"
+                        aria-checked={card.enabled}
+                        onClick={() =>
+                          updateExperimentalGroupFormSlot(index, {
+                            enabled: !card.enabled,
+                          })
+                        }
+                        className={[
+                          "inline-flex h-12 min-w-[136px] shrink-0 items-center gap-2 rounded-full border px-3 transition",
+                          card.enabled
+                            ? "border-emerald-500/35 bg-emerald-500/12 text-emerald-800"
+                            : "border-[var(--app-border)] bg-[var(--app-solid-surface-2)] text-[var(--app-text-70)]",
+                        ].join(" ")}
+                      >
+                        <span
+                          className={[
+                            "relative flex h-7 w-12 shrink-0 items-center rounded-full border transition",
+                            card.enabled
+                              ? "border-emerald-500/30 bg-emerald-500/20"
+                              : "border-[var(--app-border)] bg-[var(--app-solid-surface)]",
+                          ].join(" ")}
+                        >
+                          <span
+                            className={[
+                              "absolute h-5 w-5 rounded-full shadow-sm transition-all",
+                              card.enabled
+                                ? "left-[22px] bg-emerald-600"
+                                : "left-1 bg-[var(--app-text-45)]",
+                            ].join(" ")}
+                          />
+                        </span>
+                        <span className="text-[13px] font-semibold">
+                          {card.enabled ? "Ativada" : "Desativada"}
+                        </span>
+                      </button>
+                    </div>
                   </div>
 
                   <div className="space-y-2">
@@ -9342,15 +9341,19 @@ export function AtendimentoClient() {
                     </div>
                     <div className="grid grid-cols-2 gap-2 min-[520px]:grid-cols-3 sm:grid-cols-4">
                       {experimentalGroupWeekdayOptions.map((option) => {
-                        const isSelected = card.selectedWeekday === option.value;
+                        const isSelected = card.weekday === option.value;
                         const shortLabel =
                           EXPERIMENTAL_GROUP_WEEKDAY_SHORT_LABELS[option.value] ?? option.label.slice(0, 3);
                         return (
                           <button
-                            key={`${card.title}-${option.value}`}
+                            key={`group-slot-${index}-${option.value}`}
                             type="button"
-                            disabled={!experimentalGroupFormEnabled}
-                            onClick={() => card.setWeekday(option.value)}
+                            disabled={!card.enabled}
+                            onClick={() =>
+                              updateExperimentalGroupFormSlot(index, {
+                                weekday: option.value,
+                              })
+                            }
                             className={[
                               "flex min-h-[64px] flex-col items-center justify-center gap-0.5 rounded-2xl border px-2 py-2 text-center transition duration-150 disabled:cursor-not-allowed disabled:opacity-60 sm:min-h-[70px]",
                               isSelected
@@ -9388,13 +9391,17 @@ export function AtendimentoClient() {
                     </div>
                     <div className="grid grid-cols-2 gap-2 min-[520px]:grid-cols-3 sm:grid-cols-4">
                       {EXPERIMENTAL_CLASS_SLOT_TIMES.map((time) => {
-                        const isSelected = card.selectedTime === time;
+                        const isSelected = card.professor_time === time;
                         return (
                           <button
-                            key={`${card.title}-${time}`}
+                            key={`group-slot-${index}-${time}`}
                             type="button"
-                            disabled={!experimentalGroupFormEnabled}
-                            onClick={() => card.setTime(time)}
+                            disabled={!card.enabled}
+                            onClick={() =>
+                              updateExperimentalGroupFormSlot(index, {
+                                professor_time: time,
+                              })
+                            }
                             className={[
                               "flex h-11 items-center justify-center rounded-2xl border px-2 text-[14px] font-semibold transition duration-150 disabled:cursor-not-allowed disabled:opacity-60 sm:h-12 sm:text-[15px]",
                               isSelected

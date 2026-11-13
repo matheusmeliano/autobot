@@ -14,15 +14,20 @@ import {
 const weekdaySchema = z.enum(["mon", "tue", "wed", "thu", "fri", "sat", "sun"]);
 
 const schema = z.object({
-  enabled: z.boolean(),
   slots: z
     .array(
       z.object({
-        weekday: weekdaySchema,
-        professor_time: z.string().trim().regex(/^\d{2}:\d{2}$/),
+        enabled: z.boolean(),
+        weekday: weekdaySchema.nullable().optional(),
+        professor_time: z
+          .string()
+          .trim()
+          .regex(/^\d{2}:\d{2}$/)
+          .nullable()
+          .optional(),
       }),
     )
-    .length(2),
+    .length(4),
 });
 
 function buildWeekdayOptions() {
@@ -73,10 +78,12 @@ export async function PATCH(req: Request) {
     }
 
     const settings = normalizeExperimentalGroupClassSettings(parsed.data);
-    const uniqueWeekdays = new Set(settings.slots.map((slot) => slot.weekday));
-    if (uniqueWeekdays.size !== settings.slots.length) {
+    const activeCombinations = settings.slots
+      .filter((slot) => slot.enabled && slot.weekday && slot.professor_time)
+      .map((slot) => `${slot.weekday}-${slot.professor_time}`);
+    if (new Set(activeCombinations).size !== activeCombinations.length) {
       return Response.json(
-        { ok: false, error: "Escolha dois dias diferentes da semana." },
+        { ok: false, error: "Nao repita a mesma combinacao de dia e horario entre as turmas." },
         { status: 400 },
       );
     }

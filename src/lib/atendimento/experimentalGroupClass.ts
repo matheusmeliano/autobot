@@ -17,8 +17,9 @@ export type ExperimentalGroupWeekdayKey =
   | "sun";
 
 export type ExperimentalGroupConfiguredSlot = {
-  weekday: ExperimentalGroupWeekdayKey;
-  professor_time: string;
+  enabled: boolean;
+  weekday: ExperimentalGroupWeekdayKey | null;
+  professor_time: string | null;
 };
 
 export type ExperimentalGroupClassSettings = {
@@ -103,7 +104,11 @@ export function getDefaultExperimentalGroupClassSettings(): ExperimentalGroupCla
     enabled: false,
     professor_timezone: ATENDIMENTO_PROFESSOR_TIME_ZONE,
     capacity: 4,
-    slots: [],
+    slots: Array.from({ length: 4 }, () => ({
+      enabled: false,
+      weekday: null,
+      professor_time: null,
+    })),
   };
 }
 
@@ -135,30 +140,42 @@ export function normalizeExperimentalGroupClassSettings(
 
   const rawSlots = Array.isArray(value.slots) ? value.slots : [];
   const normalizedSlots: ExperimentalGroupConfiguredSlot[] = [];
-  for (const slot of rawSlots) {
+  for (const slot of rawSlots.slice(0, 4)) {
     if (!slot || typeof slot !== "object") continue;
+    const slotValue = slot as Record<string, unknown>;
     const weekday = normalizeWeekday((slot as Record<string, unknown>).weekday);
     const professorTime = normalizeTimeLabel(
       (slot as Record<string, unknown>).professor_time,
     );
-    if (!weekday || !professorTime) continue;
-    if (normalizedSlots.some((item) => item.weekday === weekday)) continue;
     normalizedSlots.push({
+      enabled:
+        slotValue.enabled === true ||
+        slotValue.enabled === "true" ||
+        slotValue.enabled === 1 ||
+        slotValue.enabled === "1",
       weekday,
       professor_time: professorTime,
     });
   }
 
+  while (normalizedSlots.length < 4) {
+    normalizedSlots.push({
+      enabled: false,
+      weekday: null,
+      professor_time: null,
+    });
+  }
+
+  const hasAnyEnabledConfiguredSlot = normalizedSlots.some(
+    (slot) => slot.enabled && slot.weekday && slot.professor_time,
+  );
+
   return {
-    enabled:
-      value.enabled === true ||
-      value.enabled === "true" ||
-      value.enabled === 1 ||
-      value.enabled === "1",
+    enabled: hasAnyEnabledConfiguredSlot,
     professor_timezone:
       String(value.professor_timezone ?? "").trim() || ATENDIMENTO_PROFESSOR_TIME_ZONE,
     capacity: 4,
-    slots: normalizedSlots.slice(0, 2),
+    slots: normalizedSlots,
   };
 }
 
@@ -344,6 +361,9 @@ export function listExperimentalGroupClassSlots(params: {
     const weekday = weekdayInTimeZone(candidateDate, professorTimeZone);
 
     for (const configuredSlot of settings.slots) {
+      if (!configuredSlot.enabled || !configuredSlot.weekday || !configuredSlot.professor_time) {
+        continue;
+      }
       if (configuredSlot.weekday !== weekday) continue;
       const professorStartAt = zonedDateTimeToUtcIso({
         date: professorDate,
