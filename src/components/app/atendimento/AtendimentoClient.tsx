@@ -9229,7 +9229,7 @@ export function AtendimentoClient() {
                   Aulas Experimentais em Grupo
                 </h3>
                 <div className="mt-0.5 text-[12px] text-[var(--app-text-55)]">
-                  Configure os 2 dias e horarios globais usados no Atendimento.
+                  Configure os dias e horarios usados no Atendimento.
                 </div>
               </div>
             </div>
