@@ -343,6 +343,13 @@ function isLeadAssignedToExperimentalGroup(lead: AtendimentoLeadListItem | null 
   return Boolean(assignedGroupId && assignedStatus !== "removed");
 }
 
+function isLeadMarkedForExperimentalGroup(lead: AtendimentoLeadListItem | null | undefined): boolean {
+  if (!lead) return false;
+  if (isLeadAssignedToExperimentalGroup(lead)) return true;
+  if (Boolean((lead as any)?.experimental_class_group_interest)) return true;
+  return String((lead as any)?.experimental_class_mode_preference ?? "").trim().toLowerCase() === "group";
+}
+
 function hasLeadConfirmedPaymentForRecurringNotificationsClient(
   lead: AtendimentoLeadListItem | null | undefined,
 ): boolean {
@@ -3513,16 +3520,27 @@ export function AtendimentoClient() {
       const json = await res.json().catch(() => null);
       if (!json?.ok) {
         modalToast.error(String(json?.error ?? "Falha ao carregar turmas disponíveis."));
-        return;
+        return null;
       }
       const slots = Array.isArray(json?.slots) ? (json.slots as ExperimentalGroupSlotPayload[]) : [];
       setExperimentalGroupCanOpenModal(Boolean(json?.can_open_modal));
       setExperimentalGroupAssignedProfessor((json?.assigned_professor ?? null) as { name: string; phone: string } | null);
       setExperimentalGroupSlots(slots);
-      const firstAssigned = slots.find((slot) => slot.is_current_lead_assigned) ?? slots[0] ?? null;
+      const firstAssigned =
+        slots.find((slot) => slot.is_current_lead_assigned) ??
+        slots.find((slot) => slot.available_seats > 0) ??
+        slots[0] ??
+        null;
       setExperimentalGroupSelectedSlotId(firstAssigned ? String(firstAssigned.id) : null);
+      return {
+        canOpenModal: Boolean(json?.can_open_modal),
+        slots,
+        reasons: Array.isArray(json?.reasons) ? (json.reasons as string[]) : [],
+        settings: (json?.settings ?? null) as ExperimentalGroupSettingsPayload | null,
+      };
     } catch (error: any) {
       modalToast.error(String(error?.message ?? "Falha ao carregar turmas disponíveis."));
+      return null;
     } finally {
       setExperimentalGroupLoading(false);
     }
@@ -3530,8 +3548,42 @@ export function AtendimentoClient() {
 
   async function handleOpenExperimentalGroupModal(lead: AtendimentoLeadListItem) {
     setExperimentalGroupLead(lead);
+    const result = await loadExperimentalGroupLeadData(lead);
+    if (!result) return;
+
+    const hasConfiguredSlots = Boolean(result.settings?.enabled) && (result.settings?.slots?.length ?? 0) >= 2;
+    const hasOpenSlots = result.slots.some(
+      (slot) => slot.available_seats > 0 || slot.is_current_lead_assigned,
+    );
+
+    if (result.reasons.includes("feature_disabled") || !hasConfiguredSlots) {
+      modalToast.warning(
+        "Ative a funcionalidade e configure os dois dias e horários das aulas experimentais em grupo.",
+      );
+      return;
+    }
+    if (result.reasons.includes("missing_assigned_professor")) {
+      modalToast.warning("Selecione primeiro o professor deste registro.");
+      return;
+    }
+    if (result.reasons.includes("missing_valid_phone")) {
+      modalToast.warning("Esse registro precisa ter um telefone válido para entrar em uma turma.");
+      return;
+    }
+    if (result.reasons.includes("individual_experimental_already_scheduled")) {
+      modalToast.warning("Esse registro já possui uma aula experimental definida.");
+      return;
+    }
+    if (!result.slots.length) {
+      modalToast.warning("Não tem nenhuma turma aberta no momento.");
+      return;
+    }
+    if (!hasOpenSlots) {
+      modalToast.warning("Todas as turmas estão cheias.");
+      return;
+    }
+
     setIsExperimentalGroupModalOpen(true);
-    await loadExperimentalGroupLeadData(lead);
   }
 
   async function handleAssignLeadToExperimentalGroup(slot: ExperimentalGroupSlotPayload) {
@@ -6063,6 +6115,21 @@ export function AtendimentoClient() {
                     {/* MOBILE (< sm): botões Editar/Excluir OCUPAM TUDO centralizados lado a lado (X já tá no topo direito!) */}
                     {/* DESKTOP (sm+): 3 botões Editar/Excluir/X lado a lado normal */}
                     <div className="flex w-full shrink-0 items-center justify-center gap-2 sm:justify-end overflow-x-auto overflow-y-visible overscroll-contain sm:w-auto sm:overflow-visible">
+                    <button
+                      type="button"
+                      aria-label="Selecionar aula experimental em grupo"
+                      aria-pressed={isLeadMarkedForExperimentalGroup(sl)}
+                      onClick={() => void handleOpenExperimentalGroupModal(sl)}
+                      className={[
+                        "inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border transition-all shadow-none disabled:cursor-not-allowed disabled:opacity-60",
+                        isLeadMarkedForExperimentalGroup(sl)
+                          ? "border-emerald-500/35 bg-emerald-500/15 text-emerald-700 hover:bg-emerald-500/20"
+                          : "border-[var(--app-border)] bg-[var(--app-solid-surface)] text-[var(--app-text-75)] hover:bg-[var(--app-hover)]",
+                      ].join(" ")}
+                      title="Selecionar este registro para aula experimental em grupo"
+                    >
+                      <Users className="h-5 w-5" strokeWidth={1.75} />
+                    </button>
                       <button
                         type="button"
                         onClick={() => handleOpenEditSelected()}
@@ -7636,6 +7703,21 @@ export function AtendimentoClient() {
                   {/* MOBILE (< sm): botões Editar/Excluir OCUPAM TUDO centralizados lado a lado (X já tá no topo direito!) */}
                   {/* DESKTOP (sm+): 3 botões Editar/Excluir/X lado a lado normal */}
                   <div className="flex w-full shrink-0 items-center justify-center gap-2 sm:justify-end overflow-x-auto overflow-y-visible overscroll-contain sm:w-auto sm:overflow-visible">
+                    <button
+                      type="button"
+                      aria-label="Selecionar aula experimental em grupo"
+                      aria-pressed={isLeadMarkedForExperimentalGroup(sl)}
+                      onClick={() => void handleOpenExperimentalGroupModal(sl)}
+                      className={[
+                        "inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border transition-all shadow-none disabled:cursor-not-allowed disabled:opacity-60",
+                        isLeadMarkedForExperimentalGroup(sl)
+                          ? "border-emerald-500/35 bg-emerald-500/15 text-emerald-700 hover:bg-emerald-500/20"
+                          : "border-[var(--app-border)] bg-[var(--app-solid-surface)] text-[var(--app-text-75)] hover:bg-[var(--app-hover)]",
+                      ].join(" ")}
+                      title="Selecionar este registro para aula experimental em grupo"
+                    >
+                      <Users className="h-5 w-5" strokeWidth={1.75} />
+                    </button>
                     <button
                       type="button"
                       onClick={() => handleOpenEditSelected()}
@@ -9244,13 +9326,18 @@ export function AtendimentoClient() {
                     : "Selecione primeiro o professor no card de Aula experimental para liberar as turmas em grupo."}
                 </div>
               </div>
+              {(() => {
+                const visibleSlots = experimentalGroupSlots.filter(
+                  (slot) => slot.available_seats > 0 || slot.is_current_lead_assigned,
+                );
+                return (
               <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
-                {experimentalGroupSlots.length === 0 ? (
+                {visibleSlots.length === 0 ? (
                   <div className="rounded-2xl border border-[var(--app-border)] bg-[var(--app-solid-surface-2)] px-4 py-6 text-[13px] text-[var(--app-text-55)]">
                     Nenhuma turma disponível para o professor configurado neste momento.
                   </div>
                 ) : (
-                  experimentalGroupSlots.map((slot) => {
+                  visibleSlots.map((slot) => {
                     const isSelected = selectedExperimentalGroupSlot?.id === slot.id;
                     return (
                       <button
@@ -9278,6 +9365,8 @@ export function AtendimentoClient() {
                   })
                 )}
               </div>
+                );
+              })()}
 
               {selectedExperimentalGroupSlot ? (
                 <div className="rounded-2xl border border-[var(--app-border)] bg-[var(--app-solid-surface-2)] p-4">
