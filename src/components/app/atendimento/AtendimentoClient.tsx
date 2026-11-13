@@ -19,6 +19,7 @@ import {
   buildExperimentalClassPostAttendanceWhatsAppMessages,
   calculateDisplayRecurringOccurrence,
   EXPERIMENTAL_CLASS_DEFAULT_STUDENT_DASHBOARD_LINK,
+  EXPERIMENTAL_CLASS_SLOT_TIMES,
   resolveRecurringOccurrenceSearchFromDate,
 } from "@/lib/atendimento/experimentalClass";
 import { AppModal } from "@/components/app/AppModal";
@@ -77,6 +78,16 @@ const EXPERIMENTAL_PROFESSOR_OPTIONS_CLIENT: Array<{ name: string; phone: string
   { name: "Lucas Brum", phone: "+55 65 9807-9407", short: "9807-9407" },
   { name: "Nathan Camargo", phone: "+55 65 9952-0166", short: "9952-0166" },
 ];
+
+const EXPERIMENTAL_GROUP_WEEKDAY_SHORT_LABELS: Record<string, string> = {
+  mon: "Seg",
+  tue: "Ter",
+  wed: "Qua",
+  thu: "Qui",
+  fri: "Sex",
+  sat: "Sab",
+  sun: "Dom",
+};
 
 function experimentalAssignedProfessorForLead(lead: AtendimentoLeadListItem | null | undefined): { name: string; phone: string; short: string } | null {
   if (!lead) return null;
@@ -3472,11 +3483,20 @@ export function AtendimentoClient() {
 
   async function handleSaveExperimentalGroupSettings() {
     if (experimentalGroupSettingsSaving) return;
-    if (!experimentalGroupFormDayOneWeekday || !experimentalGroupFormDayOneTime || !experimentalGroupFormDayTwoWeekday || !experimentalGroupFormDayTwoTime) {
+    if (
+      experimentalGroupFormEnabled &&
+      (!experimentalGroupFormDayOneWeekday ||
+        !experimentalGroupFormDayOneTime ||
+        !experimentalGroupFormDayTwoWeekday ||
+        !experimentalGroupFormDayTwoTime)
+    ) {
       modalToast.warning("Configure os dois dias e horários da turma.");
       return;
     }
-    if (experimentalGroupFormDayOneWeekday === experimentalGroupFormDayTwoWeekday) {
+    if (
+      experimentalGroupFormEnabled &&
+      experimentalGroupFormDayOneWeekday === experimentalGroupFormDayTwoWeekday
+    ) {
       modalToast.warning("Escolha dois dias diferentes da semana.");
       return;
     }
@@ -9198,125 +9218,264 @@ export function AtendimentoClient() {
         position="center"
         zIndexClass="z-[420]"
       >
-        <div className="flex flex-col gap-4">
-          <div className="flex items-center justify-between gap-3">
-            <div>
-              <h3 className="text-[18px] font-bold text-[var(--app-text-85)]">
-                Aulas Experimentais em Grupo
-              </h3>
-              <div className="mt-1 text-[12px] text-[var(--app-text-55)]">
-                Configuração global compartilhada no Atendimento.
+        <div className="flex w-full flex-col gap-0">
+          <div className="flex shrink-0 items-center justify-between gap-3 pb-1">
+            <div className="flex min-w-0 items-center gap-3">
+              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-[rgba(234,88,12,0.15)]">
+                <Users className="h-5 w-5 text-[#9a3412]" />
+              </div>
+              <div className="min-w-0">
+                <h3 className="truncate text-[18px] font-bold leading-tight text-[var(--app-text-85)]">
+                  Aulas Experimentais em Grupo
+                </h3>
+                <div className="mt-0.5 text-[12px] text-[var(--app-text-55)]">
+                  Configure os 2 dias e horarios globais usados no Atendimento.
+                </div>
               </div>
             </div>
             <button
               type="button"
+              aria-label="Fechar"
               onClick={() => setExperimentalGroupSettingsOpen(false)}
-              className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-[var(--app-border)] bg-[var(--app-solid-surface)] text-[var(--app-text-70)] hover:bg-[var(--app-hover)]"
+              className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-[var(--app-border)] bg-[var(--app-solid-surface)] text-[var(--app-text-70)] hover:bg-[var(--app-hover)] disabled:cursor-not-allowed disabled:opacity-60"
             >
               <X className="h-4 w-4" />
             </button>
           </div>
 
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <label className="rounded-2xl border border-[var(--app-border)] bg-[var(--app-solid-surface-2)] px-4 py-3 text-[13px] font-semibold text-[var(--app-text-85)]">
-              Funcionalidade
-              <select
-                value={experimentalGroupFormEnabled ? "enabled" : "disabled"}
-                onChange={(e) => setExperimentalGroupFormEnabled(e.target.value === "enabled")}
-                className="mt-2 w-full rounded-xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] px-3 py-2 text-[13px] font-medium text-[var(--app-text-85)] outline-none"
-              >
-                <option value="enabled">Ativada</option>
-                <option value="disabled">Desativada</option>
-              </select>
-            </label>
-            <label className="rounded-2xl border border-[var(--app-border)] bg-[var(--app-solid-surface-2)] px-4 py-3 text-[13px] font-semibold text-[var(--app-text-85)]">
-              Dia 1
-              <select
-                value={experimentalGroupFormDayOneWeekday}
-                onChange={(e) => setExperimentalGroupFormDayOneWeekday(e.target.value)}
-                className="mt-2 w-full rounded-xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] px-3 py-2 text-[13px] font-medium text-[var(--app-text-85)] outline-none"
-              >
-                <option value="">Selecione</option>
-                {experimentalGroupWeekdayOptions.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
-              <input
-                type="time"
-                value={experimentalGroupFormDayOneTime}
-                onChange={(e) => setExperimentalGroupFormDayOneTime(e.target.value)}
-                className="mt-2 w-full rounded-xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] px-3 py-2 text-[13px] font-medium text-[var(--app-text-85)] outline-none"
-              />
-            </label>
-            <label className="rounded-2xl border border-[var(--app-border)] bg-[var(--app-solid-surface-2)] px-4 py-3 text-[13px] font-semibold text-[var(--app-text-85)]">
-              Dia 2
-              <select
-                value={experimentalGroupFormDayTwoWeekday}
-                onChange={(e) => setExperimentalGroupFormDayTwoWeekday(e.target.value)}
-                className="mt-2 w-full rounded-xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] px-3 py-2 text-[13px] font-medium text-[var(--app-text-85)] outline-none"
-              >
-                <option value="">Selecione</option>
-                {experimentalGroupWeekdayOptions.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
-              <input
-                type="time"
-                value={experimentalGroupFormDayTwoTime}
-                onChange={(e) => setExperimentalGroupFormDayTwoTime(e.target.value)}
-                className="mt-2 w-full rounded-xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] px-3 py-2 text-[13px] font-medium text-[var(--app-text-85)] outline-none"
-              />
-            </label>
-          </div>
-
-          <div className="rounded-2xl border border-[var(--app-border)] bg-[var(--app-solid-surface-2)] p-4">
-            <div className="text-[13px] font-semibold text-[var(--app-text-85)]">
-              Prévia das próximas turmas
-            </div>
-            <div className="mt-3 space-y-2">
-              {experimentalGroupPreviewSlots.length === 0 ? (
-                <div className="text-[13px] text-[var(--app-text-55)]">
-                  A prévia global mostra apenas os dias e horários. O professor será definido por registro, no card de Aula experimental.
+          <div className="mt-5 space-y-4">
+            <div className="rounded-2xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] p-4">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <div className="text-[14px] font-bold text-[var(--app-text-85)]">
+                    Ativar turmas experimentais em grupo
+                  </div>
+                  <div className="mt-1 text-[12px] text-[var(--app-text-55)]">
+                    Quando ligado, o Atendimento pode usar os dois dias e horarios definidos abaixo.
+                  </div>
                 </div>
-              ) : (
-                experimentalGroupPreviewSlots.map((slot) => (
-                  <div
-                    key={slot.id}
-                    className="rounded-xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] px-4 py-3"
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={experimentalGroupFormEnabled}
+                  onClick={() => setExperimentalGroupFormEnabled((prev) => !prev)}
+                  className={[
+                    "inline-flex h-12 min-w-[136px] shrink-0 items-center gap-2 rounded-full border px-3 transition",
+                    experimentalGroupFormEnabled
+                      ? "border-emerald-500/35 bg-emerald-500/12 text-emerald-800"
+                      : "border-[var(--app-border)] bg-[var(--app-solid-surface-2)] text-[var(--app-text-70)]",
+                  ].join(" ")}
+                >
+                  <span
+                    className={[
+                      "flex h-6 w-6 items-center justify-center rounded-full transition",
+                      experimentalGroupFormEnabled
+                        ? "bg-emerald-600 text-white"
+                        : "bg-[var(--app-solid-surface)] text-[var(--app-text-55)]",
+                    ].join(" ")}
                   >
-                    <div className="text-[13px] font-semibold text-[var(--app-text-85)]">
-                      {slot.professor_weekday_label}, {formatAtendimentoDate(slot.professor_date)} às {slot.professor_time}
+                    <Check className="h-3.5 w-3.5" />
+                  </span>
+                  <span className="text-[13px] font-semibold">
+                    {experimentalGroupFormEnabled ? "Ativada" : "Desativada"}
+                  </span>
+                </button>
+              </div>
+
+              <div className="mt-4 flex flex-wrap items-center gap-2">
+                <div className="inline-flex items-center gap-1.5 rounded-full border border-[var(--app-border)] bg-[var(--app-solid-surface-2)] px-3 py-1.5 text-[11px] font-semibold text-[var(--app-text-70)]">
+                  <CalendarIcon className="h-3.5 w-3.5" />
+                  2 dias por semana
+                </div>
+                <div className="inline-flex items-center gap-1.5 rounded-full border border-[var(--app-border)] bg-[var(--app-solid-surface-2)] px-3 py-1.5 text-[11px] font-semibold text-[var(--app-text-70)]">
+                  <Users className="h-3.5 w-3.5" />
+                  Ate 4 alunos por turma
+                </div>
+                <div className="inline-flex items-center gap-1.5 rounded-full border border-[var(--app-border)] bg-[var(--app-solid-surface-2)] px-3 py-1.5 text-[11px] font-semibold text-[var(--app-text-70)]">
+                  Fuso do professor: {String(experimentalGroupSettings?.professor_timezone ?? ATENDIMENTO_PROFESSOR_TIME_ZONE)}
+                </div>
+              </div>
+            </div>
+
+            {[
+              {
+                title: "Dia 1",
+                selectedWeekday: experimentalGroupFormDayOneWeekday,
+                setWeekday: setExperimentalGroupFormDayOneWeekday,
+                selectedTime: experimentalGroupFormDayOneTime,
+                setTime: setExperimentalGroupFormDayOneTime,
+              },
+              {
+                title: "Dia 2",
+                selectedWeekday: experimentalGroupFormDayTwoWeekday,
+                setWeekday: setExperimentalGroupFormDayTwoWeekday,
+                selectedTime: experimentalGroupFormDayTwoTime,
+                setTime: setExperimentalGroupFormDayTwoTime,
+              },
+            ].map((card) => (
+              <div
+                key={card.title}
+                className={[
+                  "rounded-2xl border p-4 transition",
+                  experimentalGroupFormEnabled
+                    ? "border-[var(--app-border)] bg-[var(--app-solid-surface)]"
+                    : "border-[var(--app-border)] bg-[var(--app-solid-surface)] opacity-60",
+                ].join(" ")}
+              >
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <div className="text-[14px] font-bold text-[var(--app-text-85)]">
+                        {card.title}
+                      </div>
+                      <div className="mt-0.5 text-[12px] text-[var(--app-text-55)]">
+                        Escolha o dia da semana e o horario da turma.
+                      </div>
                     </div>
-                    <div className="mt-1 text-[12px] text-[var(--app-text-55)]">
-                      Professor: {slot.professor_name ?? "—"} | Alunos: {slot.occupied_seats}/{slot.capacity} | Vagas: {slot.available_seats}
+                    {card.selectedWeekday && card.selectedTime ? (
+                      <div className="inline-flex items-center gap-1 rounded-full border border-[#ea580c]/25 bg-[rgba(234,88,12,0.10)] px-3 py-1 text-[11px] font-bold text-[#9a3412]">
+                        {experimentalGroupWeekdayOptions.find((option) => option.value === card.selectedWeekday)?.label ?? card.selectedWeekday} as {card.selectedTime}
+                      </div>
+                    ) : null}
+                  </div>
+
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between gap-3">
+                      <label className="text-xs font-semibold text-[var(--app-text-70)]">
+                        Dia da semana
+                      </label>
+                      <div className="text-[11px] font-medium text-[var(--app-text-55)]">
+                        Selecione 1 dia
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 md:grid-cols-7">
+                      {experimentalGroupWeekdayOptions.map((option) => {
+                        const isSelected = card.selectedWeekday === option.value;
+                        const shortLabel =
+                          EXPERIMENTAL_GROUP_WEEKDAY_SHORT_LABELS[option.value] ?? option.label.slice(0, 3);
+                        return (
+                          <button
+                            key={`${card.title}-${option.value}`}
+                            type="button"
+                            disabled={!experimentalGroupFormEnabled}
+                            onClick={() => card.setWeekday(option.value)}
+                            className={[
+                              "flex min-h-[76px] flex-col items-center justify-center gap-1 rounded-2xl border px-2 py-2 text-center transition duration-150 disabled:cursor-not-allowed disabled:opacity-60",
+                              isSelected
+                                ? "!border-transparent !bg-[#ea580c] !text-white shadow-md"
+                                : "border-[var(--app-border)] bg-[var(--app-solid-surface)] text-[var(--app-text-85)] hover:border-[#ea580c]/35 hover:bg-[var(--app-hover)] hover:text-[var(--app-text-90)]",
+                            ].join(" ")}
+                          >
+                            <div className={isSelected ? "text-[11px] font-semibold uppercase tracking-wide !text-white/95" : "text-[11px] font-semibold uppercase tracking-wide text-[var(--app-text-50)]"}>
+                              {shortLabel}
+                            </div>
+                            <div className={isSelected ? "text-[12px] font-semibold leading-none !text-white" : "text-[12px] font-semibold leading-none text-[var(--app-text-92)]"}>
+                              {option.label}
+                            </div>
+                          </button>
+                        );
+                      })}
                     </div>
                   </div>
-                ))
-              )}
-            </div>
-          </div>
 
-          <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-            <button
-              type="button"
-              onClick={() => setExperimentalGroupSettingsOpen(false)}
-              className="inline-flex min-h-[44px] items-center justify-center rounded-xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] px-5 text-[13px] font-semibold text-[var(--app-text-85)]"
-            >
-              Fechar
-            </button>
-            <button
-              type="button"
-              onClick={() => void handleSaveExperimentalGroupSettings()}
-              disabled={experimentalGroupSettingsSaving}
-              className="inline-flex min-h-[44px] items-center justify-center gap-2 rounded-xl bg-[#ea580c] px-5 text-[13px] font-semibold text-white disabled:cursor-not-allowed disabled:opacity-60"
-            >
-              {experimentalGroupSettingsSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-              Salvar configuração
-            </button>
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between gap-3">
+                      <label className="text-xs font-semibold text-[var(--app-text-70)]">
+                        Horario disponivel
+                      </label>
+                      <div className="text-[11px] font-medium text-[var(--app-text-55)]">
+                        Fuso: {String(experimentalGroupSettings?.professor_timezone ?? ATENDIMENTO_PROFESSOR_TIME_ZONE)}
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 md:grid-cols-5">
+                      {EXPERIMENTAL_CLASS_SLOT_TIMES.map((time) => {
+                        const isSelected = card.selectedTime === time;
+                        return (
+                          <button
+                            key={`${card.title}-${time}`}
+                            type="button"
+                            disabled={!experimentalGroupFormEnabled}
+                            onClick={() => card.setTime(time)}
+                            className={[
+                              "flex h-12 items-center justify-center rounded-2xl border px-2 text-[15px] font-semibold transition duration-150 disabled:cursor-not-allowed disabled:opacity-60",
+                              isSelected
+                                ? "!border-transparent !bg-[#ea580c] !text-white shadow-md"
+                                : "border-[var(--app-border)] bg-[var(--app-solid-surface)] text-[var(--app-text-85)] hover:border-[#ea580c]/35 hover:bg-[var(--app-hover)] hover:text-[var(--app-text-90)]",
+                            ].join(" ")}
+                          >
+                            {time}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ))}
+
+            <div className="rounded-2xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] p-4">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <div className="text-[14px] font-bold text-[var(--app-text-85)]">
+                    Previa das proximas turmas
+                  </div>
+                  <div className="mt-0.5 text-[12px] text-[var(--app-text-55)]">
+                    Visualizacao global dos dias e horarios configurados.
+                  </div>
+                </div>
+                <div className="text-[11px] font-medium text-[var(--app-text-55)]">
+                  {experimentalGroupPreviewSlots.length} turma(s)
+                </div>
+              </div>
+
+              <div className="mt-3 space-y-2">
+                {experimentalGroupPreviewSlots.length === 0 ? (
+                  <div className="rounded-2xl border border-dashed border-[var(--app-border)] bg-[var(--app-solid-surface-2)] px-4 py-6 text-[13px] text-[var(--app-text-55)]">
+                    A previa global mostra apenas os dias e horarios. O professor sera definido por registro, no card de Aula experimental.
+                  </div>
+                ) : (
+                  experimentalGroupPreviewSlots.map((slot) => (
+                    <div
+                      key={slot.id}
+                      className="rounded-2xl border border-[var(--app-border)] bg-[var(--app-solid-surface-2)] px-4 py-3"
+                    >
+                      <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                        <div>
+                          <div className="text-[13px] font-semibold text-[var(--app-text-85)]">
+                            {slot.professor_weekday_label}, {formatAtendimentoDate(slot.professor_date)} as {slot.professor_time}
+                          </div>
+                          <div className="mt-1 text-[12px] text-[var(--app-text-55)]">
+                            Professor definido por registro individual.
+                          </div>
+                        </div>
+                        <div className="inline-flex items-center gap-1 rounded-full border border-[var(--app-border)] bg-[var(--app-solid-surface)] px-2.5 py-1 text-[11px] font-semibold text-[var(--app-text-70)]">
+                          {slot.occupied_seats}/{slot.capacity} alunos
+                        </div>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+
+            <div className="mt-2 flex shrink-0 flex-col-reverse gap-2 sm:flex-row sm:items-center sm:justify-end">
+              <button
+                type="button"
+                onClick={() => setExperimentalGroupSettingsOpen(false)}
+                className="inline-flex min-h-[44px] items-center justify-center gap-1.5 rounded-xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] px-5 text-[13px] font-semibold text-[var(--app-text-85)] hover:bg-[var(--app-hover)] disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={() => void handleSaveExperimentalGroupSettings()}
+                disabled={experimentalGroupSettingsSaving}
+                className="inline-flex min-h-[44px] items-center justify-center gap-1.5 rounded-xl border border-transparent bg-[#ea580c] px-5 text-[13px] font-semibold !text-white shadow-none transition-colors hover:bg-[#c2410c] active:bg-[#9a3412] disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {experimentalGroupSettingsSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+                Salvar configuracao
+              </button>
+            </div>
           </div>
         </div>
       </AppModal>
