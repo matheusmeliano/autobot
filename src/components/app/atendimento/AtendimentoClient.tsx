@@ -9405,51 +9405,6 @@ export function AtendimentoClient() {
               </div>
             ))}
 
-            <div className="rounded-2xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] p-4">
-              <div className="flex items-center justify-between gap-3">
-                <div>
-                  <div className="text-[14px] font-bold text-[var(--app-text-85)]">
-                    Previa das proximas turmas
-                  </div>
-                  <div className="mt-0.5 text-[12px] text-[var(--app-text-55)]">
-                    Visualizacao global dos dias e horarios configurados.
-                  </div>
-                </div>
-                <div className="text-[11px] font-medium text-[var(--app-text-55)]">
-                  {experimentalGroupPreviewSlots.length} turma(s)
-                </div>
-              </div>
-
-              <div className="mt-3 space-y-2">
-                {experimentalGroupPreviewSlots.length === 0 ? (
-                  <div className="rounded-2xl border border-dashed border-[var(--app-border)] bg-[var(--app-solid-surface-2)] px-4 py-6 text-[13px] text-[var(--app-text-55)]">
-                    A previa global mostra apenas os dias e horarios. O professor sera definido por registro, no card de Aula experimental.
-                  </div>
-                ) : (
-                  experimentalGroupPreviewSlots.map((slot) => (
-                    <div
-                      key={slot.id}
-                      className="rounded-2xl border border-[var(--app-border)] bg-[var(--app-solid-surface-2)] px-4 py-3"
-                    >
-                      <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-                        <div>
-                          <div className="text-[13px] font-semibold text-[var(--app-text-85)]">
-                            {slot.professor_weekday_label}, {formatAtendimentoDate(slot.professor_date)} as {slot.professor_time}
-                          </div>
-                          <div className="mt-1 text-[12px] text-[var(--app-text-55)]">
-                            Professor definido por registro individual.
-                          </div>
-                        </div>
-                        <div className="inline-flex items-center gap-1 rounded-full border border-[var(--app-border)] bg-[var(--app-solid-surface)] px-2.5 py-1 text-[11px] font-semibold text-[var(--app-text-70)]">
-                          {slot.occupied_seats}/{slot.capacity} alunos
-                        </div>
-                      </div>
-                    </div>
-                  ))
-                )}
-              </div>
-            </div>
-
             <div className="mt-2 flex shrink-0 flex-col-reverse gap-2 sm:flex-row sm:items-center sm:justify-end">
               <button
                 type="button"
