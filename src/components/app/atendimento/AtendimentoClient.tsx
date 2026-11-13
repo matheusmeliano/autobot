@@ -34,6 +34,47 @@ const EMPTY_SUMMARY: AtendimentoSummary = {
   conversasNaoLidas: 0,
 };
 
+type ExperimentalGroupSettingsPayload = {
+  enabled: boolean;
+  professor_name: string | null;
+  professor_phone: string | null;
+  professor_timezone?: string | null;
+  capacity?: number;
+  slots: Array<{ weekday: string; professor_time: string }>;
+};
+
+type ExperimentalGroupSlotPayload = {
+  id: string;
+  group_class_id: string | null;
+  professor_name: string | null;
+  professor_phone: string | null;
+  professor_timezone: string;
+  professor_weekday: string;
+  professor_weekday_label: string;
+  professor_date: string;
+  professor_time: string;
+  professor_start_at: string;
+  lead_timezone: string;
+  lead_date: string;
+  lead_time: string;
+  capacity: number;
+  occupied_seats: number;
+  available_seats: number;
+  status: string;
+  lesson_link: string | null;
+  confirmed_at: string | null;
+  members: Array<{
+    id: string;
+    lead_id: string;
+    full_name: string | null;
+    phone: string | null;
+    status: string | null;
+    student_notification_sent_at: string | null;
+  }>;
+  is_full: boolean;
+  is_current_lead_assigned: boolean;
+};
+
 const EXPERIMENTAL_PROFESSOR_OPTIONS_CLIENT: Array<{ name: string; phone: string; short: string }> = [
   { name: "Lucas Brum", phone: "+55 65 9807-9407", short: "9807-9407" },
   { name: "Nathan Camargo", phone: "+55 65 9952-0166", short: "9952-0166" },
@@ -234,6 +275,63 @@ function deriveLeadEffectiveTimeZone(lead: AtendimentoLeadListItem | null | unde
   }
   const savedTz = String((lead as any).timezone ?? "").trim();
   return savedTz || ATENDIMENTO_PROFESSOR_TIME_ZONE;
+}
+
+function leadHasScheduledExperimentalClassForGroupCard(
+  lead: AtendimentoLeadListItem | null | undefined,
+): boolean {
+  if (!lead) return false;
+  const bestBooking =
+    (lead as any)?.future_experimental_class_booking ??
+    (lead as any)?.experimental_class_booking ??
+    (lead as any)?.latest_experimental_class_booking ??
+    null;
+  const bookingStatus = String((bestBooking as any)?.status ?? "").trim().toLowerCase();
+  if (
+    bestBooking &&
+    bookingStatus &&
+    bookingStatus !== "cancelled" &&
+    Boolean(String((bestBooking as any)?.professor_start_at ?? "").trim())
+  ) {
+    return true;
+  }
+  const flatStatus = String((lead as any)?.experimental_class_status ?? "").trim().toLowerCase();
+  const flatStartAt = String((lead as any)?.experimental_class_professor_start_at ?? "").trim();
+  return Boolean(flatStartAt && flatStatus && flatStatus !== "cancelled");
+}
+
+function deriveExperimentalGroupCardState(params: {
+  lead: AtendimentoLeadListItem | null | undefined;
+  settingsEnabled: boolean;
+}) {
+  const lead = params.lead;
+  const reasons: string[] = [];
+  const phoneRaw = String(lead?.phone ?? "").trim();
+  const phoneDigits = phoneRaw.replace(/\D/g, "");
+  const hasValidPhone =
+    /^55\d{10,11}$/.test(phoneDigits) ||
+    /^1\d{10}$/.test(phoneDigits) ||
+    /^351\d{9}$/.test(phoneDigits) ||
+    phoneDigits.length >= 10;
+  const assignedGroupId = String((lead as any)?.experimental_class_group_class_id ?? "").trim();
+  const assignedStatus = String((lead as any)?.experimental_class_group_status ?? "").trim().toLowerCase();
+  const alreadyAssignedToGroup = Boolean(
+    assignedGroupId && assignedStatus && assignedStatus !== "removed",
+  );
+  const hasScheduledExperimentalClass = leadHasScheduledExperimentalClassForGroupCard(lead);
+
+  if (!params.settingsEnabled) reasons.push("Funcionalidade desativada.");
+  if (!hasValidPhone) reasons.push("Registro sem telefone válido.");
+  if (hasScheduledExperimentalClass && !alreadyAssignedToGroup) {
+    reasons.push("O aluno já possui aula experimental definida.");
+  }
+
+  return {
+    disabled: reasons.length > 0 && !alreadyAssignedToGroup,
+    reasons,
+    alreadyAssignedToGroup,
+    interestRegistered: Boolean((lead as any)?.experimental_class_group_interest),
+  };
 }
 
 function hasLeadConfirmedPaymentForRecurringNotificationsClient(
@@ -1391,6 +1489,26 @@ export function AtendimentoClient() {
   const [isMobileViewport, setIsMobileViewport] = useState(false);
   const [botExperimentalDisabled, setBotExperimentalDisabled] = useState<boolean>(false);
   const [botExperimentalLoading, setBotExperimentalLoading] = useState<boolean>(false);
+  const [experimentalGroupSettings, setExperimentalGroupSettings] =
+    useState<ExperimentalGroupSettingsPayload | null>(null);
+  const [experimentalGroupPreviewSlots, setExperimentalGroupPreviewSlots] = useState<
+    ExperimentalGroupSlotPayload[]
+  >([]);
+  const [experimentalGroupProfessorOptions, setExperimentalGroupProfessorOptions] = useState<
+    Array<{ name: string; phone: string; short?: string }>
+  >(EXPERIMENTAL_PROFESSOR_OPTIONS_CLIENT);
+  const [experimentalGroupWeekdayOptions, setExperimentalGroupWeekdayOptions] = useState<
+    Array<{ value: string; label: string }>
+  >([]);
+  const [experimentalGroupSettingsOpen, setExperimentalGroupSettingsOpen] = useState(false);
+  const [experimentalGroupSettingsLoading, setExperimentalGroupSettingsLoading] = useState(false);
+  const [experimentalGroupSettingsSaving, setExperimentalGroupSettingsSaving] = useState(false);
+  const [experimentalGroupFormEnabled, setExperimentalGroupFormEnabled] = useState(false);
+  const [experimentalGroupFormProfessorPhone, setExperimentalGroupFormProfessorPhone] = useState("");
+  const [experimentalGroupFormDayOneWeekday, setExperimentalGroupFormDayOneWeekday] = useState("");
+  const [experimentalGroupFormDayOneTime, setExperimentalGroupFormDayOneTime] = useState("");
+  const [experimentalGroupFormDayTwoWeekday, setExperimentalGroupFormDayTwoWeekday] = useState("");
+  const [experimentalGroupFormDayTwoTime, setExperimentalGroupFormDayTwoTime] = useState("");
   const [editLeadOpen, setEditLeadOpen] = useState(false);
   const [editLeadName, setEditLeadName] = useState("");
   const [editLeadPhone, setEditLeadPhone] = useState("");
@@ -1420,6 +1538,18 @@ export function AtendimentoClient() {
 
   const [isExpInfoOpen, setIsExpInfoOpen] = useState(false);
   const [expInfoLead, setExpInfoLead] = useState<AtendimentoLeadListItem | null>(null);
+  const [isExperimentalGroupModalOpen, setIsExperimentalGroupModalOpen] = useState(false);
+  const [experimentalGroupLead, setExperimentalGroupLead] =
+    useState<AtendimentoLeadListItem | null>(null);
+  const [experimentalGroupLoading, setExperimentalGroupLoading] = useState(false);
+  const [experimentalGroupActionLoading, setExperimentalGroupActionLoading] = useState(false);
+  const [experimentalGroupSlots, setExperimentalGroupSlots] = useState<
+    ExperimentalGroupSlotPayload[]
+  >([]);
+  const [experimentalGroupCanOpenModal, setExperimentalGroupCanOpenModal] = useState(false);
+  const [experimentalGroupSelectedSlotId, setExperimentalGroupSelectedSlotId] = useState<
+    string | null
+  >(null);
   const [isRecurringInfoOpen, setIsRecurringInfoOpen] = useState(false);
   const [recurringInfoLead, setRecurringInfoLead] = useState<AtendimentoLeadListItem | null>(null);
 
@@ -1714,6 +1844,14 @@ export function AtendimentoClient() {
     if (!selectedLeadId) return null;
     return panelLeads.find((l) => l.id === selectedLeadId) ?? null;
   }, [panelLeads, selectedLeadId]);
+
+  const selectedExperimentalGroupSlot = useMemo<ExperimentalGroupSlotPayload | null>(() => {
+    if (!experimentalGroupSelectedSlotId) return null;
+    return (
+      experimentalGroupSlots.find((slot) => String(slot.id) === experimentalGroupSelectedSlotId) ??
+      null
+    );
+  }, [experimentalGroupSelectedSlotId, experimentalGroupSlots]);
 
   const bookingLocationOk = useMemo<boolean>(() => {
     if (!selectedLead) return false;
@@ -3271,6 +3409,220 @@ export function AtendimentoClient() {
     }
   }
 
+  function syncExperimentalGroupSettingsFromPayload(json: any) {
+    const settings = (json?.settings ?? null) as ExperimentalGroupSettingsPayload | null;
+    setExperimentalGroupSettings(settings);
+    setExperimentalGroupPreviewSlots(
+      Array.isArray(json?.preview_slots) ? (json.preview_slots as ExperimentalGroupSlotPayload[]) : [],
+    );
+    setExperimentalGroupProfessorOptions(
+      Array.isArray(json?.professor_options) && json.professor_options.length > 0
+        ? (json.professor_options as Array<{ name: string; phone: string; short?: string }>)
+        : EXPERIMENTAL_PROFESSOR_OPTIONS_CLIENT,
+    );
+    setExperimentalGroupWeekdayOptions(
+      Array.isArray(json?.weekday_options) ? (json.weekday_options as Array<{ value: string; label: string }>) : [],
+    );
+    setExperimentalGroupFormEnabled(Boolean(settings?.enabled));
+    setExperimentalGroupFormProfessorPhone(String(settings?.professor_phone ?? "").trim());
+    setExperimentalGroupFormDayOneWeekday(String(settings?.slots?.[0]?.weekday ?? "").trim());
+    setExperimentalGroupFormDayOneTime(String(settings?.slots?.[0]?.professor_time ?? "").trim());
+    setExperimentalGroupFormDayTwoWeekday(String(settings?.slots?.[1]?.weekday ?? "").trim());
+    setExperimentalGroupFormDayTwoTime(String(settings?.slots?.[1]?.professor_time ?? "").trim());
+  }
+
+  async function loadExperimentalGroupSettings(silent = false) {
+    setExperimentalGroupSettingsLoading(true);
+    try {
+      const res = await fetch("/api/atendimento/settings/experimental-group-classes", {
+        cache: "no-store",
+      });
+      if (handleForbiddenResponse(res)) return;
+      const json = await res.json().catch(() => null);
+      if (!json?.ok) {
+        if (!silent) {
+          modalToast.error(String(json?.error ?? "Falha ao carregar configurações de turma."));
+        }
+        return;
+      }
+      syncExperimentalGroupSettingsFromPayload(json);
+    } catch (error: any) {
+      if (!silent) {
+        modalToast.error(String(error?.message ?? "Falha ao carregar configurações de turma."));
+      }
+    } finally {
+      setExperimentalGroupSettingsLoading(false);
+    }
+  }
+
+  async function handleOpenExperimentalGroupSettings() {
+    setExperimentalGroupSettingsOpen(true);
+    await loadExperimentalGroupSettings(false);
+  }
+
+  async function handleSaveExperimentalGroupSettings() {
+    if (experimentalGroupSettingsSaving) return;
+    if (!experimentalGroupFormProfessorPhone) {
+      modalToast.warning("Selecione o professor responsável.");
+      return;
+    }
+    if (!experimentalGroupFormDayOneWeekday || !experimentalGroupFormDayOneTime || !experimentalGroupFormDayTwoWeekday || !experimentalGroupFormDayTwoTime) {
+      modalToast.warning("Configure os dois dias e horários da turma.");
+      return;
+    }
+    if (experimentalGroupFormDayOneWeekday === experimentalGroupFormDayTwoWeekday) {
+      modalToast.warning("Escolha dois dias diferentes da semana.");
+      return;
+    }
+    const professor =
+      experimentalGroupProfessorOptions.find((item) => item.phone === experimentalGroupFormProfessorPhone) ??
+      null;
+    if (!professor) {
+      modalToast.warning("Professor inválido para a configuração.");
+      return;
+    }
+
+    setExperimentalGroupSettingsSaving(true);
+    try {
+      const res = await fetch("/api/atendimento/settings/experimental-group-classes", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          enabled: experimentalGroupFormEnabled,
+          professor_name: professor.name,
+          professor_phone: professor.phone,
+          slots: [
+            { weekday: experimentalGroupFormDayOneWeekday, professor_time: experimentalGroupFormDayOneTime },
+            { weekday: experimentalGroupFormDayTwoWeekday, professor_time: experimentalGroupFormDayTwoTime },
+          ],
+        }),
+      });
+      if (handleForbiddenResponse(res)) return;
+      const json = await res.json().catch(() => null);
+      if (!json?.ok) {
+        modalToast.error(String(json?.error ?? "Falha ao salvar configuração das turmas."));
+        return;
+      }
+      syncExperimentalGroupSettingsFromPayload(json);
+      modalToast.success("Configuração das aulas experimentais em grupo salva.");
+      void loadPanelLeads();
+    } catch (error: any) {
+      modalToast.error(String(error?.message ?? "Falha ao salvar configuração das turmas."));
+    } finally {
+      setExperimentalGroupSettingsSaving(false);
+    }
+  }
+
+  async function loadExperimentalGroupLeadData(lead: AtendimentoLeadListItem) {
+    setExperimentalGroupLoading(true);
+    try {
+      const res = await fetch(
+        `/api/atendimento/leads/${encodeURIComponent(lead.id)}/experimental-group-classes`,
+        { cache: "no-store" },
+      );
+      if (handleForbiddenResponse(res)) return;
+      const json = await res.json().catch(() => null);
+      if (!json?.ok) {
+        modalToast.error(String(json?.error ?? "Falha ao carregar turmas disponíveis."));
+        return;
+      }
+      const slots = Array.isArray(json?.slots) ? (json.slots as ExperimentalGroupSlotPayload[]) : [];
+      setExperimentalGroupCanOpenModal(Boolean(json?.can_open_modal));
+      setExperimentalGroupSlots(slots);
+      const firstAssigned = slots.find((slot) => slot.is_current_lead_assigned) ?? slots[0] ?? null;
+      setExperimentalGroupSelectedSlotId(firstAssigned ? String(firstAssigned.id) : null);
+    } catch (error: any) {
+      modalToast.error(String(error?.message ?? "Falha ao carregar turmas disponíveis."));
+    } finally {
+      setExperimentalGroupLoading(false);
+    }
+  }
+
+  async function handleOpenExperimentalGroupModal(lead: AtendimentoLeadListItem) {
+    setExperimentalGroupLead(lead);
+    setIsExperimentalGroupModalOpen(true);
+    await loadExperimentalGroupLeadData(lead);
+  }
+
+  async function handleAssignLeadToExperimentalGroup(slot: ExperimentalGroupSlotPayload) {
+    if (!experimentalGroupLead || experimentalGroupActionLoading) return;
+    setExperimentalGroupActionLoading(true);
+    try {
+      const res = await fetch("/api/atendimento/experimental-group-classes/assign", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          lead_id: experimentalGroupLead.id,
+          group_class_id: slot.group_class_id,
+          professor_start_at: slot.professor_start_at,
+        }),
+      });
+      if (handleForbiddenResponse(res)) return;
+      const json = await res.json().catch(() => null);
+      if (!json?.ok) {
+        modalToast.error(String(json?.error ?? "Falha ao atribuir registro à turma."));
+        return;
+      }
+      await Promise.all([loadPanelLeads(), loadExperimentalGroupLeadData(experimentalGroupLead)]);
+      modalToast.success("Registro vinculado à turma.");
+    } catch (error: any) {
+      modalToast.error(String(error?.message ?? "Falha ao atribuir registro à turma."));
+    } finally {
+      setExperimentalGroupActionLoading(false);
+    }
+  }
+
+  async function handleRemoveLeadFromExperimentalGroup(groupClassId: string, leadId: string) {
+    if (experimentalGroupActionLoading || !experimentalGroupLead) return;
+    setExperimentalGroupActionLoading(true);
+    try {
+      const res = await fetch("/api/atendimento/experimental-group-classes/remove-member", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          group_class_id: groupClassId,
+          lead_id: leadId,
+        }),
+      });
+      if (handleForbiddenResponse(res)) return;
+      const json = await res.json().catch(() => null);
+      if (!json?.ok) {
+        modalToast.error(String(json?.error ?? "Falha ao remover aluno da turma."));
+        return;
+      }
+      await Promise.all([loadPanelLeads(), loadExperimentalGroupLeadData(experimentalGroupLead)]);
+      modalToast.success("Aluno removido da turma.");
+    } catch (error: any) {
+      modalToast.error(String(error?.message ?? "Falha ao remover aluno da turma."));
+    } finally {
+      setExperimentalGroupActionLoading(false);
+    }
+  }
+
+  async function handleConfirmExperimentalGroup(groupClassId: string) {
+    if (experimentalGroupActionLoading || !experimentalGroupLead) return;
+    setExperimentalGroupActionLoading(true);
+    try {
+      const res = await fetch("/api/atendimento/experimental-group-classes/confirm", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ group_class_id: groupClassId }),
+      });
+      if (handleForbiddenResponse(res)) return;
+      const json = await res.json().catch(() => null);
+      if (!json?.ok) {
+        modalToast.error(String(json?.error ?? "Falha ao confirmar a turma."));
+        return;
+      }
+      await Promise.all([loadPanelLeads(), loadSummary({ silent: true }), loadExperimentalGroupLeadData(experimentalGroupLead)]);
+      modalToast.success(`Turma confirmada. ${Number(json?.sent_count ?? 0)} mensagem(ns) enviada(s).`);
+    } catch (error: any) {
+      modalToast.error(String(error?.message ?? "Falha ao confirmar a turma."));
+    } finally {
+      setExperimentalGroupActionLoading(false);
+    }
+  }
+
   async function handleToggleBotExperimental() {
     if (botExperimentalLoading) return;
     const nextDisabled = !botExperimentalDisabled;
@@ -4456,7 +4808,7 @@ export function AtendimentoClient() {
 
   useEffect(() => {
     setLoading(true);
-    Promise.all([loadSummary(), loadPanelLeads(), loadBotExperimentalSetting()])
+    Promise.all([loadSummary(), loadPanelLeads(), loadBotExperimentalSetting(), loadExperimentalGroupSettings(true)])
       .then(() => {
         setLoadError(null);
         initialLoadCompletedRef.current = true;
@@ -4510,6 +4862,27 @@ export function AtendimentoClient() {
         () => {
           void loadSummary({ silent: true });
           void loadPanelLeads();
+        },
+      )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "atendimento_experimental_group_classes" },
+        () => {
+          void loadPanelLeads();
+        },
+      )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "atendimento_experimental_group_class_members" },
+        () => {
+          void loadPanelLeads();
+        },
+      )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "app_settings" },
+        () => {
+          void loadExperimentalGroupSettings(true);
         },
       )
       .on(
@@ -5386,6 +5759,17 @@ export function AtendimentoClient() {
             >
               <Palette className="h-5 w-5" strokeWidth={1.75} />
             </button>
+            <div className="relative shrink-0">
+              <button
+                type="button"
+                aria-label="Configurar aulas experimentais em grupo"
+                disabled={experimentalGroupSettingsLoading || loading}
+                onClick={() => void handleOpenExperimentalGroupSettings()}
+                className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] text-[var(--app-text-75)] transition-all hover:bg-[var(--app-hover)] disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                <GraduationCap className="h-5 w-5" strokeWidth={1.75} />
+              </button>
+            </div>
             <div className="relative shrink-0">
               <button
                 type="button"
@@ -6945,6 +7329,68 @@ export function AtendimentoClient() {
                           </div>
                         );
                       })()}
+                      {!showRecurringCard ? (
+                        (() => {
+                          const groupCardState = deriveExperimentalGroupCardState({
+                            lead: sl,
+                            settingsEnabled: Boolean(experimentalGroupSettings?.enabled),
+                          });
+                          const assignedGroupId = String((sl as any)?.experimental_class_group_class_id ?? "").trim();
+                          const groupStatus = String((sl as any)?.experimental_class_group_status ?? "").trim();
+                          return (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                if (groupCardState.disabled) return;
+                                void handleOpenExperimentalGroupModal(sl);
+                              }}
+                              disabled={groupCardState.disabled}
+                              className={[
+                                "w-full overflow-hidden rounded-2xl border bg-[var(--app-solid-surface)] p-5 text-left shadow-none transition",
+                                groupCardState.disabled
+                                  ? "cursor-not-allowed border-[var(--app-border)] opacity-55"
+                                  : "border-[var(--app-border)] hover:bg-[var(--app-hover)]",
+                              ].join(" ")}
+                            >
+                              <div className="flex items-start justify-between gap-3">
+                                <div className="flex items-center gap-2 min-w-0">
+                                  <GraduationCap className="h-5 w-5 shrink-0 text-[var(--app-text-70)]" />
+                                  <div className="min-w-0">
+                                    <div className="truncate text-[15px] font-bold text-[var(--app-text-85)]">
+                                      Aula Experimental em Grupo
+                                    </div>
+                                    <div className="mt-1 text-[13px] text-[var(--app-text-60)]">
+                                      {assignedGroupId
+                                        ? `Turma vinculada${groupStatus ? ` (${groupStatus})` : ""}.`
+                                        : groupCardState.interestRegistered
+                                          ? "Interesse já registrado. Selecione a turma para concluir a formação."
+                                          : groupCardState.disabled
+                                            ? groupCardState.reasons[0] ?? "Indisponível no momento."
+                                            : "Selecione uma turma disponível e gerencie as vagas."}
+                                    </div>
+                                  </div>
+                                </div>
+                                <div
+                                  className={[
+                                    "shrink-0 rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.12em]",
+                                    groupCardState.disabled
+                                      ? "border border-[var(--app-border)] text-[var(--app-text-45)]"
+                                      : assignedGroupId
+                                        ? "border border-emerald-500/25 bg-emerald-500/10 text-emerald-700"
+                                        : "border border-[#ea580c]/25 bg-[#ea580c]/10 text-[#9a3412]",
+                                  ].join(" ")}
+                                >
+                                  {groupCardState.disabled
+                                    ? "Indisponível"
+                                    : assignedGroupId
+                                      ? "Turma ativa"
+                                      : "Abrir"}
+                                </div>
+                              </div>
+                            </button>
+                          );
+                        })()
+                      ) : null}
                     </div>
                   ) : null}
 
@@ -8465,6 +8911,68 @@ export function AtendimentoClient() {
                         </div>
                       );
                     })()}
+                    {!showRecurringCard ? (
+                      (() => {
+                        const groupCardState = deriveExperimentalGroupCardState({
+                          lead: sl,
+                          settingsEnabled: Boolean(experimentalGroupSettings?.enabled),
+                        });
+                        const assignedGroupId = String((sl as any)?.experimental_class_group_class_id ?? "").trim();
+                        const groupStatus = String((sl as any)?.experimental_class_group_status ?? "").trim();
+                        return (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (groupCardState.disabled) return;
+                              void handleOpenExperimentalGroupModal(sl);
+                            }}
+                            disabled={groupCardState.disabled}
+                            className={[
+                              "w-full overflow-hidden rounded-2xl border bg-[var(--app-solid-surface)] p-5 text-left shadow-none transition",
+                              groupCardState.disabled
+                                ? "cursor-not-allowed border-[var(--app-border)] opacity-55"
+                                : "border-[var(--app-border)] hover:bg-[var(--app-hover)]",
+                            ].join(" ")}
+                          >
+                            <div className="flex items-start justify-between gap-3">
+                              <div className="flex items-center gap-2 min-w-0">
+                                <GraduationCap className="h-5 w-5 shrink-0 text-[var(--app-text-70)]" />
+                                <div className="min-w-0">
+                                  <div className="truncate text-[15px] font-bold text-[var(--app-text-85)]">
+                                    Aula Experimental em Grupo
+                                  </div>
+                                  <div className="mt-1 text-[13px] text-[var(--app-text-60)]">
+                                    {assignedGroupId
+                                      ? `Turma vinculada${groupStatus ? ` (${groupStatus})` : ""}.`
+                                      : groupCardState.interestRegistered
+                                        ? "Interesse já registrado. Selecione a turma para concluir a formação."
+                                        : groupCardState.disabled
+                                          ? groupCardState.reasons[0] ?? "Indisponível no momento."
+                                          : "Selecione uma turma disponível e gerencie as vagas."}
+                                  </div>
+                                </div>
+                              </div>
+                              <div
+                                className={[
+                                  "shrink-0 rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.12em]",
+                                  groupCardState.disabled
+                                    ? "border border-[var(--app-border)] text-[var(--app-text-45)]"
+                                    : assignedGroupId
+                                      ? "border border-emerald-500/25 bg-emerald-500/10 text-emerald-700"
+                                      : "border border-[#ea580c]/25 bg-[#ea580c]/10 text-[#9a3412]",
+                                ].join(" ")}
+                              >
+                                {groupCardState.disabled
+                                  ? "Indisponível"
+                                  : assignedGroupId
+                                    ? "Turma ativa"
+                                    : "Abrir"}
+                              </div>
+                            </div>
+                          </button>
+                        );
+                      })()
+                    ) : null}
                   </div>
                 ) : null}
 
@@ -8646,6 +9154,300 @@ export function AtendimentoClient() {
 
       {/* MODAL FILTROS AVANCADOS: Clicou no ícone SlidersHorizontal (ao lado ESQUERDO do Bot!) */}
       {renderFiltersModal()}
+
+      <AppModal
+        open={experimentalGroupSettingsOpen}
+        onClose={() => setExperimentalGroupSettingsOpen(false)}
+        size="md"
+        position="center"
+        zIndexClass="z-[420]"
+      >
+        <div className="flex flex-col gap-4">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <h3 className="text-[18px] font-bold text-[var(--app-text-85)]">
+                Aulas Experimentais em Grupo
+              </h3>
+              <div className="mt-1 text-[12px] text-[var(--app-text-55)]">
+                Configuração global compartilhada no Atendimento.
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => setExperimentalGroupSettingsOpen(false)}
+              className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-[var(--app-border)] bg-[var(--app-solid-surface)] text-[var(--app-text-70)] hover:bg-[var(--app-hover)]"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <label className="rounded-2xl border border-[var(--app-border)] bg-[var(--app-solid-surface-2)] px-4 py-3 text-[13px] font-semibold text-[var(--app-text-85)]">
+              Funcionalidade
+              <select
+                value={experimentalGroupFormEnabled ? "enabled" : "disabled"}
+                onChange={(e) => setExperimentalGroupFormEnabled(e.target.value === "enabled")}
+                className="mt-2 w-full rounded-xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] px-3 py-2 text-[13px] font-medium text-[var(--app-text-85)] outline-none"
+              >
+                <option value="enabled">Ativada</option>
+                <option value="disabled">Desativada</option>
+              </select>
+            </label>
+            <label className="rounded-2xl border border-[var(--app-border)] bg-[var(--app-solid-surface-2)] px-4 py-3 text-[13px] font-semibold text-[var(--app-text-85)]">
+              Professor
+              <select
+                value={experimentalGroupFormProfessorPhone}
+                onChange={(e) => setExperimentalGroupFormProfessorPhone(e.target.value)}
+                className="mt-2 w-full rounded-xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] px-3 py-2 text-[13px] font-medium text-[var(--app-text-85)] outline-none"
+              >
+                <option value="">Selecione</option>
+                {experimentalGroupProfessorOptions.map((option) => (
+                  <option key={option.phone} value={option.phone}>
+                    {option.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="rounded-2xl border border-[var(--app-border)] bg-[var(--app-solid-surface-2)] px-4 py-3 text-[13px] font-semibold text-[var(--app-text-85)]">
+              Dia 1
+              <select
+                value={experimentalGroupFormDayOneWeekday}
+                onChange={(e) => setExperimentalGroupFormDayOneWeekday(e.target.value)}
+                className="mt-2 w-full rounded-xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] px-3 py-2 text-[13px] font-medium text-[var(--app-text-85)] outline-none"
+              >
+                <option value="">Selecione</option>
+                {experimentalGroupWeekdayOptions.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+              <input
+                type="time"
+                value={experimentalGroupFormDayOneTime}
+                onChange={(e) => setExperimentalGroupFormDayOneTime(e.target.value)}
+                className="mt-2 w-full rounded-xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] px-3 py-2 text-[13px] font-medium text-[var(--app-text-85)] outline-none"
+              />
+            </label>
+            <label className="rounded-2xl border border-[var(--app-border)] bg-[var(--app-solid-surface-2)] px-4 py-3 text-[13px] font-semibold text-[var(--app-text-85)]">
+              Dia 2
+              <select
+                value={experimentalGroupFormDayTwoWeekday}
+                onChange={(e) => setExperimentalGroupFormDayTwoWeekday(e.target.value)}
+                className="mt-2 w-full rounded-xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] px-3 py-2 text-[13px] font-medium text-[var(--app-text-85)] outline-none"
+              >
+                <option value="">Selecione</option>
+                {experimentalGroupWeekdayOptions.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+              <input
+                type="time"
+                value={experimentalGroupFormDayTwoTime}
+                onChange={(e) => setExperimentalGroupFormDayTwoTime(e.target.value)}
+                className="mt-2 w-full rounded-xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] px-3 py-2 text-[13px] font-medium text-[var(--app-text-85)] outline-none"
+              />
+            </label>
+          </div>
+
+          <div className="rounded-2xl border border-[var(--app-border)] bg-[var(--app-solid-surface-2)] p-4">
+            <div className="text-[13px] font-semibold text-[var(--app-text-85)]">
+              Prévia das próximas turmas
+            </div>
+            <div className="mt-3 space-y-2">
+              {experimentalGroupPreviewSlots.length === 0 ? (
+                <div className="text-[13px] text-[var(--app-text-55)]">
+                  Nenhuma turma disponível na prévia atual.
+                </div>
+              ) : (
+                experimentalGroupPreviewSlots.map((slot) => (
+                  <div
+                    key={slot.id}
+                    className="rounded-xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] px-4 py-3"
+                  >
+                    <div className="text-[13px] font-semibold text-[var(--app-text-85)]">
+                      {slot.professor_weekday_label}, {formatAtendimentoDate(slot.professor_date)} às {slot.professor_time}
+                    </div>
+                    <div className="mt-1 text-[12px] text-[var(--app-text-55)]">
+                      Professor: {slot.professor_name ?? "—"} | Alunos: {slot.occupied_seats}/{slot.capacity} | Vagas: {slot.available_seats}
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+
+          <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+            <button
+              type="button"
+              onClick={() => setExperimentalGroupSettingsOpen(false)}
+              className="inline-flex min-h-[44px] items-center justify-center rounded-xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] px-5 text-[13px] font-semibold text-[var(--app-text-85)]"
+            >
+              Fechar
+            </button>
+            <button
+              type="button"
+              onClick={() => void handleSaveExperimentalGroupSettings()}
+              disabled={experimentalGroupSettingsSaving}
+              className="inline-flex min-h-[44px] items-center justify-center gap-2 rounded-xl bg-[#ea580c] px-5 text-[13px] font-semibold text-white disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {experimentalGroupSettingsSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+              Salvar configuração
+            </button>
+          </div>
+        </div>
+      </AppModal>
+
+      <AppModal
+        open={isExperimentalGroupModalOpen}
+        onClose={() => setIsExperimentalGroupModalOpen(false)}
+        size="lg"
+        position="center"
+        zIndexClass="z-[420]"
+      >
+        <div className="flex flex-col gap-4">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <h3 className="text-[18px] font-bold text-[var(--app-text-85)]">
+                Aula Experimental em Grupo
+              </h3>
+              <div className="mt-1 text-[12px] text-[var(--app-text-55)]">
+                {String(experimentalGroupLead?.full_name ?? "").trim() || "Registro selecionado"}
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => setIsExperimentalGroupModalOpen(false)}
+              className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-[var(--app-border)] bg-[var(--app-solid-surface)] text-[var(--app-text-70)] hover:bg-[var(--app-hover)]"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+
+          {experimentalGroupLoading ? (
+            <div className="flex items-center justify-center gap-2 rounded-2xl border border-[var(--app-border)] bg-[var(--app-solid-surface-2)] px-4 py-8 text-[13px] text-[var(--app-text-60)]">
+              <Loader2 className="h-4 w-4 animate-spin" />
+              Carregando turmas disponíveis...
+            </div>
+          ) : (
+            <>
+              <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
+                {experimentalGroupSlots.length === 0 ? (
+                  <div className="rounded-2xl border border-[var(--app-border)] bg-[var(--app-solid-surface-2)] px-4 py-6 text-[13px] text-[var(--app-text-55)]">
+                    Nenhuma turma disponível para o professor configurado neste momento.
+                  </div>
+                ) : (
+                  experimentalGroupSlots.map((slot) => {
+                    const isSelected = selectedExperimentalGroupSlot?.id === slot.id;
+                    return (
+                      <button
+                        key={slot.id}
+                        type="button"
+                        onClick={() => setExperimentalGroupSelectedSlotId(slot.id)}
+                        className={[
+                          "rounded-2xl border p-4 text-left transition",
+                          isSelected
+                            ? "border-[#ea580c] bg-[#fff7ed]"
+                            : "border-[var(--app-border)] bg-[var(--app-solid-surface)] hover:bg-[var(--app-hover)]",
+                        ].join(" ")}
+                      >
+                        <div className="text-[14px] font-semibold text-[var(--app-text-85)]">
+                          Turma — {slot.professor_weekday_label}, {slot.professor_time}
+                        </div>
+                        <div className="mt-2 text-[12px] text-[var(--app-text-60)]">
+                          Professor: {slot.professor_name ?? "—"}
+                        </div>
+                        <div className="mt-1 text-[12px] text-[var(--app-text-60)]">
+                          Alunos: {slot.occupied_seats}/{slot.capacity} | Vagas disponíveis: {slot.available_seats}
+                        </div>
+                      </button>
+                    );
+                  })
+                )}
+              </div>
+
+              {selectedExperimentalGroupSlot ? (
+                <div className="rounded-2xl border border-[var(--app-border)] bg-[var(--app-solid-surface-2)] p-4">
+                  <div className="text-[14px] font-semibold text-[var(--app-text-85)]">
+                    Turma — {selectedExperimentalGroupSlot.professor_weekday_label}, {selectedExperimentalGroupSlot.professor_time}
+                  </div>
+                  <div className="mt-1 text-[12px] text-[var(--app-text-55)]">
+                    Professor: {selectedExperimentalGroupSlot.professor_name ?? "—"} | Alunos: {selectedExperimentalGroupSlot.occupied_seats}/{selectedExperimentalGroupSlot.capacity} | Vagas disponíveis: {selectedExperimentalGroupSlot.available_seats}
+                  </div>
+
+                  <div className="mt-4 space-y-2">
+                    {(selectedExperimentalGroupSlot.members ?? []).length === 0 ? (
+                      <div className="text-[13px] text-[var(--app-text-55)]">
+                        Nenhum aluno atribuído ainda.
+                      </div>
+                    ) : (
+                      selectedExperimentalGroupSlot.members.map((member) => (
+                        <div
+                          key={member.id}
+                          className="flex items-center justify-between gap-3 rounded-xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] px-4 py-3"
+                        >
+                          <div className="min-w-0">
+                            <div className="truncate text-[13px] font-semibold text-[var(--app-text-85)]">
+                              {member.full_name ?? "Aluno"}
+                            </div>
+                            <div className="mt-1 text-[12px] text-[var(--app-text-55)]">
+                              {formatPhoneNumber(member.phone ?? "", { includeCountryCode: true }) || "Sem telefone"}
+                            </div>
+                          </div>
+                          <button
+                            type="button"
+                            disabled={experimentalGroupActionLoading}
+                            onClick={() => void handleRemoveLeadFromExperimentalGroup(String(selectedExperimentalGroupSlot.group_class_id ?? ""), member.lead_id)}
+                            className="inline-flex h-9 items-center justify-center gap-1 rounded-xl border border-[var(--app-border)] px-3 text-[12px] font-semibold text-[var(--app-text-75)] disabled:cursor-not-allowed disabled:opacity-60"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                            Remover
+                          </button>
+                        </div>
+                      ))
+                    )}
+                  </div>
+
+                  <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:justify-end">
+                    {!selectedExperimentalGroupSlot.is_current_lead_assigned ? (
+                      <button
+                        type="button"
+                        disabled={experimentalGroupActionLoading || selectedExperimentalGroupSlot.is_full || !experimentalGroupCanOpenModal}
+                        onClick={() => void handleAssignLeadToExperimentalGroup(selectedExperimentalGroupSlot)}
+                        className="inline-flex min-h-[42px] items-center justify-center gap-2 rounded-xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] px-4 text-[13px] font-semibold text-[var(--app-text-85)] disabled:cursor-not-allowed disabled:opacity-60"
+                      >
+                        <Plus className="h-4 w-4" />
+                        Adicionar este aluno
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        disabled={experimentalGroupActionLoading || !selectedExperimentalGroupSlot.group_class_id}
+                        onClick={() => void handleRemoveLeadFromExperimentalGroup(String(selectedExperimentalGroupSlot.group_class_id ?? ""), String(experimentalGroupLead?.id ?? ""))}
+                        className="inline-flex min-h-[42px] items-center justify-center gap-2 rounded-xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] px-4 text-[13px] font-semibold text-[var(--app-text-85)] disabled:cursor-not-allowed disabled:opacity-60"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                        Remover este aluno
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      disabled={experimentalGroupActionLoading || !selectedExperimentalGroupSlot.group_class_id || selectedExperimentalGroupSlot.occupied_seats <= 0}
+                      onClick={() => void handleConfirmExperimentalGroup(String(selectedExperimentalGroupSlot.group_class_id ?? ""))}
+                      className="inline-flex min-h-[42px] items-center justify-center gap-2 rounded-xl bg-[#ea580c] px-4 text-[13px] font-semibold text-white disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      {experimentalGroupActionLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
+                      Confirmar turma
+                    </button>
+                  </div>
+                </div>
+              ) : null}
+            </>
+          )}
+        </div>
+      </AppModal>
 
       {/* Modal Agendar / Reagendar aula experimental */}
       <AppModal

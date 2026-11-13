@@ -31,6 +31,11 @@ export type AtendimentoLead = {
   experimental_class_professor_start_at?: string | null;
   experimental_class_lead_start_at?: string | null;
   experimental_class_status?: string | null;
+  experimental_class_mode_preference?: string | null;
+  experimental_class_group_interest?: boolean | null;
+  experimental_class_group_interest_at?: string | null;
+  experimental_class_group_class_id?: string | null;
+  experimental_class_group_status?: string | null;
   recurring_class_status?: string | null;
   recurring_class_weekday?: string | null;
   recurring_class_weekday_label?: string | null;

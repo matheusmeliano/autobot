@@ -58,6 +58,7 @@ import {
   findLeadByPhone,
   hasAnyBotMessage,
   loadRecurringCalendarOccupiedIntervals,
+  maybeNotifyRegisteredAttendantAboutExperimentalGroupInterest,
   maybeNotifyRegisteredAttendantAboutExperimentalClassScheduled,
   maybeSendExperimentalClassConfirmationToStudent,
   sendAtendimentoWhatsAppText,
@@ -66,6 +67,7 @@ import {
   getZapiInstanceMeta,
   detectLenientYesNo,
 } from "@/lib/atendimento/server";
+import { loadExperimentalGroupClassSettings } from "@/lib/atendimento/experimentalGroupClassServer";
 import {
   containsLocalityStructuralType,
   inferBrazilianLocationFromDdd,
@@ -84,6 +86,39 @@ const WHATSAPP_INVALID_FINAL_MESSAGE =
   "Não foi possível validar seu número de WhatsApp após 3 tentativas. Este cadastro foi bloqueado. Para tentar novamente, entre em contato com nosso suporte para desbloquear o e-mail utilizado ou realize um novo cadastro com outro e-mail.\n\nFale com nossa equipe pelo link abaixo:\n\nhttps://wa.me/5565996933336";
 const WHATSAPP_TECHNICAL_TIMEOUT_MESSAGE =
   "Nao foi possivel concluir a validacao do seu WhatsApp neste momento por instabilidade tecnica. Tente novamente em instantes.";
+const EXPERIMENTAL_GROUP_MODE_PROMPT_INTRO =
+  "Você prefere fazer sua aula experimental individualmente ou em grupo? 🎶";
+const EXPERIMENTAL_GROUP_MODE_CONFIRMATION_MESSAGE = `Perfeito! 😊🎶
+
+Nossa equipe entrará em contato com você em breve para organizar sua aula experimental em grupo e informar os dias e horários disponíveis!`;
+
+function buildExperimentalGroupModePrompt() {
+  return `${EXPERIMENTAL_GROUP_MODE_PROMPT_INTRO}
+
+👤 Aula individual: o investimento é um pouco maior, mas você recebe atenção exclusiva do professor, com um ensino mais personalizado e focado no seu desenvolvimento.
+
+👥 Aula em grupo: o investimento é menor, pois a aula é compartilhada com até 4 alunos, permitindo aprender em conjunto, com a atenção do professor dividida entre os participantes.
+
+Digite a opção desejada:
+
+1 — Aula individual
+
+2 — Aula em grupo`;
+}
+
+function isExperimentalGroupModePromptMessage(value: unknown) {
+  return String(value ?? "").includes(EXPERIMENTAL_GROUP_MODE_PROMPT_INTRO);
+}
+
+function parseExperimentalGroupModeChoice(value: string): "individual" | "group" | null {
+  const raw = String(value ?? "").trim().toLowerCase();
+  if (!raw) return null;
+  if (/^1\b/.test(raw)) return "individual";
+  if (/^2\b/.test(raw)) return "group";
+  if (/\bindividual\b/.test(raw)) return "individual";
+  if (/\bgrupo\b/.test(raw)) return "group";
+  return null;
+}
 
 function formatResolvedCountryLabel(country: "BR" | "US" | "PT" | null | undefined) {
   if (country === "BR") return "Brasil";
@@ -2598,6 +2633,13 @@ export async function POST(req: Request) {
       reason: "global_bot_disabled_no_auto_reply",
     });
   }
+
+  const experimentalGroupClassSettings = await loadExperimentalGroupClassSettings({ admin }).catch(
+    () => ({ settings: { enabled: false } as { enabled: boolean }, updatedAt: null }),
+  );
+  const experimentalGroupClassesEnabled = Boolean(
+    experimentalGroupClassSettings?.settings?.enabled,
+  );
 
   if (normalizedFrom && !validatedFrom.valid) {
     return Response.json({
@@ -5252,11 +5294,13 @@ export async function POST(req: Request) {
               : !String((lead as any)?.city ?? "").trim()
                 ? "city"
                 : null;
-          const nextMsg: string = afterNameNextField
-            ? afterNameNextField === "state"
-              ? buildStatePrompt(nameCandidate)
-              : CAPTURED_FIELD_PROMPTS.city
-            : EXPERIMENTAL_CLASS_DATE_PROMPT_MESSAGE;
+          const nextMsg: string = experimentalGroupClassesEnabled
+            ? buildExperimentalGroupModePrompt()
+            : afterNameNextField
+              ? afterNameNextField === "state"
+                ? buildStatePrompt(nameCandidate)
+                : CAPTURED_FIELD_PROMPTS.city
+              : EXPERIMENTAL_CLASS_DATE_PROMPT_MESSAGE;
           const __botMsgInsertNext = insertWhatsAppBotTextMessage({ admin, conversationId, contentText: nextMsg });
           try {
             await sendAtendimentoWhatsAppText({ phone: normalizedPhoneOnly, message: nextMsg });
@@ -5267,6 +5311,134 @@ export async function POST(req: Request) {
             ok: true,
             handled: true,
             flow: "whatsapp_name_collected",
+          });
+        }
+
+        const awaitingExperimentalGroupModeChoice =
+          experimentalGroupClassesEnabled &&
+          isExperimentalGroupModePromptMessage(lastBotText);
+        if (awaitingExperimentalGroupModeChoice) {
+          const choice = parseExperimentalGroupModeChoice(inboundContent || "");
+          if (!choice) {
+            const retryMessage = `Por favor, responda apenas com 1 para aula individual ou 2 para aula em grupo.\n\n${buildExperimentalGroupModePrompt()}`;
+            const __botMsgInsert = insertWhatsAppBotTextMessage({ admin, conversationId, contentText: retryMessage });
+            try {
+              await sendAtendimentoWhatsAppText({ phone: normalizedPhoneOnly, message: retryMessage });
+            } catch (_e) {}
+            void __botMsgInsert.catch(() => {});
+            return Response.json({
+              ok: true,
+              handled: true,
+              flow: "whatsapp_experimental_group_mode_retry",
+            });
+          }
+
+          if (choice === "group") {
+            try {
+              await admin
+                .from("atendimento_leads")
+                .update({
+                  experimental_class_mode_preference: "group",
+                  experimental_class_group_interest: true,
+                  experimental_class_group_interest_at: nowIso,
+                  experimental_class_group_status: "interested",
+                  unread_count: Number((lead as any)?.unread_count ?? 0) + 1,
+                  is_new_for_attendant: true,
+                  last_interaction_at: nowIso,
+                  updated_at: nowIso,
+                })
+                .eq("id", leadId);
+            } catch (_e) {}
+            try {
+              await admin
+                .from("atendimento_conversations")
+                .update({ bot_enabled: false, updated_at: nowIso })
+                .eq("id", conversationId);
+            } catch (_e) {}
+
+            await appendHistoryEvent({
+              leadId,
+              conversationId,
+              eventType: "experimental_group_interest_selected",
+              title: "Lead escolheu aula experimental em grupo pelo WhatsApp",
+              details: {
+                phone: normalizedPhoneOnly,
+                choice: "group",
+                source: "whatsapp_zapi",
+              },
+              actorType: "system",
+            });
+
+            const __botMsgInsert = insertWhatsAppBotTextMessage({
+              admin,
+              conversationId,
+              contentText: EXPERIMENTAL_GROUP_MODE_CONFIRMATION_MESSAGE,
+            });
+            try {
+              await sendAtendimentoWhatsAppText({
+                phone: normalizedPhoneOnly,
+                message: EXPERIMENTAL_GROUP_MODE_CONFIRMATION_MESSAGE,
+              });
+            } catch (_e) {}
+            void __botMsgInsert.catch(() => {});
+            void maybeNotifyRegisteredAttendantAboutExperimentalGroupInterest({
+              leadId,
+              leadName: String((lead as any)?.full_name ?? "").trim() || null,
+              conversationId,
+            });
+
+            return Response.json({
+              ok: true,
+              handled: true,
+              flow: "whatsapp_experimental_group_interest_selected",
+              bot_enabled: false,
+            });
+          }
+
+          try {
+            await admin
+              .from("atendimento_leads")
+              .update({
+                experimental_class_mode_preference: "individual",
+                updated_at: nowIso,
+              })
+              .eq("id", leadId);
+          } catch (_e) {}
+
+          await appendHistoryEvent({
+            leadId,
+            conversationId,
+            eventType: "experimental_group_mode_individual_selected",
+            title: "Lead escolheu seguir com aula experimental individual pelo WhatsApp",
+            details: {
+              phone: normalizedPhoneOnly,
+              choice: "individual",
+              source: "whatsapp_zapi",
+            },
+            actorType: "system",
+          });
+
+          const afterChoiceNextField: "state" | "city" | null =
+            !String((lead as any)?.state ?? "").trim()
+              ? "state"
+              : !String((lead as any)?.city ?? "").trim()
+                ? "city"
+                : null;
+          const nextMsg = afterChoiceNextField
+            ? afterChoiceNextField === "state"
+              ? buildStatePrompt(String((lead as any)?.full_name ?? "").trim() || "Aluno")
+              : CAPTURED_FIELD_PROMPTS.city
+            : EXPERIMENTAL_CLASS_DATE_PROMPT_MESSAGE;
+          const __botMsgInsert = insertWhatsAppBotTextMessage({ admin, conversationId, contentText: nextMsg });
+          try {
+            await sendAtendimentoWhatsAppText({ phone: normalizedPhoneOnly, message: nextMsg });
+          } catch (_e) {}
+          void __botMsgInsert.catch(() => {});
+
+          return Response.json({
+            ok: true,
+            handled: true,
+            flow: "whatsapp_experimental_group_mode_individual_selected",
           });
         }
 

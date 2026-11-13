@@ -2865,6 +2865,46 @@ export async function maybeNotifyRegisteredAttendantAboutNewExperimentalLeadPend
   }
 }
 
+const REGISTERED_ATTENDANT_EXPERIMENTAL_GROUP_INTEREST_EVENT_TYPE =
+  "registered_attendant_experimental_group_interest_notice_sent";
+
+export async function maybeNotifyRegisteredAttendantAboutExperimentalGroupInterest(params: {
+  leadId: string;
+  leadName: string | null | undefined;
+  conversationId?: string | null;
+}) {
+  try {
+    const admin = createSupabaseAdminClient();
+    const { count: already } = await admin
+      .from("atendimento_history_events")
+      .select("id", { count: "exact", head: true })
+      .eq("lead_id", params.leadId)
+      .eq("event_type", REGISTERED_ATTENDANT_EXPERIMENTAL_GROUP_INTEREST_EVENT_TYPE);
+    if (already && already > 0) return { ok: true, deduped: true };
+
+    const safeName =
+      String(params.leadName ?? "").trim().replace(/\s+/g, " ") || "Aluno";
+    const message = `📢 ${safeName} tem interesse em uma aula experimental em grupo.`;
+    await sendAtendimentoWhatsAppText({
+      phone: EXPERIMENTAL_CLASS_REGISTERED_ATTENDANT_NOTIFICATION_PHONE,
+      message,
+    });
+    await appendHistoryEvent({
+      leadId: params.leadId,
+      conversationId: params.conversationId ?? null,
+      eventType: REGISTERED_ATTENDANT_EXPERIMENTAL_GROUP_INTEREST_EVENT_TYPE,
+      title: "Atendente avisado sobre interesse em aula experimental em grupo",
+      details: {
+        phone: EXPERIMENTAL_CLASS_REGISTERED_ATTENDANT_NOTIFICATION_PHONE,
+      },
+      actorType: "system",
+    });
+    return { ok: true, sent: true };
+  } catch (error) {
+    return { ok: false, error: error instanceof Error ? error.message : String(error) };
+  }
+}
+
 const REGISTERED_ATTENDANT_EXPERIMENTAL_LEAD_SCHEDULED_NOTICE_EVENT_TYPE =
   "registered_attendant_experimental_lead_scheduled_notice_sent";
 
