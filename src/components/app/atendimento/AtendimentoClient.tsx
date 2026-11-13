@@ -9280,19 +9280,6 @@ export function AtendimentoClient() {
                 </button>
               </div>
 
-              <div className="mt-4 flex flex-wrap items-center gap-2">
-                <div className="inline-flex items-center gap-1.5 rounded-full border border-[var(--app-border)] bg-[var(--app-solid-surface-2)] px-3 py-1.5 text-[11px] font-semibold text-[var(--app-text-70)]">
-                  <CalendarIcon className="h-3.5 w-3.5" />
-                  2 dias por semana
-                </div>
-                <div className="inline-flex items-center gap-1.5 rounded-full border border-[var(--app-border)] bg-[var(--app-solid-surface-2)] px-3 py-1.5 text-[11px] font-semibold text-[var(--app-text-70)]">
-                  <Users className="h-3.5 w-3.5" />
-                  Ate 4 alunos por turma
-                </div>
-                <div className="inline-flex items-center gap-1.5 rounded-full border border-[var(--app-border)] bg-[var(--app-solid-surface-2)] px-3 py-1.5 text-[11px] font-semibold text-[var(--app-text-70)]">
-                  Fuso do professor: {String(experimentalGroupSettings?.professor_timezone ?? ATENDIMENTO_PROFESSOR_TIME_ZONE)}
-                </div>
-              </div>
             </div>
 
             {[
