@@ -9226,10 +9226,10 @@ export function AtendimentoClient() {
               </div>
               <div className="min-w-0">
                 <h3 className="truncate text-[18px] font-bold leading-tight text-[var(--app-text-85)]">
-                  Aulas Experimentais em Grupo
+                  Aulas em Grupo
                 </h3>
                 <div className="mt-0.5 text-[12px] text-[var(--app-text-55)]">
-                  Configure os dias e horarios usados no Atendimento.
+                  Dias e horarios usados no Atendimento.
                 </div>
               </div>
             </div>
