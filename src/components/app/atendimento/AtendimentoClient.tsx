@@ -9249,7 +9249,7 @@ export function AtendimentoClient() {
                 <div>
                   <div className="text-[14px] font-bold text-[var(--app-text-85)]">Ativar turmas</div>
                   <div className="mt-1 text-[12px] text-[var(--app-text-55)]">
-                    Quando ligado, o Atendimento pode usar os dois dias e horarios definidos abaixo.
+                    Quando ligado podera usar os dias e horarios definidos abaixo.
                   </div>
                 </div>
                 <button
