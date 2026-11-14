@@ -9557,7 +9557,7 @@ export function AtendimentoClient() {
                       </div>
                     ) : (
                       <div className="rounded-2xl border border-dashed border-[var(--app-border)] bg-[var(--app-solid-surface-2)] px-4 py-5 text-center text-[12px] font-medium text-[var(--app-text-55)]">
-                        Selecione o dia da turma para liberar os horarios.
+                        Selecione primeiro o dia.
                       </div>
                     )}
                   </div>
