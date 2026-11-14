@@ -9874,7 +9874,7 @@ export function AtendimentoClient() {
             ) : (
               <>
                 <div className="space-y-2">
-                  <div className="flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-3">
                     <label className="text-xs font-semibold text-[var(--app-text-70)]">
                       Dias disponíveis
                       {experimentalAvailability?.dates?.length ? (
@@ -9883,9 +9883,6 @@ export function AtendimentoClient() {
                         </span>
                       ) : null}
                     </label>
-                    <div className="text-[11px] font-medium text-[var(--app-text-55)]">
-                      Fuso horário: {String(experimentalAvailability?.lead_timezone ?? ATENDIMENTO_PROFESSOR_TIME_ZONE)}
-                    </div>
                   </div>
 
                   {!experimentalAvailability?.dates?.length ? (
@@ -9965,20 +9962,11 @@ export function AtendimentoClient() {
                 <div className="space-y-2">
                   <label className="text-xs font-semibold text-[var(--app-text-70)]">
                     Horários disponíveis
-                    {selectedExperimentalDateId ? (
-                      <span className="ml-2 font-normal text-[var(--app-text-45)]">
-                        (dia selecionado)
-                      </span>
-                    ) : (
-                      <span className="ml-2 font-normal text-[var(--app-text-45)]">
-                        (selecione um dia primeiro)
-                      </span>
-                    )}
                   </label>
 
                   {!selectedExperimentalDateId ? (
-                    <div className="rounded-2xl border border-dashed border-[var(--app-border)] bg-[var(--app-solid-surface-2)] px-4 py-4 text-center text-[13px] text-[var(--app-text-55)]">
-                      Clique em um dia acima para ver os horários disponíveis.
+                    <div className="rounded-2xl border border-dashed border-[var(--app-border)] bg-[var(--app-solid-surface-2)] px-4 py-4">
+                      <div className="min-h-[20px]" />
                     </div>
                   ) : (
                     ((() => {
