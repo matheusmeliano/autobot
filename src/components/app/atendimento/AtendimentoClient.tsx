@@ -9353,7 +9353,7 @@ export function AtendimentoClient() {
                                 : "border-[var(--app-border)] bg-[var(--app-solid-surface)] text-[var(--app-text-85)] hover:border-[#ea580c]/35 hover:bg-[var(--app-hover)] hover:text-[var(--app-text-90)]",
                             ].join(" ")}
                           >
-                            <div className={isSelected ? "text-[11px] font-semibold uppercase tracking-wide !text-white/95" : "text-[11px] font-semibold uppercase tracking-wide text-[var(--app-text-50)]"}>
+                            <div className={isSelected ? "text-[11px] font-semibold uppercase tracking-wide !text-white/95" : "text-[11px] font-semibold uppercase tracking-wide text-[var(--app-text-85)]"}>
                               {shortLabel}
                             </div>
                           </button>
