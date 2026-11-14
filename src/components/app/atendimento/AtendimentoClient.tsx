@@ -9410,9 +9410,6 @@ export function AtendimentoClient() {
                       <div className="text-[14px] font-bold text-[var(--app-text-85)]">
                         {`Turma ${index + 1}`}
                       </div>
-                      <div className="mt-0.5 text-[12px] text-[var(--app-text-55)]">
-                        Escolha o dia da semana e o horario da turma.
-                      </div>
                     </div>
                     <div className="flex items-start justify-end gap-2 self-start justify-self-end">
                       {card.enabled && card.weekday && card.professor_time ? (
