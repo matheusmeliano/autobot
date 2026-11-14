@@ -9347,14 +9347,38 @@ export function AtendimentoClient() {
                               })
                             }
                             className={[
-                              "flex min-h-[64px] flex-col items-center justify-center gap-0.5 rounded-2xl border px-2 py-2 text-center transition duration-150 disabled:cursor-not-allowed disabled:opacity-60 sm:min-h-[70px]",
+                              "flex min-h-[76px] flex-col items-center justify-center gap-1 rounded-2xl border px-2 py-2 text-center transition duration-150 disabled:cursor-not-allowed disabled:opacity-60",
                               isSelected
                                 ? "!border-transparent !bg-[#ea580c] !text-white shadow-md"
                                 : "border-[var(--app-border)] bg-[var(--app-solid-surface)] text-[var(--app-text-85)] hover:border-[#ea580c]/35 hover:bg-[var(--app-hover)] hover:text-[var(--app-text-90)]",
                             ].join(" ")}
                           >
-                            <div className={isSelected ? "text-[11px] font-semibold uppercase tracking-wide !text-white/95" : "text-[11px] font-semibold uppercase tracking-wide text-[var(--app-text-85)]"}>
+                            <div
+                              className={
+                                isSelected
+                                  ? "text-[11px] font-semibold uppercase tracking-wide !text-white/95"
+                                  : "text-[11px] font-semibold uppercase tracking-wide text-[var(--app-text-50)]"
+                              }
+                            >
                               {shortLabel}
+                            </div>
+                            <div
+                              className={
+                                isSelected
+                                  ? "max-w-full truncate px-1 text-[18px] font-semibold leading-tight !text-white sm:text-[20px]"
+                                  : "max-w-full truncate px-1 text-[18px] font-semibold leading-tight text-[var(--app-text-92)] sm:text-[20px]"
+                              }
+                            >
+                              {option.label}
+                            </div>
+                            <div
+                              className={
+                                isSelected
+                                  ? "text-[10px] font-semibold !text-white/90"
+                                  : "text-[10px] font-semibold text-[var(--app-text-55)]"
+                              }
+                            >
+                              Selecionar dia
                             </div>
                           </button>
                         );
@@ -9371,31 +9395,37 @@ export function AtendimentoClient() {
                         Fuso: {String(experimentalGroupSettings?.professor_timezone ?? ATENDIMENTO_PROFESSOR_TIME_ZONE)}
                       </div>
                     </div>
-                    <div className="grid grid-cols-2 gap-2 min-[520px]:grid-cols-3 sm:grid-cols-4">
-                      {EXPERIMENTAL_CLASS_SLOT_TIMES.map((time) => {
-                        const isSelected = card.professor_time === time;
-                        return (
-                          <button
-                            key={`group-slot-${index}-${time}`}
-                            type="button"
-                            disabled={!card.enabled}
-                            onClick={() =>
-                              updateExperimentalGroupFormSlot(index, {
-                                professor_time: time,
-                              })
-                            }
-                            className={[
-                              "flex h-11 items-center justify-center rounded-2xl border px-2 text-[14px] font-semibold transition duration-150 disabled:cursor-not-allowed disabled:opacity-60 sm:h-12 sm:text-[15px]",
-                              isSelected
-                                ? "!border-transparent !bg-[#ea580c] !text-white shadow-md"
-                                : "border-[var(--app-border)] bg-[var(--app-solid-surface)] text-[var(--app-text-85)] hover:border-[#ea580c]/35 hover:bg-[var(--app-hover)] hover:text-[var(--app-text-90)]",
-                            ].join(" ")}
-                          >
-                            {time}
-                          </button>
-                        );
-                      })}
-                    </div>
+                    {card.weekday ? (
+                      <div className="grid grid-cols-2 gap-2 min-[520px]:grid-cols-3 sm:grid-cols-4">
+                        {EXPERIMENTAL_CLASS_SLOT_TIMES.map((time) => {
+                          const isSelected = card.professor_time === time;
+                          return (
+                            <button
+                              key={`group-slot-${index}-${time}`}
+                              type="button"
+                              disabled={!card.enabled}
+                              onClick={() =>
+                                updateExperimentalGroupFormSlot(index, {
+                                  professor_time: time,
+                                })
+                              }
+                              className={[
+                                "flex h-11 items-center justify-center rounded-2xl border px-2 text-[14px] font-semibold transition duration-150 disabled:cursor-not-allowed disabled:opacity-60 sm:h-12 sm:text-[15px]",
+                                isSelected
+                                  ? "!border-transparent !bg-[#ea580c] !text-white shadow-md"
+                                  : "border-[var(--app-border)] bg-[var(--app-solid-surface)] text-[var(--app-text-85)] hover:border-[#ea580c]/35 hover:bg-[var(--app-hover)] hover:text-[var(--app-text-90)]",
+                              ].join(" ")}
+                            >
+                              {time}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    ) : (
+                      <div className="rounded-2xl border border-dashed border-[var(--app-border)] bg-[var(--app-solid-surface-2)] px-4 py-5 text-center text-[12px] font-medium text-[var(--app-text-55)]">
+                        Selecione o dia da turma para liberar os horarios.
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
