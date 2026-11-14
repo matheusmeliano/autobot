@@ -9634,13 +9634,16 @@ export function AtendimentoClient() {
                 ) : (
                   <div className="space-y-4 lg:col-span-2">
                     <div className="space-y-2">
-                      <div className="flex items-center gap-3">
+                      <div className="flex items-center justify-between gap-3">
                         <label className="text-xs font-semibold text-[var(--app-text-70)]">
                           Dias disponíveis
                           <span className="ml-2 font-normal text-[var(--app-text-45)]">
                             ({experimentalGroupDateOptions.length})
                           </span>
                         </label>
+                        <div className="text-[11px] font-medium text-[var(--app-text-55)]">
+                          Fuso horário: {experimentalGroupVisibleSlots[0]?.lead_timezone ?? ATENDIMENTO_PROFESSOR_TIME_ZONE}
+                        </div>
                       </div>
 
                       <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 md:grid-cols-5">
