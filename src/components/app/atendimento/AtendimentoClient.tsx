@@ -91,9 +91,54 @@ const EXPERIMENTAL_GROUP_WEEKDAY_SHORT_LABELS: Record<string, string> = {
   wed: "Qua",
   thu: "Qui",
   fri: "Sex",
-  sat: "Sab",
+  sat: "Sáb",
   sun: "Dom",
 };
+
+function weekdayKeyFromDateInTimeZone(date: Date, timeZone: string): string {
+  const raw = new Intl.DateTimeFormat("en-US", {
+    weekday: "short",
+    timeZone,
+  })
+    .format(date)
+    .toLowerCase()
+    .slice(0, 3);
+
+  switch (raw) {
+    case "mon":
+      return "mon";
+    case "tue":
+      return "tue";
+    case "wed":
+      return "wed";
+    case "thu":
+      return "thu";
+    case "fri":
+      return "fri";
+    case "sat":
+      return "sat";
+    case "sun":
+      return "sun";
+    default:
+      return raw;
+  }
+}
+
+function nextWeekdayDayLabelInTimeZone(
+  weekday: string,
+  timeZone: string,
+  fromDate: Date = new Date(),
+): string {
+  for (let offset = 0; offset < 14; offset += 1) {
+    const candidate = new Date(fromDate.getTime() + offset * 24 * 60 * 60 * 1000);
+    if (weekdayKeyFromDateInTimeZone(candidate, timeZone) !== weekday) continue;
+    return new Intl.DateTimeFormat("pt-BR", {
+      day: "numeric",
+      timeZone,
+    }).format(candidate);
+  }
+  return "—";
+}
 
 function experimentalAssignedProfessorForLead(lead: AtendimentoLeadListItem | null | undefined): { name: string; phone: string; short: string } | null {
   if (!lead) return null;
@@ -9416,11 +9461,18 @@ export function AtendimentoClient() {
                         Selecione 1 dia
                       </div>
                     </div>
-                    <div className="grid grid-cols-2 gap-2 min-[520px]:grid-cols-3 sm:grid-cols-4">
+                    <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 md:grid-cols-5">
                       {experimentalGroupWeekdayOptions.map((option) => {
                         const isSelected = card.weekday === option.value;
                         const shortLabel =
                           EXPERIMENTAL_GROUP_WEEKDAY_SHORT_LABELS[option.value] ?? option.label.slice(0, 3);
+                        const nextDayLabel = nextWeekdayDayLabelInTimeZone(
+                          option.value,
+                          String(
+                            experimentalGroupSettings?.professor_timezone ??
+                              ATENDIMENTO_PROFESSOR_TIME_ZONE,
+                          ),
+                        );
                         return (
                           <button
                             key={`group-slot-${index}-${option.value}`}
@@ -9454,7 +9506,7 @@ export function AtendimentoClient() {
                                   : "max-w-full truncate px-1 text-[18px] font-semibold leading-tight text-[var(--app-text-92)] sm:text-[20px]"
                               }
                             >
-                              {option.label}
+                              {nextDayLabel}
                             </div>
                             <div
                               className={
@@ -9463,7 +9515,7 @@ export function AtendimentoClient() {
                                   : "text-[10px] font-semibold text-[var(--app-text-55)]"
                               }
                             >
-                              Selecionar dia
+                              1 horário
                             </div>
                           </button>
                         );
