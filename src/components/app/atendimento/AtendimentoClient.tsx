@@ -10045,11 +10045,6 @@ export function AtendimentoClient() {
                   <div className="flex items-center gap-3">
                     <label className="text-xs font-semibold text-[var(--app-text-70)]">
                       Dias disponíveis
-                      {experimentalAvailability?.dates?.length ? (
-                        <span className="ml-2 font-normal text-[var(--app-text-45)]">
-                          ({String(experimentalAvailability.dates.length)})
-                        </span>
-                      ) : null}
                     </label>
                   </div>
 
