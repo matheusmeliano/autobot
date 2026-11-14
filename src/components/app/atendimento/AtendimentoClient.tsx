@@ -1581,6 +1581,9 @@ export function AtendimentoClient() {
     name: string;
     phone: string;
   } | null>(null);
+  const [experimentalGroupSelectedDateId, setExperimentalGroupSelectedDateId] = useState<
+    string | null
+  >(null);
   const [experimentalGroupSelectedSlotId, setExperimentalGroupSelectedSlotId] = useState<
     string | null
   >(null);
@@ -1886,6 +1889,81 @@ export function AtendimentoClient() {
       null
     );
   }, [experimentalGroupSelectedSlotId, experimentalGroupSlots]);
+
+  const experimentalGroupVisibleSlots = useMemo<ExperimentalGroupSlotPayload[]>(() => {
+    return experimentalGroupSlots.filter(
+      (slot) => slot.available_seats > 0 || slot.is_current_lead_assigned,
+    );
+  }, [experimentalGroupSlots]);
+
+  const experimentalGroupDateOptions = useMemo<
+    Array<{
+      id: string;
+      dayLabel: string;
+      weekdayShort: string;
+      slotCount: number;
+    }>
+  >(() => {
+    const grouped = new Map<
+      string,
+      {
+        id: string;
+        dayLabel: string;
+        weekdayShort: string;
+        slotCount: number;
+      }
+    >();
+
+    for (const slot of experimentalGroupVisibleSlots) {
+      const dateId =
+        String(slot.lead_date ?? "").trim() || String(slot.professor_date ?? "").trim();
+      if (!dateId) continue;
+
+      const current = grouped.get(dateId);
+      if (current) {
+        current.slotCount += 1;
+        continue;
+      }
+
+      let weekdayShort = "";
+      let dayLabel = dateId;
+      try {
+        if (/^\d{4}-\d{2}-\d{2}$/.test(dateId)) {
+          const date = new Date(`${dateId}T12:00:00Z`);
+          weekdayShort = new Intl.DateTimeFormat("pt-BR", {
+            weekday: "short",
+            timeZone: "UTC",
+          })
+            .format(date)
+            .replace(/\./g, "")
+            .slice(0, 3)
+            .toUpperCase();
+          dayLabel = new Intl.DateTimeFormat("pt-BR", {
+            day: "numeric",
+            timeZone: "UTC",
+          }).format(date);
+        }
+      } catch {}
+
+      grouped.set(dateId, {
+        id: dateId,
+        dayLabel,
+        weekdayShort: weekdayShort || "DIA",
+        slotCount: 1,
+      });
+    }
+
+    return Array.from(grouped.values()).sort((left, right) => left.id.localeCompare(right.id));
+  }, [experimentalGroupVisibleSlots]);
+
+  const experimentalGroupSelectedDateSlots = useMemo<ExperimentalGroupSlotPayload[]>(() => {
+    if (!experimentalGroupSelectedDateId) return [];
+    return experimentalGroupVisibleSlots.filter((slot) => {
+      const dateId =
+        String(slot.lead_date ?? "").trim() || String(slot.professor_date ?? "").trim();
+      return dateId === experimentalGroupSelectedDateId;
+    });
+  }, [experimentalGroupSelectedDateId, experimentalGroupVisibleSlots]);
 
   const bookingLocationOk = useMemo<boolean>(() => {
     if (!selectedLead) return false;
@@ -3571,7 +3649,14 @@ export function AtendimentoClient() {
         slots.find((slot) => slot.available_seats > 0) ??
         slots[0] ??
         null;
-      setExperimentalGroupSelectedSlotId(firstAssigned ? String(firstAssigned.id) : null);
+      const firstAssignedDate =
+        firstAssigned?.is_current_lead_assigned
+          ? String(firstAssigned.lead_date ?? firstAssigned.professor_date ?? "").trim() || null
+          : null;
+      setExperimentalGroupSelectedDateId(firstAssignedDate);
+      setExperimentalGroupSelectedSlotId(
+        firstAssigned?.is_current_lead_assigned ? String(firstAssigned.id) : null,
+      );
       return {
         canOpenModal: Boolean(json?.can_open_modal),
         slots,
@@ -3598,7 +3683,7 @@ export function AtendimentoClient() {
 
     if (result.reasons.includes("feature_disabled") || !hasConfiguredSlots) {
       modalToast.warning(
-        "Ative a funcionalidade e configure os dois dias e horários das aulas experimentais em grupo.",
+        "Ative a funcionalidade e configure pelo menos uma turma com dia e horário.",
       );
       return;
     }
@@ -9497,42 +9582,122 @@ export function AtendimentoClient() {
                 </div>
               </div>
               {(() => {
-                const visibleSlots = experimentalGroupSlots.filter(
-                  (slot) => slot.available_seats > 0 || slot.is_current_lead_assigned,
-                );
                 return (
               <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
-                {visibleSlots.length === 0 ? (
+                {experimentalGroupVisibleSlots.length === 0 ? (
                   <div className="rounded-2xl border border-[var(--app-border)] bg-[var(--app-solid-surface-2)] px-4 py-6 text-[13px] text-[var(--app-text-55)]">
                     Nenhuma turma disponível para o professor configurado neste momento.
                   </div>
                 ) : (
-                  visibleSlots.map((slot) => {
-                    const isSelected = selectedExperimentalGroupSlot?.id === slot.id;
-                    return (
-                      <button
-                        key={slot.id}
-                        type="button"
-                        onClick={() => setExperimentalGroupSelectedSlotId(slot.id)}
-                        className={[
-                          "rounded-2xl border p-4 text-left transition",
-                          isSelected
-                            ? "border-[#ea580c] bg-[#fff7ed]"
-                            : "border-[var(--app-border)] bg-[var(--app-solid-surface)] hover:bg-[var(--app-hover)]",
-                        ].join(" ")}
-                      >
-                        <div className="text-[14px] font-semibold text-[var(--app-text-85)]">
-                          Turma — {slot.professor_weekday_label}, {slot.professor_time}
+                  <div className="space-y-4 lg:col-span-2">
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between gap-3">
+                        <label className="text-xs font-semibold text-[var(--app-text-70)]">
+                          Dias disponíveis
+                          <span className="ml-2 font-normal text-[var(--app-text-45)]">
+                            ({experimentalGroupDateOptions.length})
+                          </span>
+                        </label>
+                        <div className="text-[11px] font-medium text-[var(--app-text-55)]">
+                          Fuso horário: {experimentalGroupVisibleSlots[0]?.lead_timezone ?? ATENDIMENTO_PROFESSOR_TIME_ZONE}
                         </div>
-                        <div className="mt-2 text-[12px] text-[var(--app-text-60)]">
-                          Professor: {slot.professor_name ?? "—"}
+                      </div>
+
+                      <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 md:grid-cols-5">
+                        {experimentalGroupDateOptions.map((dateOption) => {
+                          const isSelected = experimentalGroupSelectedDateId === dateOption.id;
+                          return (
+                            <button
+                              key={dateOption.id}
+                              type="button"
+                              onClick={() => {
+                                setExperimentalGroupSelectedDateId(dateOption.id);
+                                setExperimentalGroupSelectedSlotId(null);
+                              }}
+                              className={
+                                "flex min-h-[76px] flex-col items-center justify-center gap-1 rounded-2xl border px-2 py-2 text-center transition duration-150 " +
+                                (isSelected
+                                  ? "!border-transparent !bg-[#ea580c] !text-white shadow-md"
+                                  : "border-[var(--app-border)] bg-[var(--app-solid-surface)] text-[var(--app-text-85)] hover:border-[#ea580c]/35 hover:bg-[var(--app-hover)] hover:text-[var(--app-text-90)]")
+                              }
+                            >
+                              <div
+                                className={
+                                  "text-[11px] uppercase tracking-wide font-semibold " +
+                                  (isSelected ? "!text-white/95" : "text-[var(--app-text-50)]")
+                                }
+                              >
+                                {dateOption.weekdayShort}
+                              </div>
+                              <div
+                                className={
+                                  "text-[20px] font-semibold leading-none " +
+                                  (isSelected ? "!text-white" : "text-[var(--app-text-92)]")
+                                }
+                              >
+                                {dateOption.dayLabel}
+                              </div>
+                              <div
+                                className={
+                                  "text-[10px] font-semibold " +
+                                  (isSelected ? "!text-white/90" : "text-[var(--app-text-55)]")
+                                }
+                              >
+                                {dateOption.slotCount}{" "}
+                                {dateOption.slotCount === 1 ? "horário" : "horários"}
+                              </div>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <label className="text-xs font-semibold text-[var(--app-text-70)]">
+                        Horários disponíveis
+                        {experimentalGroupSelectedDateId ? (
+                          <span className="ml-2 font-normal text-[var(--app-text-45)]">
+                            (dia selecionado)
+                          </span>
+                        ) : (
+                          <span className="ml-2 font-normal text-[var(--app-text-45)]">
+                            (selecione um dia primeiro)
+                          </span>
+                        )}
+                      </label>
+
+                      {!experimentalGroupSelectedDateId ? (
+                        <div className="rounded-2xl border border-dashed border-[var(--app-border)] bg-[var(--app-solid-surface-2)] px-4 py-4 text-center text-[13px] text-[var(--app-text-55)]">
+                          Clique em um dia acima para ver os horários disponíveis.
                         </div>
-                        <div className="mt-1 text-[12px] text-[var(--app-text-60)]">
-                          Alunos: {slot.occupied_seats}/{slot.capacity} | Vagas disponíveis: {slot.available_seats}
+                      ) : !experimentalGroupSelectedDateSlots.length ? (
+                        <div className="rounded-2xl border border-dashed border-[var(--app-border)] bg-[var(--app-solid-surface-2)] px-4 py-4 text-center text-[13px] text-[var(--app-text-55)]">
+                          Não há horários livres para este dia. Selecione outro dia disponível.
                         </div>
-                      </button>
-                    );
-                  })
+                      ) : (
+                        <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 md:grid-cols-5">
+                          {experimentalGroupSelectedDateSlots.map((slot) => {
+                            const isSelected = selectedExperimentalGroupSlot?.id === slot.id;
+                            return (
+                              <button
+                                key={slot.id}
+                                type="button"
+                                onClick={() => setExperimentalGroupSelectedSlotId(slot.id)}
+                                className={
+                                  "flex h-12 items-center justify-center rounded-2xl border px-2 text-[15px] font-semibold transition duration-150 " +
+                                  (isSelected
+                                    ? "!border-transparent !bg-[#ea580c] !text-white shadow-md"
+                                    : "border-[var(--app-border)] bg-[var(--app-solid-surface)] text-[var(--app-text-85)] hover:border-[#ea580c]/35 hover:bg-[var(--app-hover)] hover:text-[var(--app-text-90)]")
+                                }
+                              >
+                                {slot.lead_time || slot.professor_time || "Horário"}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  </div>
                 )}
               </div>
                 );
