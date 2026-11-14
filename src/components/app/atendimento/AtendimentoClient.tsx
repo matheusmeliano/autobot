@@ -9356,16 +9356,6 @@ export function AtendimentoClient() {
                             <div className={isSelected ? "text-[11px] font-semibold uppercase tracking-wide !text-white/95" : "text-[11px] font-semibold uppercase tracking-wide text-[var(--app-text-50)]"}>
                               {shortLabel}
                             </div>
-                            <div
-                              className={
-                                isSelected
-                                  ? "max-w-full truncate px-1 text-[11px] font-semibold leading-tight !text-white/95 sm:text-[12px]"
-                                  : "max-w-full truncate px-1 text-[11px] font-semibold leading-tight text-[var(--app-text-92)] sm:text-[12px]"
-                              }
-                              title={option.label}
-                            >
-                              {option.label}
-                            </div>
                           </button>
                         );
                       })}
