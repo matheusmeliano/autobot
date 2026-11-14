@@ -48,6 +48,31 @@ type ExperimentalGroupFormSlot = {
   professor_time: string;
 };
 
+type ExperimentalAvailabilityDateOption = {
+  id: string;
+  professorDate: string;
+  leadDate: string;
+  dayLabel: string;
+  displayLabel: string;
+  slotCount: number;
+};
+
+type ExperimentalAvailabilityTimeOption = {
+  id: string;
+  professorDate: string;
+  professorTime: string;
+  professorStartAt: string;
+  leadDate: string;
+  leadTime: string;
+  displayLabel: string;
+};
+
+type ExperimentalAvailabilityPayload = {
+  dates: ExperimentalAvailabilityDateOption[];
+  slotsByDate: Record<string, ExperimentalAvailabilityTimeOption[]>;
+  professor_timezone: string;
+};
+
 type ExperimentalGroupSlotPayload = {
   id: string;
   group_class_id: string | null;
@@ -138,6 +163,81 @@ function nextWeekdayDayLabelInTimeZone(
     }).format(candidate);
   }
   return "—";
+}
+
+function normalizeExperimentalAvailabilityPayload(value: any): ExperimentalAvailabilityPayload | null {
+  if (!value || !Array.isArray(value.dates)) return null;
+  const dates: ExperimentalAvailabilityDateOption[] = value.dates.map((item: any) => ({
+    id: String(item?.id ?? "").trim(),
+    professorDate: String(item?.professorDate ?? "").trim(),
+    leadDate: String(item?.leadDate ?? "").trim(),
+    dayLabel: String(item?.dayLabel ?? "").trim(),
+    displayLabel: String(item?.displayLabel ?? "").trim(),
+    slotCount: Math.max(0, Number(item?.slotCount ?? 0)),
+  }));
+  const rawSlotsByDate =
+    value?.slotsByDate && typeof value.slotsByDate === "object" ? (value.slotsByDate as Record<string, any[]>) : {};
+  const slotsByDate: Record<string, ExperimentalAvailabilityTimeOption[]> = {};
+  for (const key of Object.keys(rawSlotsByDate)) {
+    const rawSlots = Array.isArray(rawSlotsByDate[key]) ? rawSlotsByDate[key] : [];
+    slotsByDate[String(key)] = rawSlots.map((slot: any) => ({
+      id: String(slot?.id ?? "").trim(),
+      professorDate: String(slot?.professorDate ?? "").trim(),
+      professorTime: String(slot?.professorTime ?? "").trim(),
+      professorStartAt: String(slot?.professorStartAt ?? "").trim(),
+      leadDate: String(slot?.leadDate ?? "").trim(),
+      leadTime: String(slot?.leadTime ?? "").trim(),
+      displayLabel: String(slot?.displayLabel ?? "").trim(),
+    }));
+  }
+  return {
+    dates: dates.filter((item) => item.id),
+    slotsByDate,
+    professor_timezone:
+      String(value?.professor_timezone ?? "").trim() || ATENDIMENTO_PROFESSOR_TIME_ZONE,
+  };
+}
+
+function getExperimentalAvailabilitySlotsForDate(
+  availability: ExperimentalAvailabilityPayload | null | undefined,
+  dateId: string | null | undefined,
+): ExperimentalAvailabilityTimeOption[] {
+  const key = String(dateId ?? "").trim();
+  if (!key) return [];
+  return Array.isArray(availability?.slotsByDate?.[key]) ? availability!.slotsByDate[key] : [];
+}
+
+function getExperimentalAvailabilityWeekdayForDate(
+  availability: ExperimentalAvailabilityPayload | null | undefined,
+  dateId: string | null | undefined,
+): string {
+  const firstSlot = getExperimentalAvailabilitySlotsForDate(availability, dateId)[0];
+  if (!firstSlot?.professorStartAt) return "";
+  return weekdayKeyFromDateInTimeZone(
+    new Date(firstSlot.professorStartAt),
+    String(availability?.professor_timezone ?? "").trim() || ATENDIMENTO_PROFESSOR_TIME_ZONE,
+  );
+}
+
+function resolveExperimentalAvailabilityDateIdForGroupSlot(
+  availability: ExperimentalAvailabilityPayload | null | undefined,
+  slot: ExperimentalGroupFormSlot,
+): string {
+  const weekday = String(slot.weekday ?? "").trim();
+  if (!weekday) return "";
+  const dates = Array.isArray(availability?.dates) ? availability!.dates : [];
+  const preferred = dates.find((dateOption) => {
+    if (getExperimentalAvailabilityWeekdayForDate(availability, dateOption.id) !== weekday) return false;
+    if (!slot.professor_time) return true;
+    return getExperimentalAvailabilitySlotsForDate(availability, dateOption.id).some(
+      (timeOption) => timeOption.professorTime === slot.professor_time,
+    );
+  });
+  if (preferred?.id) return preferred.id;
+  const fallback = dates.find(
+    (dateOption) => getExperimentalAvailabilityWeekdayForDate(availability, dateOption.id) === weekday,
+  );
+  return String(fallback?.id ?? "").trim();
 }
 
 function experimentalAssignedProfessorForLead(lead: AtendimentoLeadListItem | null | undefined): { name: string; phone: string; short: string } | null {
@@ -1575,6 +1675,8 @@ export function AtendimentoClient() {
   const [experimentalGroupSettingsOpen, setExperimentalGroupSettingsOpen] = useState(false);
   const [experimentalGroupSettingsLoading, setExperimentalGroupSettingsLoading] = useState(false);
   const [experimentalGroupSettingsSaving, setExperimentalGroupSettingsSaving] = useState(false);
+  const [experimentalGroupAvailability, setExperimentalGroupAvailability] =
+    useState<ExperimentalAvailabilityPayload | null>(null);
   const [experimentalGroupFormSlots, setExperimentalGroupFormSlots] = useState<
     ExperimentalGroupFormSlot[]
   >(
@@ -1583,6 +1685,9 @@ export function AtendimentoClient() {
       weekday: "",
       professor_time: "",
     })),
+  );
+  const [experimentalGroupFormDateIds, setExperimentalGroupFormDateIds] = useState<string[]>(
+    Array.from({ length: 4 }, () => ""),
   );
   const [editLeadOpen, setEditLeadOpen] = useState(false);
   const [editLeadName, setEditLeadName] = useState("");
@@ -3568,7 +3673,9 @@ export function AtendimentoClient() {
 
   function syncExperimentalGroupSettingsFromPayload(json: any) {
     const settings = (json?.settings ?? null) as ExperimentalGroupSettingsPayload | null;
+    const availability = normalizeExperimentalAvailabilityPayload(json?.availability ?? null);
     setExperimentalGroupSettings(settings);
+    setExperimentalGroupAvailability(availability);
     setExperimentalGroupWeekdayOptions(
       Array.isArray(json?.weekday_options) ? (json.weekday_options as Array<{ value: string; label: string }>) : [],
     );
@@ -3582,6 +3689,9 @@ export function AtendimentoClient() {
       };
     });
     setExperimentalGroupFormSlots(normalizedSlots);
+    setExperimentalGroupFormDateIds(
+      normalizedSlots.map((slot) => resolveExperimentalAvailabilityDateIdForGroupSlot(availability, slot)),
+    );
   }
 
   async function loadExperimentalGroupSettings(silent = false) {
@@ -3669,6 +3779,34 @@ export function AtendimentoClient() {
             }
           : slot,
       ),
+    );
+  }
+
+  function updateExperimentalGroupFormDateSelection(index: number, dateId: string) {
+    const normalizedDateId = String(dateId ?? "").trim();
+    const selectedSlots = getExperimentalAvailabilitySlotsForDate(
+      experimentalGroupAvailability,
+      normalizedDateId,
+    );
+    const weekday = getExperimentalAvailabilityWeekdayForDate(
+      experimentalGroupAvailability,
+      normalizedDateId,
+    );
+    setExperimentalGroupFormDateIds((prev) =>
+      prev.map((value, slotIndex) => (slotIndex === index ? normalizedDateId : value)),
+    );
+    setExperimentalGroupFormSlots((prev) =>
+      prev.map((slot, slotIndex) => {
+        if (slotIndex !== index) return slot;
+        const hasCurrentTime = selectedSlots.some(
+          (timeOption) => timeOption.professorTime === slot.professor_time,
+        );
+        return {
+          ...slot,
+          weekday,
+          professor_time: hasCurrentTime ? slot.professor_time : "",
+        };
+      }),
     );
   }
 
@@ -9395,168 +9533,198 @@ export function AtendimentoClient() {
 
           <div className="mt-5 space-y-4">
             {experimentalGroupFormSlots.map((card, index) => (
-              <div
-                key={`group-slot-${index}`}
-                className={[
-                  "rounded-2xl border p-4 transition",
-                  card.enabled
-                    ? "border-[var(--app-border)] bg-[var(--app-solid-surface)]"
-                    : "border-[var(--app-border)] bg-[var(--app-solid-surface)] opacity-60",
-                ].join(" ")}
-              >
-                <div className="space-y-4">
-                  <div className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-2">
-                    <div className="min-w-0">
-                      <div className="text-[14px] font-bold text-[var(--app-text-85)]">
-                        {`Turma ${index + 1}`}
-                      </div>
-                    </div>
-                    <div className="flex items-start justify-end gap-2 self-start justify-self-end">
-                      {card.enabled && card.weekday && card.professor_time ? (
-                        <div className="inline-flex items-center gap-1 rounded-full border border-[#ea580c]/25 bg-[rgba(234,88,12,0.10)] px-3 py-1 text-[11px] font-bold text-[#9a3412]">
-                          {experimentalGroupWeekdayOptions.find((option) => option.value === card.weekday)?.label ?? card.weekday} as {card.professor_time}
-                        </div>
-                      ) : null}
-                      <button
-                        type="button"
-                        role="switch"
-                        aria-checked={card.enabled}
-                        onClick={() =>
-                          updateExperimentalGroupFormSlot(index, {
-                            enabled: !card.enabled,
-                          })
-                        }
-                        className="inline-flex shrink-0 items-center justify-center bg-transparent p-0 transition"
-                      >
-                        <span
-                          className={[
-                            "relative flex h-7 w-12 shrink-0 items-center rounded-full border transition",
-                            card.enabled
-                              ? "border-emerald-500/30 bg-emerald-500/20"
-                              : "border-[var(--app-border)] bg-[var(--app-solid-surface)]",
-                          ].join(" ")}
-                        >
-                          <span
-                            className={[
-                              "absolute h-5 w-5 rounded-full shadow-sm transition-all",
-                              card.enabled
-                                ? "left-[22px] bg-emerald-600"
-                                : "left-1 bg-[var(--app-text-45)]",
-                            ].join(" ")}
-                          />
-                        </span>
-                      </button>
-                    </div>
-                  </div>
+              (() => {
+                const dateOptions = experimentalGroupAvailability?.dates ?? [];
+                const selectedDateId =
+                  String(experimentalGroupFormDateIds[index] ?? "").trim() ||
+                  resolveExperimentalAvailabilityDateIdForGroupSlot(
+                    experimentalGroupAvailability,
+                    card,
+                  );
+                const selectedDateSlots = getExperimentalAvailabilitySlotsForDate(
+                  experimentalGroupAvailability,
+                  selectedDateId,
+                );
 
-                  <div className="space-y-2">
-                    <div className="flex items-center gap-3">
-                      <label className="text-xs font-semibold text-[var(--app-text-70)]">
-                        Dia da semana
-                      </label>
-                    </div>
-                    <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 md:grid-cols-5">
-                      {experimentalGroupWeekdayOptions.map((option) => {
-                        const isSelected = card.weekday === option.value;
-                        const shortLabel =
-                          EXPERIMENTAL_GROUP_WEEKDAY_SHORT_LABELS[option.value] ?? option.label.slice(0, 3);
-                        const nextDayLabel = nextWeekdayDayLabelInTimeZone(
-                          option.value,
-                          String(
-                            experimentalGroupSettings?.professor_timezone ??
-                              ATENDIMENTO_PROFESSOR_TIME_ZONE,
-                          ),
-                        );
-                        return (
+                return (
+                  <div
+                    key={`group-slot-${index}`}
+                    className={[
+                      "rounded-2xl border p-4 transition",
+                      card.enabled
+                        ? "border-[var(--app-border)] bg-[var(--app-solid-surface)]"
+                        : "border-[var(--app-border)] bg-[var(--app-solid-surface)] opacity-60",
+                    ].join(" ")}
+                  >
+                    <div className="space-y-4">
+                      <div className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-2">
+                        <div className="min-w-0">
+                          <div className="text-[14px] font-bold text-[var(--app-text-85)]">
+                            {`Turma ${index + 1}`}
+                          </div>
+                        </div>
+                        <div className="flex items-start justify-end gap-2 self-start justify-self-end">
+                          {card.enabled && card.weekday && card.professor_time ? (
+                            <div className="inline-flex items-center gap-1 rounded-full border border-[#ea580c]/25 bg-[rgba(234,88,12,0.10)] px-3 py-1 text-[11px] font-bold text-[#9a3412]">
+                              {experimentalGroupWeekdayOptions.find((option) => option.value === card.weekday)?.label ?? card.weekday} as {card.professor_time}
+                            </div>
+                          ) : null}
                           <button
-                            key={`group-slot-${index}-${option.value}`}
                             type="button"
-                            disabled={!card.enabled}
+                            role="switch"
+                            aria-checked={card.enabled}
                             onClick={() =>
                               updateExperimentalGroupFormSlot(index, {
-                                weekday: option.value,
+                                enabled: !card.enabled,
                               })
                             }
-                            className={[
-                              "flex min-h-[76px] flex-col items-center justify-center gap-1 rounded-2xl border px-2 py-2 text-center transition duration-150 disabled:cursor-not-allowed disabled:opacity-60",
-                              isSelected
-                                ? "!border-transparent !bg-[#ea580c] !text-white shadow-md"
-                                : "border-[var(--app-border)] bg-[var(--app-solid-surface)] text-[var(--app-text-85)] hover:border-[#ea580c]/35 hover:bg-[var(--app-hover)] hover:text-[var(--app-text-90)]",
-                            ].join(" ")}
+                            className="inline-flex shrink-0 items-center justify-center bg-transparent p-0 transition"
                           >
-                            <div
-                              className={
-                                isSelected
-                                  ? "text-[11px] font-semibold uppercase tracking-wide !text-white/95"
-                                  : "text-[11px] font-semibold uppercase tracking-wide text-[var(--app-text-50)]"
-                              }
-                            >
-                              {shortLabel}
-                            </div>
-                            <div
-                              className={
-                                isSelected
-                                  ? "max-w-full truncate px-1 text-[18px] font-semibold leading-tight !text-white sm:text-[20px]"
-                                  : "max-w-full truncate px-1 text-[18px] font-semibold leading-tight text-[var(--app-text-92)] sm:text-[20px]"
-                              }
-                            >
-                              {nextDayLabel}
-                            </div>
-                            <div
-                              className={
-                                isSelected
-                                  ? "text-[10px] font-semibold !text-white/90"
-                                  : "text-[10px] font-semibold text-[var(--app-text-55)]"
-                              }
-                            >
-                              1 horário
-                            </div>
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-
-                  <div className="space-y-2">
-                    <div className="flex items-center gap-3">
-                      <label className="text-xs font-semibold text-[var(--app-text-70)]">
-                        Horario disponivel
-                      </label>
-                    </div>
-                    {card.weekday ? (
-                      <div className="grid grid-cols-2 gap-2 min-[520px]:grid-cols-3 sm:grid-cols-4">
-                        {EXPERIMENTAL_CLASS_SLOT_TIMES.map((time) => {
-                          const isSelected = card.professor_time === time;
-                          return (
-                            <button
-                              key={`group-slot-${index}-${time}`}
-                              type="button"
-                              disabled={!card.enabled}
-                              onClick={() =>
-                                updateExperimentalGroupFormSlot(index, {
-                                  professor_time: time,
-                                })
-                              }
+                            <span
                               className={[
-                                "flex h-11 items-center justify-center rounded-2xl border px-2 text-[14px] font-semibold transition duration-150 disabled:cursor-not-allowed disabled:opacity-60 sm:h-12 sm:text-[15px]",
-                                isSelected
-                                  ? "!border-transparent !bg-[#ea580c] !text-white shadow-md"
-                                  : "border-[var(--app-border)] bg-[var(--app-solid-surface)] text-[var(--app-text-85)] hover:border-[#ea580c]/35 hover:bg-[var(--app-hover)] hover:text-[var(--app-text-90)]",
+                                "relative flex h-7 w-12 shrink-0 items-center rounded-full border transition",
+                                card.enabled
+                                  ? "border-emerald-500/30 bg-emerald-500/20"
+                                  : "border-[var(--app-border)] bg-[var(--app-solid-surface)]",
                               ].join(" ")}
                             >
-                              {time}
-                            </button>
-                          );
-                        })}
+                              <span
+                                className={[
+                                  "absolute h-5 w-5 rounded-full shadow-sm transition-all",
+                                  card.enabled
+                                    ? "left-[22px] bg-emerald-600"
+                                    : "left-1 bg-[var(--app-text-45)]",
+                                ].join(" ")}
+                              />
+                            </span>
+                          </button>
+                        </div>
                       </div>
-                    ) : (
-                      <div className="rounded-2xl border border-dashed border-[var(--app-border)] bg-[var(--app-solid-surface-2)] px-4 py-5 text-center text-[12px] font-medium text-[var(--app-text-55)]">
-                        Selecione o dia primeiro.
+
+                      <div className="space-y-2">
+                        <div className="flex items-center gap-3">
+                          <label className="text-xs font-semibold text-[var(--app-text-70)]">
+                            Dia da semana
+                          </label>
+                        </div>
+                        {!dateOptions.length ? (
+                          <div className="rounded-2xl border border-dashed border-[var(--app-border)] bg-[var(--app-solid-surface-2)] px-4 py-5 text-center text-[12px] font-medium text-[var(--app-text-55)]">
+                            Nao ha dias disponiveis no momento.
+                          </div>
+                        ) : (
+                          <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 md:grid-cols-5">
+                            {dateOptions.map((dateOption) => {
+                              const dateSlots = getExperimentalAvailabilitySlotsForDate(
+                                experimentalGroupAvailability,
+                                dateOption.id,
+                              );
+                              const weekdayKey = getExperimentalAvailabilityWeekdayForDate(
+                                experimentalGroupAvailability,
+                                dateOption.id,
+                              );
+                              const shortLabel =
+                                EXPERIMENTAL_GROUP_WEEKDAY_SHORT_LABELS[weekdayKey] ?? weekdayKey;
+                              const isSelected = selectedDateId === dateOption.id;
+                              return (
+                                <button
+                                  key={`group-slot-${index}-${dateOption.id}`}
+                                  type="button"
+                                  disabled={!card.enabled}
+                                  onClick={() =>
+                                    updateExperimentalGroupFormDateSelection(index, dateOption.id)
+                                  }
+                                  className={[
+                                    "flex min-h-[76px] flex-col items-center justify-center gap-1 rounded-2xl border px-2 py-2 text-center transition duration-150 disabled:cursor-not-allowed disabled:opacity-60",
+                                    isSelected
+                                      ? "!border-transparent !bg-[#ea580c] !text-white shadow-md"
+                                      : "border-[var(--app-border)] bg-[var(--app-solid-surface)] text-[var(--app-text-85)] hover:border-[#ea580c]/35 hover:bg-[var(--app-hover)] hover:text-[var(--app-text-90)]",
+                                  ].join(" ")}
+                                >
+                                  <div
+                                    className={
+                                      isSelected
+                                        ? "text-[11px] font-semibold uppercase tracking-wide !text-white/95"
+                                        : "text-[11px] font-semibold uppercase tracking-wide text-[var(--app-text-50)]"
+                                    }
+                                  >
+                                    {shortLabel}
+                                  </div>
+                                  <div
+                                    className={
+                                      isSelected
+                                        ? "max-w-full truncate px-1 text-[18px] font-semibold leading-tight !text-white sm:text-[20px]"
+                                        : "max-w-full truncate px-1 text-[18px] font-semibold leading-tight text-[var(--app-text-92)] sm:text-[20px]"
+                                    }
+                                  >
+                                    {dateOption.dayLabel}
+                                  </div>
+                                  <div
+                                    className={
+                                      isSelected
+                                        ? "text-[10px] font-semibold !text-white/90"
+                                        : "text-[10px] font-semibold text-[var(--app-text-55)]"
+                                    }
+                                  >
+                                    {dateSlots.length} {dateSlots.length === 1 ? "horário" : "horários"}
+                                  </div>
+                                </button>
+                              );
+                            })}
+                          </div>
+                        )}
                       </div>
-                    )}
+
+                      <div className="space-y-2">
+                        <div className="flex items-center gap-3">
+                          <label className="text-xs font-semibold text-[var(--app-text-70)]">
+                            Horario disponivel
+                          </label>
+                        </div>
+                        {!selectedDateId ? (
+                          <div className="rounded-2xl border border-dashed border-[var(--app-border)] bg-[var(--app-solid-surface-2)] px-4 py-5 text-center text-[12px] font-medium text-[var(--app-text-55)]">
+                            Selecione o dia primeiro.
+                          </div>
+                        ) : !selectedDateSlots.length ? (
+                          <div className="rounded-2xl border border-dashed border-[var(--app-border)] bg-[var(--app-solid-surface-2)] px-4 py-5 text-center text-[12px] font-medium text-[var(--app-text-55)]">
+                            Nao ha horarios disponiveis neste dia.
+                          </div>
+                        ) : (
+                          <div className="grid grid-cols-2 gap-2 min-[520px]:grid-cols-3 sm:grid-cols-4">
+                            {selectedDateSlots.map((timeOption) => {
+                              const isSelected = card.professor_time === timeOption.professorTime;
+                              return (
+                                <button
+                                  key={`group-slot-${index}-${timeOption.id}`}
+                                  type="button"
+                                  disabled={!card.enabled}
+                                  onClick={() =>
+                                    updateExperimentalGroupFormSlot(index, {
+                                      weekday:
+                                        getExperimentalAvailabilityWeekdayForDate(
+                                          experimentalGroupAvailability,
+                                          selectedDateId,
+                                        ) || card.weekday,
+                                      professor_time: timeOption.professorTime,
+                                    })
+                                  }
+                                  className={[
+                                    "flex h-11 items-center justify-center rounded-2xl border px-2 text-[14px] font-semibold transition duration-150 disabled:cursor-not-allowed disabled:opacity-60 sm:h-12 sm:text-[15px]",
+                                    isSelected
+                                      ? "!border-transparent !bg-[#ea580c] !text-white shadow-md"
+                                      : "border-[var(--app-border)] bg-[var(--app-solid-surface)] text-[var(--app-text-85)] hover:border-[#ea580c]/35 hover:bg-[var(--app-hover)] hover:text-[var(--app-text-90)]",
+                                  ].join(" ")}
+                                >
+                                  {timeOption.professorTime}
+                                </button>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </div>
+                    </div>
                   </div>
-                </div>
-              </div>
+                );
+              })()
             ))}
 
             <div className="mt-2 flex shrink-0 flex-col-reverse gap-2 sm:flex-row sm:items-center sm:justify-end">
