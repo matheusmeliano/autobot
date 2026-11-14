@@ -9549,7 +9549,11 @@ export function AtendimentoClient() {
                           );
                         })}
                       </div>
-                    ) : null}
+                    ) : (
+                      <div className="rounded-2xl border border-dashed border-[var(--app-border)] bg-[var(--app-solid-surface-2)] px-4 py-5">
+                        <div className="min-h-[20px]" />
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
