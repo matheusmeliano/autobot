@@ -9405,8 +9405,8 @@ export function AtendimentoClient() {
                 ].join(" ")}
               >
                 <div className="space-y-4">
-                  <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                    <div>
+                  <div className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-2">
+                    <div className="min-w-0">
                       <div className="text-[14px] font-bold text-[var(--app-text-85)]">
                         {`Turma ${index + 1}`}
                       </div>
@@ -9414,7 +9414,7 @@ export function AtendimentoClient() {
                         Escolha o dia da semana e o horario da turma.
                       </div>
                     </div>
-                    <div className="flex items-center gap-2 self-start sm:self-auto">
+                    <div className="flex items-start justify-end gap-2 self-start justify-self-end">
                       {card.enabled && card.weekday && card.professor_time ? (
                         <div className="inline-flex items-center gap-1 rounded-full border border-[#ea580c]/25 bg-[rgba(234,88,12,0.10)] px-3 py-1 text-[11px] font-bold text-[#9a3412]">
                           {experimentalGroupWeekdayOptions.find((option) => option.value === card.weekday)?.label ?? card.weekday} as {card.professor_time}
