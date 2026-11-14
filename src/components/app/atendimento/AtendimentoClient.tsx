@@ -9604,7 +9604,7 @@ export function AtendimentoClient() {
                       <div className="space-y-2">
                         <div className="flex items-center gap-3">
                           <label className="text-xs font-semibold text-[var(--app-text-70)]">
-                            Dia da semana
+                            Dias disponíveis
                           </label>
                         </div>
                         {!dateOptions.length ? (
@@ -9677,7 +9677,7 @@ export function AtendimentoClient() {
                       <div className="space-y-2">
                         <div className="flex items-center gap-3">
                           <label className="text-xs font-semibold text-[var(--app-text-70)]">
-                            Horario disponivel
+                            Horários disponíveis
                           </label>
                         </div>
                         {!selectedDateId ? (
