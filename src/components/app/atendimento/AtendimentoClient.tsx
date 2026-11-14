@@ -9965,7 +9965,7 @@ export function AtendimentoClient() {
                   </label>
 
                   {!selectedExperimentalDateId ? (
-                    <div className="rounded-2xl border border-dashed border-[var(--app-border)] bg-[var(--app-solid-surface-2)] px-4 py-5 text-center text-[12px] font-medium text-[var(--app-text-55)]">
+                    <div className="rounded-2xl border border-dashed border-[var(--app-border)] bg-[var(--app-solid-surface)] px-4 py-5 text-center text-[12px] font-medium text-[var(--app-text-55)]">
                       Selecione o dia primeiro.
                     </div>
                   ) : (
