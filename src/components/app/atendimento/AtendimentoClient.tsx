@@ -9299,12 +9299,7 @@ export function AtendimentoClient() {
                             enabled: !card.enabled,
                           })
                         }
-                        className={[
-                          "inline-flex h-12 w-[76px] shrink-0 items-center justify-center rounded-full border px-2 transition",
-                          card.enabled
-                            ? "border-emerald-500/35 bg-emerald-500/12 text-emerald-800"
-                            : "border-[var(--app-border)] bg-[var(--app-solid-surface-2)] text-[var(--app-text-70)]",
-                        ].join(" ")}
+                        className="inline-flex shrink-0 items-center justify-center bg-transparent p-0 transition"
                       >
                         <span
                           className={[
