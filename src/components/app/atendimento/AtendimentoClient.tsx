@@ -9730,21 +9730,15 @@ export function AtendimentoClient() {
                       <div className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-2">
                         <div className="min-w-0">
                           <div className="text-[14px] font-bold text-[var(--app-text-85)]">
-                            {`Par ${pair.pairNumber}`}
+                            {`Turma ${pair.experimentalIndex + 1}`}
                           </div>
                           <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
                             <div className="rounded-xl border border-[var(--app-border)] bg-[var(--app-solid-surface-2)] px-3 py-3">
-                              <div className="text-[13px] font-bold text-[var(--app-text-85)]">
-                                {`Turma ${pair.experimentalIndex + 1}`}
-                              </div>
                               <div className="mt-2 inline-flex items-center rounded-full border border-[#ea580c]/25 bg-[rgba(234,88,12,0.10)] px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.12em] text-[#9a3412]">
                                 Experimental
                               </div>
                             </div>
                             <div className="rounded-xl border border-[var(--app-border)] bg-[var(--app-solid-surface-2)] px-3 py-3">
-                              <div className="text-[13px] font-bold text-[var(--app-text-85)]">
-                                {`Turma ${pair.recurringIndex + 1}`}
-                              </div>
                               <div className="mt-2 inline-flex items-center rounded-full border border-[#2563eb]/25 bg-[rgba(37,99,235,0.10)] px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.12em] text-[#1d4ed8]">
                                 Recorrente
                               </div>
