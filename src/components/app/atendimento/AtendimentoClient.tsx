@@ -3979,11 +3979,13 @@ export function AtendimentoClient() {
 
   function handleOpenExperimentalGroupPairs() {
     setExperimentalGroupFormSlots((prev) => {
-      const pairCount = Math.max(
-        0,
-        new Set(prev.map((slot) => String(slot.pairId ?? "").trim()).filter(Boolean)).size,
-      );
-      return [...prev, ...buildExperimentalGroupFormPair(pairCount + 1)];
+      const highestPairNumber = prev.reduce((highest, slot, index) => {
+        const rawPairId =
+          String(slot.pairId ?? "").trim() || `pair-${Math.floor(index / 2) + 1}`;
+        const pairNumber = Number(rawPairId.match(/(\d+)/)?.[1] ?? Number.NaN);
+        return Number.isFinite(pairNumber) ? Math.max(highest, pairNumber) : highest;
+      }, 0);
+      return [...prev, ...buildExperimentalGroupFormPair(highestPairNumber + 1)];
     });
     setExperimentalGroupFormDateIds((prev) => [...prev, "", ""]);
   }
