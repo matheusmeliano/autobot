@@ -83,7 +83,7 @@ export async function POST(req: NextRequest) {
         const cands = phoneCandidatesResume(safePhoneDigits);
         const probe = await admin
           .from("atendimento_leads")
-          .select("id, phone, full_name, recurring_registration_password, signup_password_raw_temp, recurring_registration_step, recurring_class_weekday, recurring_class_weekday_label, recurring_class_professor_time, recurring_class_lead_time, recurring_class_professor_name, recurring_class_professor_phone, recurring_class_professor_timezone, recurring_class_lead_timezone, recurring_class_student_start_notification_sent_at, recurring_class_attendant_start_notification_sent_at, state, city, country, timezone, contract_pdf_url, contract_signed_at")
+          .select("id, phone, full_name, recurring_registration_password, signup_password_raw_temp, recurring_registration_step, recurring_class_weekday, recurring_class_weekday_label, recurring_class_professor_time, recurring_class_lead_time, recurring_class_professor_name, recurring_class_professor_phone, recurring_class_professor_timezone, recurring_class_lead_timezone, recurring_class_group_pair_id, recurring_class_group_status, recurring_class_student_start_notification_sent_at, recurring_class_attendant_start_notification_sent_at, state, city, country, timezone, contract_pdf_url, contract_signed_at")
           .in("phone", cands)
           .order("created_at", { ascending: false })
           .limit(5)
@@ -182,6 +182,8 @@ export async function POST(req: NextRequest) {
         city: readStr("city"),
         country: readStr("country"),
         timezone: readStr("timezone"),
+        recurring_class_group_pair_id: readStr("recurring_class_group_pair_id"),
+        recurring_class_group_status: readStr("recurring_class_group_status"),
         recurring_class_student_start_notification_sent_at: readStr(
           "recurring_class_student_start_notification_sent_at",
         ),
@@ -224,6 +226,8 @@ export async function POST(req: NextRequest) {
         recurring_class_weekday_label: readStr("recurring_class_weekday_label"),
         recurring_class_professor_time: readStr("recurring_class_professor_time"),
         recurring_class_lead_time: readStr("recurring_class_lead_time"),
+        recurring_class_group_pair_id: readStr("recurring_class_group_pair_id"),
+        recurring_class_group_status: readStr("recurring_class_group_status"),
         recurring_class_student_start_notification_sent_at: readStr(
           "recurring_class_student_start_notification_sent_at",
         ),

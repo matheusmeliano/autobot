@@ -167,6 +167,13 @@ type DraftPayload = {
   lead_id?: string | null;
 };
 
+function isLeadAssignedToRecurringGroup(lead: Record<string, unknown> | null): boolean {
+  if (!lead) return false;
+  const pairId = String((lead as any)?.recurring_class_group_pair_id ?? "").trim();
+  const status = String((lead as any)?.recurring_class_group_status ?? "").trim().toLowerCase();
+  return Boolean(pairId && status !== "removed");
+}
+
 export async function GET(req: NextRequest) {
   try {
     const admin = createSupabaseAdminClient();
@@ -190,7 +197,7 @@ export async function GET(req: NextRequest) {
       } else if (/column.*does not exist|PGRST204|42703/i.test(String(selFull.error?.message ?? ""))) {
           const fallback = await admin
             .from("atendimento_leads")
-            .select("id, phone, full_name, cpf, legal_responsible_name, legal_responsible_cpf, contract_pdf_url, contract_signed_at, state, city, country, timezone, recurring_registration_step, signup_password_raw_temp, recurring_registration_password, recurring_class_weekday, recurring_class_weekday_label, recurring_class_professor_time, recurring_class_lead_time, recurring_class_professor_name, recurring_class_professor_phone, recurring_class_professor_timezone, recurring_class_lead_timezone, plan_name, plan_monthly_value, payment_status, payment_confirmed_at, recurring_class_student_start_notification_sent_at, recurring_class_attendant_start_notification_sent_at, status, funnel_stage, enrollment_number, student_email, email")
+            .select("id, phone, full_name, cpf, legal_responsible_name, legal_responsible_cpf, contract_pdf_url, contract_signed_at, state, city, country, timezone, recurring_registration_step, signup_password_raw_temp, recurring_registration_password, recurring_class_weekday, recurring_class_weekday_label, recurring_class_professor_time, recurring_class_lead_time, recurring_class_professor_name, recurring_class_professor_phone, recurring_class_professor_timezone, recurring_class_lead_timezone, recurring_class_group_pair_id, recurring_class_group_status, plan_name, plan_monthly_value, payment_status, payment_confirmed_at, recurring_class_student_start_notification_sent_at, recurring_class_attendant_start_notification_sent_at, status, funnel_stage, enrollment_number, student_email, email")
             .eq("phone", normalizedPhone)
             .limit(1)
             .maybeSingle();
@@ -204,7 +211,7 @@ export async function GET(req: NextRequest) {
         try {
           const fallback = await admin
             .from("atendimento_leads")
-            .select("id, phone, full_name, cpf, legal_responsible_name, legal_responsible_cpf, contract_pdf_url, contract_signed_at, state, city, country, timezone, recurring_registration_step, signup_password_raw_temp, recurring_registration_password, recurring_class_weekday, recurring_class_weekday_label, recurring_class_professor_time, recurring_class_lead_time, recurring_class_professor_name, recurring_class_professor_phone, recurring_class_professor_timezone, recurring_class_lead_timezone, plan_name, plan_monthly_value, payment_status, payment_confirmed_at, recurring_class_student_start_notification_sent_at, recurring_class_attendant_start_notification_sent_at, status, funnel_stage, enrollment_number, student_email, email")
+            .select("id, phone, full_name, cpf, legal_responsible_name, legal_responsible_cpf, contract_pdf_url, contract_signed_at, state, city, country, timezone, recurring_registration_step, signup_password_raw_temp, recurring_registration_password, recurring_class_weekday, recurring_class_weekday_label, recurring_class_professor_time, recurring_class_lead_time, recurring_class_professor_name, recurring_class_professor_phone, recurring_class_professor_timezone, recurring_class_lead_timezone, recurring_class_group_pair_id, recurring_class_group_status, plan_name, plan_monthly_value, payment_status, payment_confirmed_at, recurring_class_student_start_notification_sent_at, recurring_class_attendant_start_notification_sent_at, status, funnel_stage, enrollment_number, student_email, email")
             .eq("phone", normalizedPhone)
             .limit(1)
             .maybeSingle();
@@ -367,6 +374,8 @@ export async function GET(req: NextRequest) {
         recurring_class_professor_time: readStr("recurring_class_professor_time"),
         recurring_class_lead_time: readStr("recurring_class_lead_time"),
         recurring_class_professor_name: readStr("recurring_class_professor_name"),
+        recurring_class_group_pair_id: readStr("recurring_class_group_pair_id"),
+        recurring_class_group_status: readStr("recurring_class_group_status"),
         plan_name: readStr("plan_name"),
         plan_monthly_value: readStr("plan_monthly_value"),
         payment_status: readStr("payment_status"),
@@ -416,6 +425,8 @@ export async function GET(req: NextRequest) {
         recurring_class_weekday_label: readStr("recurring_class_weekday_label"),
         recurring_class_professor_time: readStr("recurring_class_professor_time"),
         recurring_class_lead_time: readStr("recurring_class_lead_time"),
+        recurring_class_group_pair_id: readStr("recurring_class_group_pair_id"),
+        recurring_class_group_status: readStr("recurring_class_group_status"),
         recurring_class_student_start_notification_sent_at: readStr(
           "recurring_class_student_start_notification_sent_at",
         ),
@@ -560,6 +571,16 @@ export async function PATCH(req: NextRequest) {
             "Acesso bloqueado. Seu cadastro foi excluído. Para acessar novamente, inicie um novo atendimento pelo WhatsApp.",
         },
         { status: 403 },
+      );
+    }
+    if (hasManualScheduleChange && isLeadAssignedToRecurringGroup(lead as any)) {
+      return NextResponse.json(
+        {
+          ok: false,
+          error:
+            "Este aluno está vinculado a uma turma recorrente. O dia e horário são definidos pela turma.",
+        },
+        { status: 409 },
       );
     }
 

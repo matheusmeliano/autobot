@@ -304,6 +304,13 @@ function buildAlunoRecurringScheduleLabel(lead: Record<string, unknown> | null |
   return weekdayLabelFallback || leadTimeRaw || "—";
 }
 
+function isLeadAssignedToRecurringGroup(lead: Record<string, unknown> | null | undefined): boolean {
+  if (!lead) return false;
+  const pairId = String((lead as any)?.recurring_class_group_pair_id ?? "").trim();
+  const status = String((lead as any)?.recurring_class_group_status ?? "").trim().toLowerCase();
+  return Boolean(pairId && status !== "removed");
+}
+
 function buildAlunoRecurringRestoreSeed(
   lead: Record<string, unknown> | null | undefined,
 ): {
@@ -607,6 +614,9 @@ export default function CadastroRecorrenteBody() {
     leadTimezone,
   ]);
   const enrollmentPaymentConfig = ENROLLMENT_PAYMENT_CONFIGS[enrollmentPaymentCountry];
+  const alunoRecurringGroupLocked = isLeadAssignedToRecurringGroup(
+    (alunoLeadFull ?? null) as Record<string, unknown> | null,
+  );
   const [alunoEnrollmentCopied, setAlunoEnrollmentCopied] = useState(false);
   const [alunoEnrollmentBackfillDone, setAlunoEnrollmentBackfillDone] = useState(false);
   const [alunoStatusDismissed, setAlunoStatusDismissed] = useState<null | boolean>(null);
@@ -771,6 +781,7 @@ export default function CadastroRecorrenteBody() {
   }
 
   function openAlunoSched() {
+    if (alunoRecurringGroupLocked) return;
     setAlunoSchedStep(0);
     setAlunoSchedDayId(null);
     setAlunoSchedTimeOpt(null);
@@ -2372,12 +2383,18 @@ export default function CadastroRecorrenteBody() {
                     <button
                       type="button"
                       onClick={() => openAlunoSched()}
-                      className="inline-flex items-center gap-1.5 rounded-xl border border-indigo-200 bg-white/70 px-3 py-1.5 text-xs font-semibold text-indigo-700 hover:bg-white hover:text-indigo-800 transition"
+                      disabled={alunoRecurringGroupLocked}
+                      title={
+                        alunoRecurringGroupLocked
+                          ? "Este aluno está vinculado a uma turma recorrente. O dia e horário são definidos pela turma."
+                          : "Editar dia e horário"
+                      }
+                      className="inline-flex items-center gap-1.5 rounded-xl border border-indigo-200 bg-white/70 px-3 py-1.5 text-xs font-semibold text-indigo-700 hover:bg-white hover:text-indigo-800 transition disabled:cursor-not-allowed disabled:opacity-55"
                     >
                       <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                       </svg>
-                      Editar dia e horário
+                      {alunoRecurringGroupLocked ? "Definido pela turma" : "Editar dia e horário"}
                     </button>
                   </div>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -2397,6 +2414,13 @@ export default function CadastroRecorrenteBody() {
                         {professorName}
                       </div>
                     </div>
+                    {alunoRecurringGroupLocked ? (
+                      <div className="sm:col-span-2">
+                        <div className="rounded-2xl border border-indigo-200/80 bg-white/70 px-4 py-3 text-sm text-indigo-900">
+                          Este aluno está vinculado a uma turma recorrente. O dia e horário são definidos exclusivamente pela turma.
+                        </div>
+                      </div>
+                    ) : null}
                     <div>
                       <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-indigo-700/75 mb-1">
                         Plano

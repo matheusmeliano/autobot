@@ -1623,6 +1623,40 @@ export async function PATCH(request: Request, context: { params: Promise<{ leadI
   if (safeExpBookingId !== undefined) updateData.experimental_class_booking_id = safeExpBookingId;
   if (safeInternalNotes !== undefined) updateData.internal_notes = safeInternalNotes;
 
+  const touchingRecurringScheduleFields =
+    Object.prototype.hasOwnProperty.call(updateData, "recurring_class_weekday") ||
+    Object.prototype.hasOwnProperty.call(updateData, "recurring_class_weekday_label") ||
+    Object.prototype.hasOwnProperty.call(updateData, "recurring_class_lead_time") ||
+    Object.prototype.hasOwnProperty.call(updateData, "recurring_class_professor_time");
+
+  if (touchingRecurringScheduleFields) {
+    const { data: currentLead, error: currentLeadError } = await admin
+      .from("atendimento_leads")
+      .select("id, recurring_class_group_pair_id, recurring_class_group_status")
+      .eq("id", leadId)
+      .eq("assigned_user_email", "atendimento.usa.music@gmail.com")
+      .maybeSingle();
+    if (currentLeadError) {
+      return Response.json({ ok: false, error: currentLeadError.message }, { status: 500 });
+    }
+    const currentRecurringGroupPairId = String(
+      (currentLead as any)?.recurring_class_group_pair_id ?? "",
+    ).trim();
+    const currentRecurringGroupStatus = String(
+      (currentLead as any)?.recurring_class_group_status ?? "",
+    ).trim().toLowerCase();
+    if (currentRecurringGroupPairId && currentRecurringGroupStatus !== "removed") {
+      return Response.json(
+        {
+          ok: false,
+          error:
+            "Este aluno está vinculado a uma turma recorrente. O dia e horário são definidos pela turma.",
+        },
+        { status: 409 },
+      );
+    }
+  }
+
   const cityOrStateTouched = safeCity !== undefined || safeState !== undefined;
   const timeZoneMissingFromRequest = safeTimezone === undefined;
   const countryMissingFromRequest = safeCountry === undefined;

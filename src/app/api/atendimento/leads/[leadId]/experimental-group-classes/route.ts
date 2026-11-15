@@ -40,6 +40,13 @@ function isLeadRecurringStudent(lead: Record<string, unknown> | null): boolean {
   );
 }
 
+function leadHasStateAndCity(lead: Record<string, unknown> | null): boolean {
+  if (!lead) return false;
+  const stateRaw = String((lead as any)?.state ?? "").trim();
+  const cityRaw = String((lead as any)?.city ?? "").trim();
+  return Boolean(stateRaw && cityRaw);
+}
+
 export async function GET(_req: Request, { params }: { params: Promise<{ leadId: string }> }) {
   try {
     const auth = await requireAtendimentoUser();
@@ -70,6 +77,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ leadId:
     const { settings, updatedAt } = await loadExperimentalGroupClassSettings({ admin });
     const isStudentLead = isLeadRecurringStudent(lead as any);
     const hasPhone = isLeadPhoneEligibleForExperimentalGroup((lead as any)?.phone ?? null);
+    const hasStateAndCity = leadHasStateAndCity(lead as any);
     const assignedProfessor = isStudentLead
       ? resolveRecurringGroupProfessorFromLead(lead as any)
       : resolveExperimentalGroupProfessorFromLead(lead as any);
@@ -111,6 +119,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ leadId:
     const reasons: string[] = [];
     if (!settings.enabled) reasons.push("feature_disabled");
     if (!hasPhone) reasons.push("missing_valid_phone");
+    if (!hasStateAndCity) reasons.push("missing_state_city");
     if (!assignedProfessor) {
       reasons.push(isStudentLead ? "missing_assigned_recurring_professor" : "missing_assigned_professor");
     }

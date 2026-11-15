@@ -36,6 +36,13 @@ function isLeadRecurringStudent(lead: Record<string, unknown> | null): boolean {
   );
 }
 
+function leadHasStateAndCity(lead: Record<string, unknown> | null): boolean {
+  if (!lead) return false;
+  const stateRaw = String((lead as any)?.state ?? "").trim();
+  const cityRaw = String((lead as any)?.city ?? "").trim();
+  return Boolean(stateRaw && cityRaw);
+}
+
 export async function POST(req: Request) {
   try {
     const auth = await requireAtendimentoUser();
@@ -62,6 +69,15 @@ export async function POST(req: Request) {
     }
     if (!lead?.id) {
       return Response.json({ ok: false, error: "lead_not_found" }, { status: 404 });
+    }
+    if (!leadHasStateAndCity(lead as any)) {
+      return Response.json(
+        {
+          ok: false,
+          error: "Para atribuir uma turma a este registro, informe primeiro o estado e a cidade.",
+        },
+        { status: 409 },
+      );
     }
 
     const { settings } = await loadExperimentalGroupClassSettings({ admin });
@@ -108,6 +124,13 @@ export async function POST(req: Request) {
         { status: 409 },
       );
     }
+    const expectedSlotType = isStudentLead ? "recorrente" : "experimental";
+    if (targetSlot.slot_type !== expectedSlotType) {
+      return Response.json(
+        { ok: false, error: "Este registro só pode ser atribuído ao tipo de turma correspondente." },
+        { status: 409 },
+      );
+    }
 
     if (targetSlot.is_full && !targetSlot.is_current_lead_assigned) {
       return Response.json(
@@ -146,6 +169,9 @@ export async function POST(req: Request) {
           recurring_class_lead_time: targetSlot.lead_time || targetSlot.professor_time,
           recurring_class_professor_timezone: targetSlot.professor_timezone,
           recurring_class_lead_timezone: leadTimeZone,
+          recurring_class_first_class_at: targetSlot.professor_start_at,
+          recurring_class_student_start_notification_sent_at: null,
+          recurring_class_attendant_start_notification_sent_at: null,
           updated_at: nowIso,
         })
         .eq("id", leadId);
@@ -214,6 +240,14 @@ export async function POST(req: Request) {
           String((lead as any)?.experimental_class_group_interest_at ?? "").trim() || nowIso,
         experimental_class_group_class_id: groupClassId || null,
         experimental_class_group_status: "assigned",
+        experimental_class_professor_date: targetSlot.professor_date || null,
+        experimental_class_professor_time: targetSlot.professor_time || null,
+        experimental_class_professor_start_at: targetSlot.professor_start_at || null,
+        experimental_class_lead_date: targetSlot.lead_date || null,
+        experimental_class_lead_time: targetSlot.lead_time || targetSlot.professor_time || null,
+        experimental_class_lead_start_at: targetSlot.professor_start_at || null,
+        experimental_class_professor_name: targetSlot.professor_name,
+        experimental_class_professor_phone: targetSlot.professor_phone,
         updated_at: nowIso,
       })
       .eq("id", leadId);
