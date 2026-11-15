@@ -9612,7 +9612,7 @@ export function AtendimentoClient() {
                             Nao ha dias disponiveis no momento.
                           </div>
                         ) : (
-                          <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 md:grid-cols-5">
+                          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
                             {dateOptions.map((dateOption) => {
                               const dateSlots = getExperimentalAvailabilitySlotsForDate(
                                 experimentalGroupAvailability,
