@@ -509,29 +509,6 @@ function deriveLeadEffectiveTimeZone(lead: AtendimentoLeadListItem | null | unde
   return savedTz || ATENDIMENTO_PROFESSOR_TIME_ZONE;
 }
 
-function leadHasScheduledExperimentalClassForGroupCard(
-  lead: AtendimentoLeadListItem | null | undefined,
-): boolean {
-  if (!lead) return false;
-  const bestBooking =
-    (lead as any)?.future_experimental_class_booking ??
-    (lead as any)?.experimental_class_booking ??
-    (lead as any)?.latest_experimental_class_booking ??
-    null;
-  const bookingStatus = String((bestBooking as any)?.status ?? "").trim().toLowerCase();
-  if (
-    bestBooking &&
-    bookingStatus &&
-    bookingStatus !== "cancelled" &&
-    Boolean(String((bestBooking as any)?.professor_start_at ?? "").trim())
-  ) {
-    return true;
-  }
-  const flatStatus = String((lead as any)?.experimental_class_status ?? "").trim().toLowerCase();
-  const flatStartAt = String((lead as any)?.experimental_class_professor_start_at ?? "").trim();
-  return Boolean(flatStartAt && flatStatus && flatStatus !== "cancelled");
-}
-
 function leadHasStateAndCityForExperimentalGroup(
   lead: AtendimentoLeadListItem | null | undefined,
 ): boolean {
@@ -586,7 +563,6 @@ function deriveExperimentalGroupCardState(params: {
     assignedGroupId && assignedStatus && assignedStatus !== "removed",
   );
   const alreadyAssignedToRecurringGroup = isLeadAssignedToRecurringGroup(lead);
-  const hasScheduledExperimentalClass = leadHasScheduledExperimentalClassForGroupCard(lead);
 
   if (!params.settingsEnabled) reasons.push("Ative a funcionalidade e configure pelo menos uma turma com dia e horário.");
   if (!hasValidPhone) reasons.push("Esse registro precisa ter um telefone válido para entrar em uma turma.");
@@ -600,10 +576,6 @@ function deriveExperimentalGroupCardState(params: {
         : "Selecione primeiro o professor deste registro.",
     );
   }
-  if (!isStudentLead && hasScheduledExperimentalClass && !alreadyAssignedToGroup) {
-    hardReasons.push("O aluno já possui aula experimental definida.");
-  }
-
   return {
     disabled: hardReasons.length > 0 && !alreadyAssignedToGroup && !alreadyAssignedToRecurringGroup,
     reasons: [...hardReasons, ...reasons],
@@ -4195,10 +4167,6 @@ export function AtendimentoClient() {
       modalToast.warning("Esse registro precisa ter um telefone válido para entrar em uma turma.");
       return;
     }
-    if (result.reasons.includes("individual_experimental_already_scheduled")) {
-      modalToast.warning("Esse registro já possui uma aula experimental definida.");
-      return;
-    }
     const isMissingProfessor =
       result.reasons.includes("missing_assigned_professor") ||
       result.reasons.includes("missing_assigned_recurring_professor");
@@ -6754,9 +6722,7 @@ export function AtendimentoClient() {
                           settingsEnabled: Boolean(experimentalGroupSettings?.enabled),
                         });
                         const isStudentLead = isLeadMatriculaConcluida(sl);
-                        const groupShortcutLocked =
-                          groupCardState.disabled ||
-                          (!isStudentLead && leadHasScheduledExperimentalClassForGroupCard(sl));
+                        const groupShortcutLocked = groupCardState.disabled;
                         return (
                           <button
                             type="button"
@@ -8368,9 +8334,7 @@ export function AtendimentoClient() {
                         settingsEnabled: Boolean(experimentalGroupSettings?.enabled),
                       });
                       const isStudentLead = isLeadMatriculaConcluida(sl);
-                      const groupShortcutLocked =
-                        groupCardState.disabled ||
-                        (!isStudentLead && leadHasScheduledExperimentalClassForGroupCard(sl));
+                      const groupShortcutLocked = groupCardState.disabled;
                       return (
                         <button
                           type="button"

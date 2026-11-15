@@ -14,14 +14,6 @@ import {
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
-function hasIndividualExperimentalScheduled(lead: Record<string, unknown> | null): boolean {
-  if (!lead) return false;
-  const statusRaw = String((lead as any)?.experimental_class_status ?? "").trim().toLowerCase();
-  const flatStartAt = String((lead as any)?.experimental_class_professor_start_at ?? "").trim();
-  if (statusRaw && statusRaw !== "cancelled" && flatStartAt) return true;
-  return false;
-}
-
 function isLeadRecurringStudent(lead: Record<string, unknown> | null): boolean {
   if (!lead) return false;
   const payStatusRaw = String((lead as any)?.payment_status ?? "").trim().toLowerCase();
@@ -82,20 +74,6 @@ export async function GET(_req: Request, { params }: { params: Promise<{ leadId:
       ? resolveRecurringGroupProfessorFromLead(lead as any)
       : resolveExperimentalGroupProfessorFromLead(lead as any);
 
-    const { data: activeIndividualBookings, error: activeIndividualBookingsError } = await admin
-      .from("atendimento_experimental_class_bookings")
-      .select("id")
-      .eq("lead_id", leadId)
-      .in("status", ["scheduled", "confirmed", "in_progress"])
-      .limit(1);
-
-    if (activeIndividualBookingsError && String((activeIndividualBookingsError as any)?.code ?? "") !== "42P01") {
-      return Response.json({ ok: false, error: activeIndividualBookingsError.message }, { status: 500 });
-    }
-
-    const hasScheduledIndividual =
-      Boolean((activeIndividualBookings ?? []).length) || hasIndividualExperimentalScheduled(lead as any);
-
     const slots = isStudentLead
       ? await buildRecurringGroupClassSlotsForLead({
           admin,
@@ -110,7 +88,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ leadId:
           settings,
           now: new Date(),
           lookAheadDays: 42,
-          excludeLeadIdFromIndividualBookings: false,
+          excludeLeadIdFromIndividualBookings: true,
         });
 
     const currentAssignedSlot =
@@ -123,10 +101,6 @@ export async function GET(_req: Request, { params }: { params: Promise<{ leadId:
     if (!assignedProfessor) {
       reasons.push(isStudentLead ? "missing_assigned_recurring_professor" : "missing_assigned_professor");
     }
-    if (!isStudentLead && hasScheduledIndividual) {
-      reasons.push("individual_experimental_already_scheduled");
-    }
-
     return Response.json({
       ok: true,
       lead_slot_type: isStudentLead ? "recorrente" : "experimental",

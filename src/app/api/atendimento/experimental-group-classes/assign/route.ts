@@ -43,6 +43,19 @@ function leadHasStateAndCity(lead: Record<string, unknown> | null): boolean {
   return Boolean(stateRaw && cityRaw);
 }
 
+function isMissingExperimentalBookingRelation(error: unknown): boolean {
+  const code = String((error as any)?.code ?? "").trim();
+  const message = String((error as any)?.message ?? "");
+  return (
+    code === "42P01" ||
+    code === "PGRST205" ||
+    /relation .*atendimento_experimental_class_bookings.*does not exist/i.test(message) ||
+    /could not find the table .*atendimento_experimental_class_bookings.* in the schema cache/i.test(
+      message,
+    )
+  );
+}
+
 export async function POST(req: Request) {
   try {
     const auth = await requireAtendimentoUser();
@@ -103,7 +116,7 @@ export async function POST(req: Request) {
           settings,
           now: new Date(),
           lookAheadDays: 42,
-          excludeLeadIdFromIndividualBookings: false,
+          excludeLeadIdFromIndividualBookings: true,
         });
 
     const targetSlot =
@@ -199,6 +212,27 @@ export async function POST(req: Request) {
       });
     }
 
+    try {
+      const { error: cancelBookingError } = await admin
+        .from("atendimento_experimental_class_bookings")
+        .update({
+          status: "cancelled",
+          updated_at: nowIso,
+        })
+        .eq("lead_id", leadId)
+        .in("status", ["scheduled", "booked", "confirmed", "in_progress"]);
+      if (cancelBookingError && !isMissingExperimentalBookingRelation(cancelBookingError)) {
+        return Response.json({ ok: false, error: cancelBookingError.message }, { status: 500 });
+      }
+    } catch (error) {
+      if (!isMissingExperimentalBookingRelation(error)) {
+        return Response.json(
+          { ok: false, error: String((error as any)?.message ?? error ?? "erro interno") },
+          { status: 500 },
+        );
+      }
+    }
+
     const rpcResult = await admin.rpc("assign_atendimento_experimental_group_member", {
       p_lead_id: leadId,
       p_conversation_id: String((latestConversation as any)?.id ?? "").trim() || null,
@@ -240,6 +274,7 @@ export async function POST(req: Request) {
           String((lead as any)?.experimental_class_group_interest_at ?? "").trim() || nowIso,
         experimental_class_group_class_id: groupClassId || null,
         experimental_class_group_status: "assigned",
+        experimental_class_status: "scheduled",
         experimental_class_professor_date: targetSlot.professor_date || null,
         experimental_class_professor_time: targetSlot.professor_time || null,
         experimental_class_professor_start_at: targetSlot.professor_start_at || null,
@@ -248,6 +283,11 @@ export async function POST(req: Request) {
         experimental_class_lead_start_at: targetSlot.professor_start_at || null,
         experimental_class_professor_name: targetSlot.professor_name,
         experimental_class_professor_phone: targetSlot.professor_phone,
+        experimental_class_booking_id: null,
+        experimental_class_link: null,
+        experimental_class_student_notification_sent_at: null,
+        experimental_class_attendant_notification_sent_at: null,
+        experimental_class_registered_attendant_notification_sent_at: null,
         updated_at: nowIso,
       })
       .eq("id", leadId);
