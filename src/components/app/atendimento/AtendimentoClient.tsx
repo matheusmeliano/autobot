@@ -9859,11 +9859,6 @@ export function AtendimentoClient() {
                           </div>
                         </div>
                         <div className="flex items-start justify-end gap-2 self-start justify-self-end">
-                          {card.enabled && card.weekday && card.professor_time ? (
-                            <div className="inline-flex items-center gap-1 rounded-full border border-[#ea580c]/25 bg-[rgba(234,88,12,0.10)] px-3 py-1 text-[11px] font-bold text-[#9a3412]">
-                              {experimentalGroupWeekdayOptions.find((option) => option.value === card.weekday)?.label ?? card.weekday} as {card.professor_time}
-                            </div>
-                          ) : null}
                           <button
                             type="button"
                             role="switch"
