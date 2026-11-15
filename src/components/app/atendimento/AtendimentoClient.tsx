@@ -466,6 +466,8 @@ function deriveExperimentalGroupCardState(params: {
 }) {
   const lead = params.lead;
   const reasons: string[] = [];
+  const stateRaw = String((lead as any)?.state ?? "").trim();
+  const cityRaw = String((lead as any)?.city ?? "").trim();
   const phoneRaw = String(lead?.phone ?? "").trim();
   const phoneDigits = phoneRaw.replace(/\D/g, "");
   const hasValidPhone =
@@ -483,6 +485,9 @@ function deriveExperimentalGroupCardState(params: {
 
   if (!params.settingsEnabled) reasons.push("Funcionalidade desativada.");
   if (!hasValidPhone) reasons.push("Registro sem telefone válido.");
+  if (!stateRaw && !cityRaw) reasons.push("Preencha estado e cidade antes de atribuir este registro a uma turma.");
+  if (stateRaw && !cityRaw) reasons.push("Preencha a cidade antes de atribuir este registro a uma turma.");
+  if (!stateRaw && cityRaw) reasons.push("Preencha o estado antes de atribuir este registro a uma turma.");
   if (!hasAssignedProfessor && !alreadyAssignedToGroup) {
     reasons.push("Selecione primeiro o professor deste registro.");
   }
@@ -6424,7 +6429,12 @@ export function AtendimentoClient() {
                     {/* DESKTOP (sm+): 3 botões Editar/Excluir/X lado a lado normal */}
                     <div className="flex w-full shrink-0 items-center justify-center gap-2 sm:justify-end overflow-x-auto overflow-y-visible overscroll-contain sm:w-auto sm:overflow-visible">
                       {(() => {
+                        const groupCardState = deriveExperimentalGroupCardState({
+                          lead: sl,
+                          settingsEnabled: Boolean(experimentalGroupSettings?.enabled),
+                        });
                         const groupShortcutLocked =
+                          groupCardState.disabled ||
                           leadHasScheduledExperimentalClassForGroupCard(sl) ||
                           isLeadMatriculaConcluida(sl);
                         return (
@@ -6447,7 +6457,9 @@ export function AtendimentoClient() {
                             ].join(" ")}
                             title={
                               groupShortcutLocked
-                                ? isLeadMatriculaConcluida(sl)
+                                ? groupCardState.disabled
+                                  ? groupCardState.reasons[0] ?? "Turma em grupo indisponível."
+                                  : isLeadMatriculaConcluida(sl)
                                   ? "Esse registro já é aluno."
                                   : "Esse registro já possui aula experimental agendada."
                                 : "Selecionar este registro para aula experimental em grupo"
@@ -8031,7 +8043,12 @@ export function AtendimentoClient() {
                   {/* DESKTOP (sm+): 3 botões Editar/Excluir/X lado a lado normal */}
                   <div className="flex w-full shrink-0 items-center justify-center gap-2 sm:justify-end overflow-x-auto overflow-y-visible overscroll-contain sm:w-auto sm:overflow-visible">
                     {(() => {
+                      const groupCardState = deriveExperimentalGroupCardState({
+                        lead: sl,
+                        settingsEnabled: Boolean(experimentalGroupSettings?.enabled),
+                      });
                       const groupShortcutLocked =
+                        groupCardState.disabled ||
                         leadHasScheduledExperimentalClassForGroupCard(sl) ||
                         isLeadMatriculaConcluida(sl);
                       return (
@@ -8054,7 +8071,9 @@ export function AtendimentoClient() {
                           ].join(" ")}
                           title={
                             groupShortcutLocked
-                              ? isLeadMatriculaConcluida(sl)
+                              ? groupCardState.disabled
+                                ? groupCardState.reasons[0] ?? "Turma em grupo indisponível."
+                                : isLeadMatriculaConcluida(sl)
                                 ? "Esse registro já é aluno."
                                 : "Esse registro já possui aula experimental agendada."
                               : "Selecionar este registro para aula experimental em grupo"
