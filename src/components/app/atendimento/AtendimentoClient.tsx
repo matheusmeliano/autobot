@@ -9925,7 +9925,7 @@ export function AtendimentoClient() {
                             </div>
                           </div>
                         </div>
-                        <div className="flex items-start justify-end gap-2 self-start justify-self-end">
+                        <div className="flex items-center justify-end gap-2 self-start justify-self-end">
                           <button
                             type="button"
                             role="switch"
