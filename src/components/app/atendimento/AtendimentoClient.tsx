@@ -6653,6 +6653,7 @@ export function AtendimentoClient() {
                   {pagedFilteredLeads.map((lead) => {
                     const isSelected = lead.id === selectedLeadId;
                     const meta = buildExperimentalMetaForList(lead);
+                    const hasExperimentalGroupAssigned = isLeadAssignedToExperimentalGroup(lead);
                     return (
                       <button
                         key={lead.id}
@@ -6697,12 +6698,23 @@ export function AtendimentoClient() {
                           </div>
                         </div>
 
-                        <ChevronRight
-                          className={[
-                            "mt-2 h-4 w-4 shrink-0 transition-colors",
-                            isSelected ? "text-[#9a3412]" : "text-[var(--app-text-45)] group-hover:text-[var(--app-text-70)]",
-                          ].join(" ")}
-                        />
+                        <div className="mt-0.5 flex shrink-0 flex-col items-end justify-between self-stretch">
+                          <ChevronRight
+                            className={[
+                              "mt-1 h-4 w-4 shrink-0 transition-colors",
+                              isSelected ? "text-[#9a3412]" : "text-[var(--app-text-45)] group-hover:text-[var(--app-text-70)]",
+                            ].join(" ")}
+                          />
+                          {hasExperimentalGroupAssigned ? (
+                            <div
+                              aria-hidden="true"
+                              className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] text-[var(--app-text-75)] transition-all"
+                              title="Registro vinculado a uma turma experimental em grupo"
+                            >
+                              <Users className="h-5 w-5" />
+                            </div>
+                          ) : null}
+                        </div>
                       </button>
                     );
                   })}
