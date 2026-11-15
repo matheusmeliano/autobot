@@ -9732,16 +9732,12 @@ export function AtendimentoClient() {
                           <div className="text-[14px] font-bold text-[var(--app-text-85)]">
                             {`Turma ${pair.pairNumber}`}
                           </div>
-                          <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
-                            <div className="rounded-xl border border-[var(--app-border)] bg-[var(--app-solid-surface-2)] px-3 py-3">
-                              <div className="mt-2 inline-flex items-center rounded-full border border-[#ea580c]/25 bg-[rgba(234,88,12,0.10)] px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.12em] text-[#9a3412]">
-                                Experimental
-                              </div>
+                          <div className="mt-3 flex flex-wrap items-center gap-2">
+                            <div className="mt-2 inline-flex items-center rounded-full border border-[#ea580c]/25 bg-[rgba(234,88,12,0.10)] px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.12em] text-[#9a3412]">
+                              Experimental
                             </div>
-                            <div className="rounded-xl border border-[var(--app-border)] bg-[var(--app-solid-surface-2)] px-3 py-3">
-                              <div className="mt-2 inline-flex items-center rounded-full border border-[#2563eb]/25 bg-[rgba(37,99,235,0.10)] px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.12em] text-[#1d4ed8]">
-                                Recorrente
-                              </div>
+                            <div className="mt-2 inline-flex items-center rounded-full border border-[#2563eb]/25 bg-[rgba(37,99,235,0.10)] px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.12em] text-[#1d4ed8]">
+                              Recorrente
                             </div>
                           </div>
                         </div>
