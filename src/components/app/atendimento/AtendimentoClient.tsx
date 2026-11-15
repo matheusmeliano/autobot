@@ -4438,18 +4438,30 @@ export function AtendimentoClient() {
         modalToast.error(
           normalizeExperimentalGroupErrorMessage(
             json?.error,
-            "Falha ao remover aluno da turma.",
+            slot.slot_type === "recorrente"
+              ? "Falha ao remover aluno da turma recorrente."
+              : "Falha ao remover registro da turma.",
           ),
         );
         return;
       }
-      await Promise.all([loadPanelLeads(), loadExperimentalGroupLeadData(experimentalGroupLead)]);
-      modalToast.success("Aluno removido da turma.");
+      await Promise.all([
+        loadPanelLeads(),
+        loadSummary({ silent: true }),
+        loadExperimentalGroupLeadData(experimentalGroupLead),
+      ]);
+      modalToast.success(
+        slot.slot_type === "recorrente"
+          ? "Aluno removido da turma recorrente. O dia e horário voltaram para o individual."
+          : "Registro removido da turma. O agendamento voltou para o individual.",
+      );
     } catch (error: any) {
       modalToast.error(
         normalizeExperimentalGroupErrorMessage(
           error?.message,
-          "Falha ao remover aluno da turma.",
+          slot.slot_type === "recorrente"
+            ? "Falha ao remover aluno da turma recorrente."
+            : "Falha ao remover registro da turma.",
         ),
       );
     } finally {
@@ -10674,21 +10686,42 @@ export function AtendimentoClient() {
                 );
               })()}
 
-              {selectedExperimentalGroupSlot?.slot_type === "experimental" ? (
+              {selectedExperimentalGroupSlot ? (
                 <div className="flex justify-end">
+                  {(() => {
+                    const isCurrentLeadAssigned = Boolean(
+                      selectedExperimentalGroupSlot.is_current_lead_assigned,
+                    );
+                    const actionDisabled = isCurrentLeadAssigned
+                      ? experimentalGroupActionLoading
+                      : experimentalGroupActionLoading ||
+                        selectedExperimentalGroupSlot.is_full ||
+                        !experimentalGroupCanOpenModal;
+                    return (
                   <button
                     type="button"
-                    disabled={
-                      experimentalGroupActionLoading ||
-                      selectedExperimentalGroupSlot.is_full ||
-                      !experimentalGroupCanOpenModal
+                    disabled={actionDisabled}
+                    onClick={() =>
+                      isCurrentLeadAssigned
+                        ? void handleRemoveLeadFromExperimentalGroup(
+                            selectedExperimentalGroupSlot,
+                            experimentalGroupLead?.id ?? "",
+                          )
+                        : void handleConfirmSelectedExperimentalGroup(selectedExperimentalGroupSlot)
                     }
-                    onClick={() => void handleConfirmSelectedExperimentalGroup(selectedExperimentalGroupSlot)}
                     className="inline-flex min-h-[42px] items-center justify-center gap-2 rounded-xl bg-[#ea580c] px-4 text-[13px] font-semibold !text-white disabled:cursor-not-allowed disabled:opacity-60"
                   >
-                    {experimentalGroupActionLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
-                    Confirmar turma
+                    {experimentalGroupActionLoading ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : isCurrentLeadAssigned ? (
+                      <X className="h-4 w-4" />
+                    ) : (
+                      <Check className="h-4 w-4" />
+                    )}
+                    {isCurrentLeadAssigned ? "Sair da turma" : "Confirmar turma"}
                   </button>
+                    );
+                  })()}
                 </div>
               ) : null}
             </>

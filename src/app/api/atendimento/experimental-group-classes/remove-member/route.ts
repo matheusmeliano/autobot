@@ -57,11 +57,18 @@ export async function POST(req: Request) {
         .from("atendimento_leads")
         .update({
           recurring_class_group_pair_id: null,
-          recurring_class_group_status: "removed",
+          recurring_class_group_status: null,
           recurring_class_weekday: null,
           recurring_class_weekday_label: null,
+          recurring_class_professor_name: null,
+          recurring_class_professor_phone: null,
           recurring_class_professor_time: null,
           recurring_class_lead_time: null,
+          recurring_class_professor_timezone: null,
+          recurring_class_lead_timezone: null,
+          recurring_class_first_class_at: null,
+          recurring_class_student_start_notification_sent_at: null,
+          recurring_class_attendant_start_notification_sent_at: null,
           updated_at: nowIso,
         })
         .eq("id", parsed.data.lead_id);
@@ -147,8 +154,27 @@ export async function POST(req: Request) {
     await admin
       .from("atendimento_leads")
       .update({
+        status: "aguardando_aula_experimental",
+        funnel_stage: "aula_experimental_antecipada",
+        experimental_class_mode_preference: null,
+        experimental_class_group_interest: false,
+        experimental_class_group_interest_at: null,
         experimental_class_group_class_id: null,
-        experimental_class_group_status: "interested",
+        experimental_class_group_status: null,
+        experimental_class_status: null,
+        experimental_class_professor_date: null,
+        experimental_class_professor_time: null,
+        experimental_class_professor_start_at: null,
+        experimental_class_lead_date: null,
+        experimental_class_lead_time: null,
+        experimental_class_lead_start_at: null,
+        experimental_class_professor_name: null,
+        experimental_class_professor_phone: null,
+        experimental_class_booking_id: null,
+        experimental_class_link: null,
+        experimental_class_student_notification_sent_at: null,
+        experimental_class_attendant_notification_sent_at: null,
+        experimental_class_registered_attendant_notification_sent_at: null,
         updated_at: nowIso,
       })
       .eq("id", parsed.data.lead_id);
