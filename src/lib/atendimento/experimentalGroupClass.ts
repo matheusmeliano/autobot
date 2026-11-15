@@ -16,10 +16,14 @@ export type ExperimentalGroupWeekdayKey =
   | "sat"
   | "sun";
 
+export type ExperimentalGroupSlotType = "experimental" | "recorrente";
+
 export type ExperimentalGroupConfiguredSlot = {
   enabled: boolean;
   weekday: ExperimentalGroupWeekdayKey | null;
   professor_time: string | null;
+  slot_type: ExperimentalGroupSlotType;
+  pair_id: string;
 };
 
 export type ExperimentalGroupClassSettings = {
@@ -99,16 +103,34 @@ const WEEKDAY_LABELS_PT_BR: Record<ExperimentalGroupWeekdayKey, string> = {
   sun: "Domingo",
 };
 
+const VALID_SLOT_TYPES: ExperimentalGroupSlotType[] = ["experimental", "recorrente"];
+
+function buildDefaultExperimentalGroupPair(pairNumber: number): ExperimentalGroupConfiguredSlot[] {
+  const pairId = `pair-${pairNumber}`;
+  return [
+    {
+      enabled: false,
+      weekday: null,
+      professor_time: null,
+      slot_type: "experimental",
+      pair_id: pairId,
+    },
+    {
+      enabled: false,
+      weekday: null,
+      professor_time: null,
+      slot_type: "recorrente",
+      pair_id: pairId,
+    },
+  ];
+}
+
 export function getDefaultExperimentalGroupClassSettings(): ExperimentalGroupClassSettings {
   return {
     enabled: false,
     professor_timezone: ATENDIMENTO_PROFESSOR_TIME_ZONE,
     capacity: 4,
-    slots: Array.from({ length: 4 }, () => ({
-      enabled: false,
-      weekday: null,
-      professor_time: null,
-    })),
+    slots: [...buildDefaultExperimentalGroupPair(1), ...buildDefaultExperimentalGroupPair(2)],
   };
 }
 
@@ -131,6 +153,13 @@ function normalizeWeekday(value: unknown): ExperimentalGroupWeekdayKey | null {
     : null;
 }
 
+function normalizeSlotType(value: unknown): ExperimentalGroupSlotType | null {
+  const normalized = String(value ?? "").trim().toLowerCase();
+  return VALID_SLOT_TYPES.includes(normalized as ExperimentalGroupSlotType)
+    ? (normalized as ExperimentalGroupSlotType)
+    : null;
+}
+
 export function normalizeExperimentalGroupClassSettings(
   raw: unknown,
 ): ExperimentalGroupClassSettings {
@@ -139,15 +168,21 @@ export function normalizeExperimentalGroupClassSettings(
   const value = raw as Record<string, unknown>;
 
   const rawSlots = Array.isArray(value.slots) ? value.slots : [];
-  const normalizedSlots: ExperimentalGroupConfiguredSlot[] = [];
-  for (const slot of rawSlots.slice(0, 4)) {
+  const parsedSlots: ExperimentalGroupConfiguredSlot[] = [];
+  for (const [index, slot] of rawSlots.slice(0, 40).entries()) {
     if (!slot || typeof slot !== "object") continue;
     const slotValue = slot as Record<string, unknown>;
     const weekday = normalizeWeekday((slot as Record<string, unknown>).weekday);
     const professorTime = normalizeTimeLabel(
       (slot as Record<string, unknown>).professor_time,
     );
-    normalizedSlots.push({
+    const inferredPairNumber = Math.floor(index / 2) + 1;
+    const pairId =
+      String(slotValue.pair_id ?? "").trim() || `pair-${inferredPairNumber}`;
+    const slotType =
+      normalizeSlotType(slotValue.slot_type) ??
+      (index % 2 === 0 ? "experimental" : "recorrente");
+    parsedSlots.push({
       enabled:
         slotValue.enabled === true ||
         slotValue.enabled === "true" ||
@@ -155,19 +190,73 @@ export function normalizeExperimentalGroupClassSettings(
         slotValue.enabled === "1",
       weekday,
       professor_time: professorTime,
+      slot_type: slotType,
+      pair_id: pairId,
+    });
+  }
+
+  const slotsByPair = new Map<string, ExperimentalGroupConfiguredSlot[]>();
+  for (const slot of parsedSlots) {
+    const list = slotsByPair.get(slot.pair_id) ?? [];
+    list.push(slot);
+    slotsByPair.set(slot.pair_id, list);
+  }
+
+  const normalizedSlots: ExperimentalGroupConfiguredSlot[] = [];
+  const pairIds =
+    slotsByPair.size > 0
+      ? Array.from(slotsByPair.keys()).sort((a, b) => {
+          const aMatch = a.match(/(\d+)/);
+          const bMatch = b.match(/(\d+)/);
+          const aNumber = Number(aMatch?.[1] ?? Number.NaN);
+          const bNumber = Number(bMatch?.[1] ?? Number.NaN);
+          if (Number.isFinite(aNumber) && Number.isFinite(bNumber) && aNumber !== bNumber) {
+            return aNumber - bNumber;
+          }
+          return a.localeCompare(b);
+        })
+      : ["pair-1", "pair-2"];
+
+  for (const [pairIndex, pairId] of pairIds.entries()) {
+    const pairSlots = slotsByPair.get(pairId) ?? [];
+    const experimentalSlot =
+      pairSlots.find((slot) => slot.slot_type === "experimental") ?? null;
+    const recurringSlot =
+      pairSlots.find((slot) => slot.slot_type === "recorrente") ?? null;
+    const fallbackWeekday =
+      experimentalSlot?.weekday ?? recurringSlot?.weekday ?? null;
+    const fallbackProfessorTime =
+      experimentalSlot?.professor_time ?? recurringSlot?.professor_time ?? null;
+    const fallbackEnabled = Boolean(
+      experimentalSlot?.enabled ?? recurringSlot?.enabled ?? false,
+    );
+    const canonicalPairId = String(pairId ?? "").trim() || `pair-${pairIndex + 1}`;
+    normalizedSlots.push({
+      enabled: Boolean(experimentalSlot?.enabled ?? fallbackEnabled),
+      weekday: experimentalSlot?.weekday ?? fallbackWeekday,
+      professor_time: experimentalSlot?.professor_time ?? fallbackProfessorTime,
+      slot_type: "experimental",
+      pair_id: canonicalPairId,
+    });
+    normalizedSlots.push({
+      enabled: Boolean(recurringSlot?.enabled ?? fallbackEnabled),
+      weekday: recurringSlot?.weekday ?? fallbackWeekday,
+      professor_time: recurringSlot?.professor_time ?? fallbackProfessorTime,
+      slot_type: "recorrente",
+      pair_id: canonicalPairId,
     });
   }
 
   while (normalizedSlots.length < 4) {
-    normalizedSlots.push({
-      enabled: false,
-      weekday: null,
-      professor_time: null,
-    });
+    normalizedSlots.push(...buildDefaultExperimentalGroupPair(normalizedSlots.length / 2 + 1));
   }
 
   const hasAnyEnabledConfiguredSlot = normalizedSlots.some(
-    (slot) => slot.enabled && slot.weekday && slot.professor_time,
+    (slot) =>
+      slot.slot_type === "experimental" &&
+      slot.enabled &&
+      slot.weekday &&
+      slot.professor_time,
   );
 
   return {
@@ -361,7 +450,12 @@ export function listExperimentalGroupClassSlots(params: {
     const weekday = weekdayInTimeZone(candidateDate, professorTimeZone);
 
     for (const configuredSlot of settings.slots) {
-      if (!configuredSlot.enabled || !configuredSlot.weekday || !configuredSlot.professor_time) {
+      if (
+        configuredSlot.slot_type !== "experimental" ||
+        !configuredSlot.enabled ||
+        !configuredSlot.weekday ||
+        !configuredSlot.professor_time
+      ) {
         continue;
       }
       if (configuredSlot.weekday !== weekday) continue;

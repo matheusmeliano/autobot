@@ -18,6 +18,7 @@ import { ATENDIMENTO_PROFESSOR_TIME_ZONE } from "@/lib/atendimento/constants";
 import { listExperimentalClassAvailability } from "@/lib/atendimento/experimentalClass";
 
 const weekdaySchema = z.enum(["mon", "tue", "wed", "thu", "fri", "sat", "sun"]);
+const slotTypeSchema = z.enum(["experimental", "recorrente"]);
 
 const schema = z.object({
   slots: z
@@ -31,9 +32,11 @@ const schema = z.object({
           .regex(/^\d{2}:\d{2}$/)
           .nullable()
           .optional(),
+        slot_type: slotTypeSchema.optional(),
+        pair_id: z.string().trim().min(1).optional(),
       }),
     )
-    .length(4),
+    .min(2),
 });
 
 function buildWeekdayOptions() {
@@ -165,10 +168,19 @@ export async function PATCH(req: Request) {
     if (!parsed.success) {
       return Response.json({ ok: false, error: "invalid_payload" }, { status: 400 });
     }
+    if (parsed.data.slots.length % 2 !== 0) {
+      return Response.json({ ok: false, error: "invalid_slot_pairs" }, { status: 400 });
+    }
 
     const settings = normalizeExperimentalGroupClassSettings(parsed.data);
     const activeCombinations = settings.slots
-      .filter((slot) => slot.enabled && slot.weekday && slot.professor_time)
+      .filter(
+        (slot) =>
+          slot.slot_type === "experimental" &&
+          slot.enabled &&
+          slot.weekday &&
+          slot.professor_time,
+      )
       .map((slot) => `${slot.weekday}-${slot.professor_time}`);
     if (new Set(activeCombinations).size !== activeCombinations.length) {
       return Response.json(

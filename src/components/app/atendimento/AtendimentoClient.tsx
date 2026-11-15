@@ -39,13 +39,23 @@ type ExperimentalGroupSettingsPayload = {
   enabled: boolean;
   professor_timezone?: string | null;
   capacity?: number;
-  slots: Array<{ enabled?: boolean; weekday?: string | null; professor_time?: string | null }>;
+  slots: Array<{
+    enabled?: boolean;
+    weekday?: string | null;
+    professor_time?: string | null;
+    slot_type?: "experimental" | "recorrente";
+    pair_id?: string | null;
+  }>;
 };
+
+type ExperimentalGroupSlotType = "experimental" | "recorrente";
 
 type ExperimentalGroupFormSlot = {
   enabled: boolean;
   weekday: string;
   professor_time: string;
+  slotType: ExperimentalGroupSlotType;
+  pairId: string;
 };
 
 type ExperimentalAvailabilityDateOption = {
@@ -119,6 +129,30 @@ const EXPERIMENTAL_GROUP_WEEKDAY_SHORT_LABELS: Record<string, string> = {
   sat: "Sáb",
   sun: "Dom",
 };
+
+function buildExperimentalGroupFormPair(pairNumber: number): ExperimentalGroupFormSlot[] {
+  const pairId = `pair-${pairNumber}`;
+  return [
+    {
+      enabled: false,
+      weekday: "",
+      professor_time: "",
+      slotType: "experimental",
+      pairId,
+    },
+    {
+      enabled: false,
+      weekday: "",
+      professor_time: "",
+      slotType: "recorrente",
+      pairId,
+    },
+  ];
+}
+
+function createDefaultExperimentalGroupFormSlots() {
+  return [...buildExperimentalGroupFormPair(1), ...buildExperimentalGroupFormPair(2)];
+}
 
 function weekdayKeyFromDateInTimeZone(date: Date, timeZone: string): string {
   const raw = new Intl.DateTimeFormat("en-US", {
@@ -1692,15 +1726,9 @@ export function AtendimentoClient() {
     useState<ExperimentalAvailabilityPayload | null>(null);
   const [experimentalGroupFormSlots, setExperimentalGroupFormSlots] = useState<
     ExperimentalGroupFormSlot[]
-  >(
-    Array.from({ length: 4 }, () => ({
-      enabled: false,
-      weekday: "",
-      professor_time: "",
-    })),
-  );
+  >(createDefaultExperimentalGroupFormSlots);
   const [experimentalGroupFormDateIds, setExperimentalGroupFormDateIds] = useState<string[]>(
-    Array.from({ length: 4 }, () => ""),
+    createDefaultExperimentalGroupFormSlots().map(() => ""),
   );
   const [editLeadOpen, setEditLeadOpen] = useState(false);
   const [editLeadName, setEditLeadName] = useState("");
@@ -2058,6 +2086,67 @@ export function AtendimentoClient() {
       (slot) => slot.available_seats > 0 || slot.is_current_lead_assigned,
     );
   }, [experimentalGroupSlots]);
+
+  const experimentalGroupFormPairs = useMemo<
+    Array<{
+      pairId: string;
+      pairNumber: number;
+      experimentalIndex: number;
+      recurringIndex: number;
+      experimentalSlot: ExperimentalGroupFormSlot;
+      recurringSlot: ExperimentalGroupFormSlot;
+    }>
+  >(() => {
+    const pairMap = new Map<
+      string,
+      {
+        pairId: string;
+        experimentalIndex: number;
+        recurringIndex: number;
+        experimentalSlot: ExperimentalGroupFormSlot | null;
+        recurringSlot: ExperimentalGroupFormSlot | null;
+      }
+    >();
+
+    experimentalGroupFormSlots.forEach((slot, index) => {
+      const pairId = String(slot.pairId ?? "").trim() || `pair-${Math.floor(index / 2) + 1}`;
+      const current =
+        pairMap.get(pairId) ?? {
+          pairId,
+          experimentalIndex: -1,
+          recurringIndex: -1,
+          experimentalSlot: null,
+          recurringSlot: null,
+        };
+      if (slot.slotType === "experimental") {
+        current.experimentalIndex = index;
+        current.experimentalSlot = slot;
+      } else {
+        current.recurringIndex = index;
+        current.recurringSlot = slot;
+      }
+      pairMap.set(pairId, current);
+    });
+
+    return Array.from(pairMap.values())
+      .filter((pair) => pair.experimentalSlot && pair.recurringSlot)
+      .sort((a, b) => {
+        const aNumber = Number(String(a.pairId).match(/(\d+)/)?.[1] ?? Number.NaN);
+        const bNumber = Number(String(b.pairId).match(/(\d+)/)?.[1] ?? Number.NaN);
+        if (Number.isFinite(aNumber) && Number.isFinite(bNumber) && aNumber !== bNumber) {
+          return aNumber - bNumber;
+        }
+        return a.pairId.localeCompare(b.pairId);
+      })
+      .map((pair, index) => ({
+        pairId: pair.pairId,
+        pairNumber: index + 1,
+        experimentalIndex: pair.experimentalIndex,
+        recurringIndex: pair.recurringIndex,
+        experimentalSlot: pair.experimentalSlot as ExperimentalGroupFormSlot,
+        recurringSlot: pair.recurringSlot as ExperimentalGroupFormSlot,
+      }));
+  }, [experimentalGroupFormSlots]);
 
   const experimentalGroupDateOptions = useMemo<
     Array<{
@@ -3693,14 +3782,20 @@ export function AtendimentoClient() {
       Array.isArray(json?.weekday_options) ? (json.weekday_options as Array<{ value: string; label: string }>) : [],
     );
     const rawSlots = Array.isArray(settings?.slots) ? settings!.slots : [];
-    const normalizedSlots: ExperimentalGroupFormSlot[] = Array.from({ length: 4 }, (_, index) => {
-      const slot = rawSlots[index];
-      return {
-        enabled: Boolean(slot?.enabled),
-        weekday: String(slot?.weekday ?? "").trim(),
-        professor_time: String(slot?.professor_time ?? "").trim(),
-      };
-    });
+    const normalizedSlots: ExperimentalGroupFormSlot[] =
+      rawSlots.length > 0
+        ? rawSlots.map((slot, index) => ({
+            enabled: Boolean(slot?.enabled),
+            weekday: String(slot?.weekday ?? "").trim(),
+            professor_time: String(slot?.professor_time ?? "").trim(),
+            slotType:
+              String(slot?.slot_type ?? "").trim().toLowerCase() === "recorrente"
+                ? "recorrente"
+                : "experimental",
+            pairId:
+              String(slot?.pair_id ?? "").trim() || `pair-${Math.floor(index / 2) + 1}`,
+          }))
+        : createDefaultExperimentalGroupFormSlots();
     setExperimentalGroupFormSlots(normalizedSlots);
     setExperimentalGroupFormDateIds(
       normalizedSlots.map((slot) => resolveExperimentalAvailabilityDateIdForGroupSlot(availability, slot)),
@@ -3738,7 +3833,9 @@ export function AtendimentoClient() {
 
   async function handleSaveExperimentalGroupSettings() {
     if (experimentalGroupSettingsSaving) return;
-    const enabledSlots = experimentalGroupFormSlots.filter((slot) => slot.enabled);
+    const enabledSlots = experimentalGroupFormSlots.filter(
+      (slot) => slot.slotType === "experimental" && slot.enabled,
+    );
     if (
       enabledSlots.some((slot) => !slot.weekday || !slot.professor_time)
     ) {
@@ -3760,6 +3857,8 @@ export function AtendimentoClient() {
             enabled: slot.enabled,
             weekday: slot.weekday || null,
             professor_time: slot.professor_time || null,
+            slot_type: slot.slotType,
+            pair_id: slot.pairId,
           })),
         }),
       });
@@ -3782,16 +3881,22 @@ export function AtendimentoClient() {
   function updateExperimentalGroupFormSlot(
     index: number,
     patch: Partial<ExperimentalGroupFormSlot>,
+    options?: { syncPair?: boolean },
   ) {
     setExperimentalGroupFormSlots((prev) =>
-      prev.map((slot, slotIndex) =>
-        slotIndex === index
+      prev.map((slot, slotIndex) => {
+        const shouldUpdateSelf = slotIndex === index;
+        const shouldUpdatePair =
+          Boolean(options?.syncPair) &&
+          slotIndex !== index &&
+          slot.pairId === prev[index]?.pairId;
+        return shouldUpdateSelf || shouldUpdatePair
           ? {
               ...slot,
               ...patch,
             }
-          : slot,
-      ),
+          : slot;
+      }),
     );
   }
 
@@ -3805,12 +3910,18 @@ export function AtendimentoClient() {
       experimentalGroupAvailability,
       normalizedDateId,
     );
+    const targetPairId = String(experimentalGroupFormSlots[index]?.pairId ?? "").trim();
     setExperimentalGroupFormDateIds((prev) =>
-      prev.map((value, slotIndex) => (slotIndex === index ? normalizedDateId : value)),
+      prev.map((value, slotIndex) =>
+        slotIndex === index ||
+        (targetPairId && experimentalGroupFormSlots[slotIndex]?.pairId === targetPairId)
+          ? normalizedDateId
+          : value,
+      ),
     );
     setExperimentalGroupFormSlots((prev) =>
       prev.map((slot, slotIndex) => {
-        if (slotIndex !== index) return slot;
+        if (slotIndex !== index && slot.pairId !== targetPairId) return slot;
         const hasCurrentTime = selectedSlots.some(
           (timeOption) => timeOption.professorTime === slot.professor_time,
         );
@@ -3821,6 +3932,17 @@ export function AtendimentoClient() {
         };
       }),
     );
+  }
+
+  function handleOpenExperimentalGroupPairs() {
+    setExperimentalGroupFormSlots((prev) => {
+      const pairCount = Math.max(
+        0,
+        new Set(prev.map((slot) => String(slot.pairId ?? "").trim()).filter(Boolean)).size,
+      );
+      return [...prev, ...buildExperimentalGroupFormPair(pairCount + 1)];
+    });
+    setExperimentalGroupFormDateIds((prev) => [...prev, "", ""]);
   }
 
   async function loadExperimentalGroupLeadData(lead: AtendimentoLeadListItem) {
@@ -9568,9 +9690,22 @@ export function AtendimentoClient() {
           </div>
 
           <div className="mt-5 space-y-4">
-            {experimentalGroupFormSlots.map((card, index) => (
+            <div className="flex justify-end">
+              <button
+                type="button"
+                onClick={handleOpenExperimentalGroupPairs}
+                className="inline-flex min-h-[42px] items-center justify-center gap-2 rounded-xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] px-4 text-[13px] font-semibold text-[var(--app-text-85)] transition hover:bg-[var(--app-hover)] disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                <Plus className="h-4 w-4" />
+                Abrir Turmas
+              </button>
+            </div>
+
+            {experimentalGroupFormPairs.map((pair) => (
               (() => {
                 const dateOptions = experimentalGroupAvailability?.dates ?? [];
+                const card = pair.experimentalSlot;
+                const index = pair.experimentalIndex;
                 const selectedDateId =
                   String(experimentalGroupFormDateIds[index] ?? "").trim() ||
                   resolveExperimentalAvailabilityDateIdForGroupSlot(
@@ -9584,7 +9719,7 @@ export function AtendimentoClient() {
 
                 return (
                   <div
-                    key={`group-slot-${index}`}
+                    key={`group-pair-${pair.pairId}`}
                     className={[
                       "rounded-2xl border p-4 transition",
                       card.enabled
@@ -9596,7 +9731,25 @@ export function AtendimentoClient() {
                       <div className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-2">
                         <div className="min-w-0">
                           <div className="text-[14px] font-bold text-[var(--app-text-85)]">
-                            {`Turma ${index + 1}`}
+                            {`Par ${pair.pairNumber}`}
+                          </div>
+                          <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
+                            <div className="rounded-xl border border-[var(--app-border)] bg-[var(--app-solid-surface-2)] px-3 py-3">
+                              <div className="text-[13px] font-bold text-[var(--app-text-85)]">
+                                {`Turma ${pair.experimentalIndex + 1}`}
+                              </div>
+                              <div className="mt-2 inline-flex items-center rounded-full border border-[#ea580c]/25 bg-[rgba(234,88,12,0.10)] px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.12em] text-[#9a3412]">
+                                Experimental
+                              </div>
+                            </div>
+                            <div className="rounded-xl border border-[var(--app-border)] bg-[var(--app-solid-surface-2)] px-3 py-3">
+                              <div className="text-[13px] font-bold text-[var(--app-text-85)]">
+                                {`Turma ${pair.recurringIndex + 1}`}
+                              </div>
+                              <div className="mt-2 inline-flex items-center rounded-full border border-[#2563eb]/25 bg-[rgba(37,99,235,0.10)] px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.12em] text-[#1d4ed8]">
+                                Recorrente
+                              </div>
+                            </div>
                           </div>
                         </div>
                         <div className="flex items-start justify-end gap-2 self-start justify-self-end">
@@ -9610,9 +9763,13 @@ export function AtendimentoClient() {
                             role="switch"
                             aria-checked={card.enabled}
                             onClick={() =>
-                              updateExperimentalGroupFormSlot(index, {
-                                enabled: !card.enabled,
-                              })
+                              updateExperimentalGroupFormSlot(
+                                index,
+                                {
+                                  enabled: !card.enabled,
+                                },
+                                { syncPair: true },
+                              )
                             }
                             className="inline-flex shrink-0 items-center justify-center bg-transparent p-0 transition"
                           >
@@ -9734,14 +9891,18 @@ export function AtendimentoClient() {
                                   type="button"
                                   disabled={!card.enabled}
                                   onClick={() =>
-                                    updateExperimentalGroupFormSlot(index, {
-                                      weekday:
-                                        getExperimentalAvailabilityWeekdayForDate(
-                                          experimentalGroupAvailability,
-                                          selectedDateId,
-                                        ) || card.weekday,
-                                      professor_time: timeOption.professorTime,
-                                    })
+                                    updateExperimentalGroupFormSlot(
+                                      index,
+                                      {
+                                        weekday:
+                                          getExperimentalAvailabilityWeekdayForDate(
+                                            experimentalGroupAvailability,
+                                            selectedDateId,
+                                          ) || card.weekday,
+                                        professor_time: timeOption.professorTime,
+                                      },
+                                      { syncPair: true },
+                                    )
                                   }
                                   className={[
                                     "flex h-11 items-center justify-center rounded-2xl border px-2 text-[14px] font-semibold transition duration-150 disabled:cursor-not-allowed disabled:opacity-60 sm:h-12 sm:text-[15px]",
