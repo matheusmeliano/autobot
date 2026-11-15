@@ -1811,8 +1811,6 @@ export function AtendimentoClient() {
     ExperimentalGroupSlotPayload[]
   >([]);
   const [experimentalGroupCanOpenModal, setExperimentalGroupCanOpenModal] = useState(false);
-  const [experimentalGroupAssignProfDropdownOpen, setExperimentalGroupAssignProfDropdownOpen] =
-    useState(false);
   const [experimentalGroupSettingsAssignProfPairId, setExperimentalGroupSettingsAssignProfPairId] =
     useState("");
   const [experimentalGroupAssignedProfessor, setExperimentalGroupAssignedProfessor] = useState<{
@@ -2128,17 +2126,6 @@ export function AtendimentoClient() {
     );
   }, [experimentalGroupSelectedSlotId, experimentalGroupSlots]);
 
-  const experimentalGroupLeadSlotType = useMemo<"experimental" | "recorrente">(
-    () => (isLeadMatriculaConcluida(experimentalGroupLead as AtendimentoLeadListItem) ? "recorrente" : "experimental"),
-    [experimentalGroupLead],
-  );
-
-  function isExperimentalGroupProfessorAssigning() {
-    return experimentalGroupLeadSlotType === "recorrente"
-      ? recAssigningProfessor
-      : expAssigningProfessor;
-  }
-
   const experimentalGroupVisibleSlots = useMemo<ExperimentalGroupSlotPayload[]>(() => {
     return experimentalGroupSlots.filter(
       (slot) => slot.available_seats > 0 || slot.is_current_lead_assigned,
@@ -2146,7 +2133,6 @@ export function AtendimentoClient() {
   }, [experimentalGroupSlots]);
 
   useEffect(() => {
-    setExperimentalGroupAssignProfDropdownOpen(false);
     setExperimentalGroupSettingsAssignProfPairId("");
   }, [experimentalGroupLead?.id, isExperimentalGroupModalOpen]);
 
@@ -2302,6 +2288,34 @@ export function AtendimentoClient() {
       return dateId === experimentalGroupSelectedDateId;
     });
   }, [experimentalGroupSelectedDateId, experimentalGroupVisibleSlots]);
+
+  const experimentalGroupDisplayProfessor = useMemo<{ name: string; phone: string } | null>(() => {
+    const sourceSlots =
+      selectedExperimentalGroupSlot
+        ? [selectedExperimentalGroupSlot]
+        : experimentalGroupSelectedDateSlots.length > 0
+          ? experimentalGroupSelectedDateSlots
+          : experimentalGroupVisibleSlots;
+    const uniqueProfessors = Array.from(
+      new Map(
+        sourceSlots
+          .map((slot) => {
+            const name = String(slot.professor_name ?? "").trim();
+            const phone = String(slot.professor_phone ?? "").trim();
+            if (!name && !phone) return null;
+            return [`${phone}::${name}`, { name, phone }] as const;
+          })
+          .filter(Boolean) as Array<readonly [string, { name: string; phone: string }]>,
+      ).values(),
+    );
+    if (uniqueProfessors.length === 1) return uniqueProfessors[0] ?? null;
+    return experimentalGroupAssignedProfessor;
+  }, [
+    experimentalGroupAssignedProfessor,
+    experimentalGroupSelectedDateSlots,
+    experimentalGroupVisibleSlots,
+    selectedExperimentalGroupSlot,
+  ]);
 
   const bookingLocationOk = useMemo<boolean>(() => {
     if (!selectedLead) return false;
@@ -4125,19 +4139,6 @@ export function AtendimentoClient() {
     }
   }
 
-  async function handleAssignProfessorFromExperimentalGroupModal(
-    lead: AtendimentoLeadListItem,
-    prof: { name: string; phone: string },
-  ) {
-    if (isExperimentalGroupProfessorAssigning()) return;
-    if (experimentalGroupLeadSlotType === "recorrente") {
-      await handleAssignProfessorRecurring(lead, prof);
-    } else {
-      await handleAssignProfessorExperimental(lead, prof);
-    }
-    await loadExperimentalGroupLeadData(lead);
-  }
-
   async function handleOpenExperimentalGroupModal(lead: AtendimentoLeadListItem) {
     if (
       !isLeadAssignedToAnyGroup(lead) &&
@@ -4170,12 +4171,16 @@ export function AtendimentoClient() {
     const isMissingProfessor =
       result.reasons.includes("missing_assigned_professor") ||
       result.reasons.includes("missing_assigned_recurring_professor");
+    if (isMissingProfessor) {
+      modalToast.warning("Defina o professor da turma no modal Aulas em Grupo antes de atribuir o registro.");
+      return;
+    }
 
-    if (!result.slots.length && !isMissingProfessor) {
+    if (!result.slots.length) {
       modalToast.warning("Não tem nenhuma turma aberta no momento.");
       return;
     }
-    if (!hasOpenSlots && !isMissingProfessor) {
+    if (!hasOpenSlots) {
       modalToast.warning("Todas as turmas estão cheias.");
       return;
     }
@@ -10250,9 +10255,7 @@ export function AtendimentoClient() {
               <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
                 {experimentalGroupVisibleSlots.length === 0 ? (
                   <div className="rounded-2xl border border-[var(--app-border)] bg-[var(--app-solid-surface-2)] px-4 py-6 text-[13px] text-[var(--app-text-55)]">
-                    {experimentalGroupAssignedProfessor?.name
-                      ? "Nenhuma turma disponível para o professor configurado neste momento."
-                      : "Selecione primeiro o professor da turma para ver os dias e horários disponíveis."}
+                    Nenhuma turma disponível no momento.
                   </div>
                 ) : (
                   <div className="space-y-4 lg:col-span-2">
@@ -10319,83 +10322,25 @@ export function AtendimentoClient() {
                       <label className="text-xs font-semibold text-[var(--app-text-70)]">
                         Professor da turma
                       </label>
-                      <div className="relative">
-                        <button
-                          type="button"
-                          onClick={() => setExperimentalGroupAssignProfDropdownOpen((value) => !value)}
-                          onBlur={() => {
-                            setTimeout(() => setExperimentalGroupAssignProfDropdownOpen(false), 180);
-                          }}
-                          disabled={isExperimentalGroupProfessorAssigning() || !experimentalGroupLead}
-                          className="inline-flex min-h-[44px] w-full items-center justify-between gap-3 rounded-2xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] px-4 text-left text-[13px] font-semibold text-[var(--app-text-85)] transition hover:bg-[var(--app-hover)] disabled:cursor-not-allowed disabled:opacity-55"
-                          title={
-                            experimentalGroupAssignedProfessor?.name
-                              ? `Professor vinculado: ${experimentalGroupAssignedProfessor.name}`
-                              : "Selecionar professor que dará a aula para a turma."
-                          }
-                        >
-                          <span className="flex min-w-0 items-center gap-2">
-                            {isExperimentalGroupProfessorAssigning() ? (
-                              <Loader2 className="h-4 w-4 shrink-0 animate-spin text-[var(--app-text-65)]" />
-                            ) : (
-                              <CheckCircle2 className="h-4 w-4 shrink-0 text-[var(--app-text-65)]" />
-                            )}
-                            <span className="min-w-0 truncate">
-                              {experimentalGroupAssignedProfessor?.name
-                                ? `${experimentalGroupAssignedProfessor.name}`
-                                : "Selecionar professor"}
-                            </span>
+                      <div
+                        className="inline-flex min-h-[44px] w-full items-center justify-between gap-3 rounded-2xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] px-4 text-left text-[13px] font-semibold text-[var(--app-text-85)]"
+                        title={
+                          experimentalGroupDisplayProfessor?.name
+                            ? `Professor vinculado: ${experimentalGroupDisplayProfessor.name}`
+                            : "O professor será definido pela turma selecionada."
+                        }
+                      >
+                        <span className="flex min-w-0 items-center gap-2">
+                          <CheckCircle2 className="h-4 w-4 shrink-0 text-[var(--app-text-65)]" />
+                          <span className="min-w-0 truncate">
+                            {experimentalGroupDisplayProfessor?.name || "Professor definido pela turma"}
                           </span>
-                          <ChevronDown className="h-4 w-4 shrink-0 text-[var(--app-text-65)]" />
-                        </button>
-                        {experimentalGroupAssignProfDropdownOpen ? (
-                          <div className="absolute left-0 top-full z-[380] mt-2 flex w-full flex-col gap-1 overflow-hidden rounded-2xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] p-1.5 shadow-lg">
-                            {EXPERIMENTAL_PROFESSOR_OPTIONS_CLIENT.map((opt) => {
-                              const isActive =
-                                experimentalGroupAssignedProfessor?.phone === opt.phone &&
-                                experimentalGroupAssignedProfessor?.name === opt.name;
-                              return (
-                                <button
-                                  key={`experimental-group-prof-${opt.phone}`}
-                                  type="button"
-                                  disabled={isExperimentalGroupProfessorAssigning() || !experimentalGroupLead}
-                                  onClick={() => {
-                                    if (!experimentalGroupLead) return;
-                                    setExperimentalGroupAssignProfDropdownOpen(false);
-                                    void handleAssignProfessorFromExperimentalGroupModal(
-                                      experimentalGroupLead,
-                                      { name: opt.name, phone: opt.phone },
-                                    );
-                                  }}
-                                  className={[
-                                    "flex w-full items-center justify-between gap-3 rounded-xl px-3.5 py-3 text-left transition",
-                                    isActive
-                                      ? "border border-emerald-500/30 bg-emerald-500/10"
-                                      : "border border-transparent hover:bg-[var(--app-hover)]",
-                                    "disabled:cursor-not-allowed disabled:opacity-55",
-                                  ].join(" ")}
-                                >
-                                  <div className="min-w-0 flex-1">
-                                    <div className="truncate text-[13px] font-semibold text-[var(--app-text-85)]">
-                                      {opt.name}
-                                    </div>
-                                  </div>
-                                  {isActive ? (
-                                    <div className="inline-flex shrink-0 items-center gap-1 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.12em] text-emerald-700">
-                                      <Check className="h-3 w-3 shrink-0" />
-                                      Atual
-                                    </div>
-                                  ) : null}
-                                </button>
-                              );
-                            })}
-                          </div>
-                        ) : null}
+                        </span>
                       </div>
                       <div className="text-[12px] text-[var(--app-text-55)]">
-                        {experimentalGroupAssignedProfessor?.name
-                          ? `${experimentalGroupAssignedProfessor.name} (${experimentalGroupAssignedProfessor.phone})`
-                          : "Selecione o professor que dará a aula para esta turma."}
+                        {experimentalGroupDisplayProfessor?.name
+                          ? `${experimentalGroupDisplayProfessor.name} (${experimentalGroupDisplayProfessor.phone})`
+                          : "As informações do professor seguem o que foi configurado na turma selecionada."}
                       </div>
                     </div>
 
