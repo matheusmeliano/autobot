@@ -7854,7 +7854,7 @@ export function AtendimentoClient() {
                                   </div>
                                 </div>
                                 <div className="flex flex-wrap items-stretch justify-start sm:justify-end gap-2 sm:gap-3 w-full sm:w-auto min-w-0 sm:mt-0 mt-6">
-                                  {expCanShowDisparar ? (
+                                  {!expIsGroupAssigned && expCanShowDisparar ? (
                                     <div className="flex w-full sm:w-auto shrink-0">
                                       <button
                                         type="button"
@@ -7932,6 +7932,7 @@ export function AtendimentoClient() {
                                       {expIsGroupAssigned ? "Gerenciar turma" : "Reagendar"}
                                     </button>
                                   </div>
+                                  {!expIsGroupAssigned ? (
                                   <div className="relative w-full sm:w-auto shrink-0 min-w-0 sm:max-w-[320px]">
                                   <button
                                     type="button"
@@ -8030,6 +8031,8 @@ export function AtendimentoClient() {
                                     </div>
                                   ) : null}
                                 </div>
+                                  ) : null}
+                                  {!expIsGroupAssigned ? (
                                   <button
                                     type="button"
                                     onClick={() => void handleCancelExperimentalBooking(sl)}
@@ -8067,6 +8070,7 @@ export function AtendimentoClient() {
                                       <X className="h-4 w-4 shrink-0" />
                                     )}
                                   </button>
+                                  ) : null}
                                 </div>
                                 <div className="flex sm:hidden absolute top-5 right-5 z-10 items-center gap-2">
                                   {expHasAttendanceStatus ? (
@@ -8099,6 +8103,7 @@ export function AtendimentoClient() {
                                       )}
                                     </button>
                                   ) : null}
+                                  {!expIsGroupAssigned ? (
                                   <button
                                     type="button"
                                     onClick={() => void handleCancelExperimentalBooking(sl)}
@@ -8136,9 +8141,10 @@ export function AtendimentoClient() {
                                       <X className="h-4 w-4 shrink-0" />
                                     )}
                                   </button>
+                                  ) : null}
                                 </div>
                               </div>
-                              {!expAssigned ? (
+                              {!expIsGroupAssigned && !expAssigned ? (
                                 <div className="mt-3 flex sm:hidden min-w-0 items-center gap-2">
                                   <div className="inline-flex shrink-0 items-center gap-1 rounded-full border border-amber-500/30 bg-amber-500/10 px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.12em] text-amber-700">
                                     <AlertTriangle className="h-3 w-3 shrink-0" />
@@ -8173,6 +8179,7 @@ export function AtendimentoClient() {
                                 </div>
                               )}
 
+                              {!expIsGroupAssigned ? (
                               <div className="mt-5">
                                 <div className="flex flex-col items-stretch gap-3 min-[600px]:flex-row min-[600px]:items-end">
                                   <div className="min-w-0 flex-1">
@@ -8214,6 +8221,7 @@ export function AtendimentoClient() {
                                   </button>
                                 </div>
                               </div>
+                              ) : null}
                             </div>
                           );
                         }
@@ -9431,7 +9439,7 @@ export function AtendimentoClient() {
                                 </div>
                               </div>
                               <div className="flex flex-wrap items-stretch justify-start sm:justify-end gap-2 sm:gap-3 w-full sm:w-auto min-w-0 sm:mt-0 mt-6">
-                                {expCanShowDisparar ? (
+                                {!expIsGroupAssigned && expCanShowDisparar ? (
                                   <div className="flex w-full sm:w-auto shrink-0">
                                     <button
                                       type="button"
@@ -9508,6 +9516,7 @@ export function AtendimentoClient() {
                                     {expIsGroupAssigned ? "Gerenciar turma" : "Reagendar"}
                                   </button>
                                 </div>
+                                {!expIsGroupAssigned ? (
                                 <div className="relative w-full sm:w-auto shrink-0 sm:shrink sm:max-w-[320px]">
                                 <button
                                   type="button"
@@ -9614,6 +9623,8 @@ export function AtendimentoClient() {
                                   </div>
                                 ) : null}
                               </div>
+                                ) : null}
+                                {!expIsGroupAssigned ? (
                                 <button
                                   type="button"
                                   onClick={() => void handleCancelExperimentalBooking(sl)}
@@ -9651,6 +9662,7 @@ export function AtendimentoClient() {
                                     <X className="h-4 w-4 shrink-0" />
                                   )}
                                 </button>
+                                ) : null}
                               </div>
                               <div className="flex sm:hidden absolute top-5 right-5 z-10 items-center gap-2">
                                 {expHasAttendanceStatus ? (
@@ -9683,6 +9695,7 @@ export function AtendimentoClient() {
                                     )}
                                   </button>
                                 ) : null}
+                                {!expIsGroupAssigned ? (
                                 <button
                                   type="button"
                                   onClick={() => void handleCancelExperimentalBooking(sl)}
@@ -9720,9 +9733,10 @@ export function AtendimentoClient() {
                                     <X className="h-4 w-4 shrink-0" />
                                   )}
                                 </button>
+                                ) : null}
                               </div>
                             </div>
-                            {!expAssigned ? (
+                            {!expIsGroupAssigned && !expAssigned ? (
                               <div className="mt-3 flex sm:hidden min-w-0 items-center gap-2">
                                 <div className="inline-flex shrink-0 items-center gap-1 rounded-full border border-amber-500/30 bg-amber-500/10 px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.12em] text-amber-700">
                                   <AlertTriangle className="h-3 w-3 shrink-0" />
@@ -9757,6 +9771,7 @@ export function AtendimentoClient() {
                               </div>
                             )}
 
+                            {!expIsGroupAssigned ? (
                             <div className="mt-5">
                               <div className="flex flex-col items-stretch gap-3 min-[600px]:flex-row min-[600px]:items-end">
                                 <div className="min-w-0 flex-1">
@@ -9798,6 +9813,7 @@ export function AtendimentoClient() {
                                 </button>
                               </div>
                             </div>
+                            ) : null}
                           </div>
                         );
                       }
