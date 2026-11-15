@@ -6708,10 +6708,10 @@ export function AtendimentoClient() {
                           {hasGroupAssigned ? (
                             <div
                               aria-hidden="true"
-                              className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] text-[var(--app-text-75)] transition-all"
+                              className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-xl border border-[var(--app-border)]/70 bg-[var(--app-solid-surface)]/80 text-[var(--app-text-60)] transition-all"
                               title="Registro vinculado a uma turma em grupo"
                             >
-                              <Users className="h-5 w-5" />
+                              <Users className="h-4 w-4" />
                             </div>
                           ) : null}
                         </div>
