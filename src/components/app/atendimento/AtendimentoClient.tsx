@@ -9985,83 +9985,6 @@ export function AtendimentoClient() {
                       <div className="space-y-2">
                         <div className="flex items-center gap-3">
                           <label className="text-xs font-semibold text-[var(--app-text-70)]">
-                            Dias disponíveis
-                          </label>
-                        </div>
-                        {!card.professorPhone ? (
-                          <div className="rounded-2xl border border-dashed border-[var(--app-border)] bg-[var(--app-solid-surface-2)] px-4 py-5 text-center text-[12px] font-medium text-[var(--app-text-55)]">
-                            Selecione o professor primeiro.
-                          </div>
-                        ) : !dateOptions.length ? (
-                          <div className="rounded-2xl border border-dashed border-[var(--app-border)] bg-[var(--app-solid-surface-2)] px-4 py-5 text-center text-[12px] font-medium text-[var(--app-text-55)]">
-                            Nao ha dias disponiveis no momento.
-                          </div>
-                        ) : (
-                          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-                            {dateOptions.map((dateOption) => {
-                              const dateSlots = getExperimentalAvailabilitySlotsForDate(
-                                pairAvailability,
-                                dateOption.id,
-                              );
-                              const weekdayKey = getExperimentalAvailabilityWeekdayForDate(
-                                pairAvailability,
-                                dateOption.id,
-                              );
-                              const shortLabel =
-                                EXPERIMENTAL_GROUP_WEEKDAY_SHORT_LABELS[weekdayKey] ?? weekdayKey;
-                              const isSelected = selectedDateId === dateOption.id;
-                              return (
-                                <button
-                                  key={`group-slot-${index}-${dateOption.id}`}
-                                  type="button"
-                                  disabled={!card.enabled || !card.professorPhone}
-                                  onClick={() =>
-                                    updateExperimentalGroupFormDateSelection(index, dateOption.id)
-                                  }
-                                  className={[
-                                    "flex min-h-[76px] flex-col items-center justify-center gap-1 rounded-2xl border px-2 py-2 text-center transition duration-150 disabled:cursor-not-allowed disabled:opacity-60",
-                                    isSelected
-                                      ? "!border-transparent !bg-[#ea580c] !text-white shadow-md"
-                                      : "border-[var(--app-border)] bg-[var(--app-solid-surface)] text-[var(--app-text-85)] hover:border-[#ea580c]/35 hover:bg-[var(--app-hover)] hover:text-[var(--app-text-90)]",
-                                  ].join(" ")}
-                                >
-                                  <div
-                                    className={
-                                      isSelected
-                                        ? "text-[11px] font-semibold uppercase tracking-wide !text-white/95"
-                                        : "text-[11px] font-semibold uppercase tracking-wide text-[var(--app-text-50)]"
-                                    }
-                                  >
-                                    {shortLabel}
-                                  </div>
-                                  <div
-                                    className={
-                                      isSelected
-                                        ? "max-w-full truncate px-1 text-[18px] font-semibold leading-tight !text-white sm:text-[20px]"
-                                        : "max-w-full truncate px-1 text-[18px] font-semibold leading-tight text-[var(--app-text-92)] sm:text-[20px]"
-                                    }
-                                  >
-                                    {dateOption.dayLabel}
-                                  </div>
-                                  <div
-                                    className={
-                                      isSelected
-                                        ? "text-[10px] font-semibold !text-white/90"
-                                        : "text-[10px] font-semibold text-[var(--app-text-55)]"
-                                    }
-                                  >
-                                    {dateSlots.length} {dateSlots.length === 1 ? "horário" : "horários"}
-                                  </div>
-                                </button>
-                              );
-                            })}
-                          </div>
-                        )}
-                      </div>
-
-                      <div className="space-y-2">
-                        <div className="flex items-center gap-3">
-                          <label className="text-xs font-semibold text-[var(--app-text-70)]">
                             Professor da turma
                           </label>
                         </div>
@@ -10137,6 +10060,83 @@ export function AtendimentoClient() {
                             </div>
                           ) : null}
                         </div>
+                      </div>
+
+                      <div className="space-y-2">
+                        <div className="flex items-center gap-3">
+                          <label className="text-xs font-semibold text-[var(--app-text-70)]">
+                            Dias disponíveis
+                          </label>
+                        </div>
+                        {!card.professorPhone ? (
+                          <div className="rounded-2xl border border-dashed border-[var(--app-border)] bg-[var(--app-solid-surface-2)] px-4 py-5 text-center text-[12px] font-medium text-[var(--app-text-55)]">
+                            Selecione o professor primeiro.
+                          </div>
+                        ) : !dateOptions.length ? (
+                          <div className="rounded-2xl border border-dashed border-[var(--app-border)] bg-[var(--app-solid-surface-2)] px-4 py-5 text-center text-[12px] font-medium text-[var(--app-text-55)]">
+                            Nao ha dias disponiveis no momento.
+                          </div>
+                        ) : (
+                          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                            {dateOptions.map((dateOption) => {
+                              const dateSlots = getExperimentalAvailabilitySlotsForDate(
+                                pairAvailability,
+                                dateOption.id,
+                              );
+                              const weekdayKey = getExperimentalAvailabilityWeekdayForDate(
+                                pairAvailability,
+                                dateOption.id,
+                              );
+                              const shortLabel =
+                                EXPERIMENTAL_GROUP_WEEKDAY_SHORT_LABELS[weekdayKey] ?? weekdayKey;
+                              const isSelected = selectedDateId === dateOption.id;
+                              return (
+                                <button
+                                  key={`group-slot-${index}-${dateOption.id}`}
+                                  type="button"
+                                  disabled={!card.enabled || !card.professorPhone}
+                                  onClick={() =>
+                                    updateExperimentalGroupFormDateSelection(index, dateOption.id)
+                                  }
+                                  className={[
+                                    "flex min-h-[76px] flex-col items-center justify-center gap-1 rounded-2xl border px-2 py-2 text-center transition duration-150 disabled:cursor-not-allowed disabled:opacity-60",
+                                    isSelected
+                                      ? "!border-transparent !bg-[#ea580c] !text-white shadow-md"
+                                      : "border-[var(--app-border)] bg-[var(--app-solid-surface)] text-[var(--app-text-85)] hover:border-[#ea580c]/35 hover:bg-[var(--app-hover)] hover:text-[var(--app-text-90)]",
+                                  ].join(" ")}
+                                >
+                                  <div
+                                    className={
+                                      isSelected
+                                        ? "text-[11px] font-semibold uppercase tracking-wide !text-white/95"
+                                        : "text-[11px] font-semibold uppercase tracking-wide text-[var(--app-text-50)]"
+                                    }
+                                  >
+                                    {shortLabel}
+                                  </div>
+                                  <div
+                                    className={
+                                      isSelected
+                                        ? "max-w-full truncate px-1 text-[18px] font-semibold leading-tight !text-white sm:text-[20px]"
+                                        : "max-w-full truncate px-1 text-[18px] font-semibold leading-tight text-[var(--app-text-92)] sm:text-[20px]"
+                                    }
+                                  >
+                                    {dateOption.dayLabel}
+                                  </div>
+                                  <div
+                                    className={
+                                      isSelected
+                                        ? "text-[10px] font-semibold !text-white/90"
+                                        : "text-[10px] font-semibold text-[var(--app-text-55)]"
+                                    }
+                                  >
+                                    {dateSlots.length} {dateSlots.length === 1 ? "horário" : "horários"}
+                                  </div>
+                                </button>
+                              );
+                            })}
+                          </div>
+                        )}
                       </div>
 
                       <div className="space-y-2">
