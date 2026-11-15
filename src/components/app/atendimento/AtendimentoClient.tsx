@@ -460,14 +460,22 @@ function leadHasScheduledExperimentalClassForGroupCard(
   return Boolean(flatStartAt && flatStatus && flatStatus !== "cancelled");
 }
 
+function leadHasStateAndCityForExperimentalGroup(
+  lead: AtendimentoLeadListItem | null | undefined,
+): boolean {
+  if (!lead) return false;
+  const stateRaw = String((lead as any)?.state ?? "").trim();
+  const cityRaw = String((lead as any)?.city ?? "").trim();
+  return Boolean(stateRaw && cityRaw);
+}
+
 function deriveExperimentalGroupCardState(params: {
   lead: AtendimentoLeadListItem | null | undefined;
   settingsEnabled: boolean;
 }) {
   const lead = params.lead;
   const reasons: string[] = [];
-  const stateRaw = String((lead as any)?.state ?? "").trim();
-  const cityRaw = String((lead as any)?.city ?? "").trim();
+  const hardReasons: string[] = [];
   const phoneRaw = String(lead?.phone ?? "").trim();
   const phoneDigits = phoneRaw.replace(/\D/g, "");
   const hasValidPhone =
@@ -483,21 +491,21 @@ function deriveExperimentalGroupCardState(params: {
   );
   const hasScheduledExperimentalClass = leadHasScheduledExperimentalClassForGroupCard(lead);
 
-  if (!params.settingsEnabled) reasons.push("Funcionalidade desativada.");
-  if (!hasValidPhone) reasons.push("Registro sem telefone válido.");
-  if (!stateRaw && !cityRaw) reasons.push("Preencha estado e cidade antes de atribuir este registro a uma turma.");
-  if (stateRaw && !cityRaw) reasons.push("Preencha a cidade antes de atribuir este registro a uma turma.");
-  if (!stateRaw && cityRaw) reasons.push("Preencha o estado antes de atribuir este registro a uma turma.");
+  if (!params.settingsEnabled) reasons.push("Ative a funcionalidade e configure pelo menos uma turma com dia e horário.");
+  if (!hasValidPhone) reasons.push("Esse registro precisa ter um telefone válido para entrar em uma turma.");
+  if (!leadHasStateAndCityForExperimentalGroup(lead)) {
+    reasons.push("Para atribuir uma turma a este registro, informe primeiro o estado e a cidade.");
+  }
   if (!hasAssignedProfessor && !alreadyAssignedToGroup) {
     reasons.push("Selecione primeiro o professor deste registro.");
   }
   if (hasScheduledExperimentalClass && !alreadyAssignedToGroup) {
-    reasons.push("O aluno já possui aula experimental definida.");
+    hardReasons.push("O aluno já possui aula experimental definida.");
   }
 
   return {
-    disabled: reasons.length > 0 && !alreadyAssignedToGroup,
-    reasons,
+    disabled: hardReasons.length > 0 && !alreadyAssignedToGroup,
+    reasons: [...hardReasons, ...reasons],
     alreadyAssignedToGroup,
     interestRegistered: Boolean((lead as any)?.experimental_class_group_interest),
   };
@@ -3860,6 +3868,15 @@ export function AtendimentoClient() {
   }
 
   async function handleOpenExperimentalGroupModal(lead: AtendimentoLeadListItem) {
+    if (
+      !isLeadAssignedToExperimentalGroup(lead) &&
+      !leadHasStateAndCityForExperimentalGroup(lead)
+    ) {
+      modalToast.warning(
+        "Para atribuir uma turma a este registro, informe primeiro o estado e a cidade.",
+      );
+      return;
+    }
     setExperimentalGroupLead(lead);
     const result = await loadExperimentalGroupLeadData(lead);
     if (!result) return;
