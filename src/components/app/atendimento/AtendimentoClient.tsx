@@ -518,6 +518,14 @@ function leadHasStateAndCityForExperimentalGroup(
   return Boolean(stateRaw && cityRaw);
 }
 
+function leadHasNameForExperimentalGroup(
+  lead: AtendimentoLeadListItem | null | undefined,
+): boolean {
+  if (!lead) return false;
+  const nameRaw = String((lead as any)?.full_name ?? "").trim();
+  return Boolean(nameRaw);
+}
+
 function recurringAssignedProfessorForGroupLead(
   lead: AtendimentoLeadListItem | null | undefined,
 ): { name: string; phone: string } | null {
@@ -566,6 +574,9 @@ function deriveExperimentalGroupCardState(params: {
 
   if (!params.settingsEnabled) reasons.push("Ative a funcionalidade e configure pelo menos uma turma com dia e horário.");
   if (!hasValidPhone) reasons.push("Esse registro precisa ter um telefone válido para entrar em uma turma.");
+  if (!leadHasNameForExperimentalGroup(lead)) {
+    reasons.push("Para atribuir uma turma a este registro, informe primeiro o nome.");
+  }
   if (!leadHasStateAndCityForExperimentalGroup(lead)) {
     reasons.push("Para atribuir uma turma a este registro, informe primeiro o estado e a cidade.");
   }
@@ -4266,6 +4277,12 @@ export function AtendimentoClient() {
   }
 
   async function handleOpenExperimentalGroupModal(lead: AtendimentoLeadListItem) {
+    if (!isLeadAssignedToAnyGroup(lead) && !leadHasNameForExperimentalGroup(lead)) {
+      modalToast.warning(
+        "Para atribuir uma turma a este registro, informe primeiro o nome.",
+      );
+      return;
+    }
     if (
       !isLeadAssignedToAnyGroup(lead) &&
       !leadHasStateAndCityForExperimentalGroup(lead)

@@ -43,6 +43,12 @@ function leadHasStateAndCity(lead: Record<string, unknown> | null): boolean {
   return Boolean(stateRaw && cityRaw);
 }
 
+function leadHasName(lead: Record<string, unknown> | null): boolean {
+  if (!lead) return false;
+  const nameRaw = String((lead as any)?.full_name ?? "").trim();
+  return Boolean(nameRaw);
+}
+
 function isMissingExperimentalBookingRelation(error: unknown): boolean {
   const code = String((error as any)?.code ?? "").trim();
   const message = String((error as any)?.message ?? "");
@@ -244,6 +250,15 @@ export async function POST(req: Request) {
     }
     if (!lead?.id) {
       return Response.json({ ok: false, error: "lead_not_found" }, { status: 404 });
+    }
+    if (!leadHasName(lead as any)) {
+      return Response.json(
+        {
+          ok: false,
+          error: "Para atribuir uma turma a este registro, informe primeiro o nome.",
+        },
+        { status: 409 },
+      );
     }
     if (!leadHasStateAndCity(lead as any)) {
       return Response.json(
