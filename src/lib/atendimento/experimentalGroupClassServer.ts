@@ -47,6 +47,24 @@ type RecurringGroupAssignedLeadRecord = {
   recurring_class_group_status: string | null;
 };
 
+export type ExperimentalGroupPairUsageSummary = Record<
+  string,
+  {
+    assigned_count: number;
+    has_assigned_members: boolean;
+    has_experimental_members: boolean;
+    has_recurring_members: boolean;
+    experimental_lead_ids: string[];
+    recurring_lead_ids: string[];
+    members: Array<{
+      id: string;
+      lead_id: string;
+      full_name: string | null;
+      phone: string | null;
+    }>;
+  }
+>;
+
 function localDateInTimeZone(value: Date | string | number, timeZone: string): string {
   const parts = new Intl.DateTimeFormat("en-CA", {
     timeZone,
@@ -77,6 +95,159 @@ function formatTimeInTimeZone(iso: string, timeZone: string): string {
     minute: "2-digit",
     hour12: false,
   }).format(new Date(iso));
+}
+
+function findPairIdForExperimentalClass(params: {
+  settings: ExperimentalGroupClassSettings;
+  groupClass: ExperimentalGroupClassRecord;
+}): string {
+  const classWeekday = String(params.groupClass.professor_weekday ?? "").trim().toLowerCase();
+  const classTime = String(params.groupClass.professor_time ?? "").trim();
+  const classProfessorDigits = normalizePhoneDigits(params.groupClass.professor_phone);
+  const matchingSlot = params.settings.slots.find((slot) => {
+    if (slot.slot_type !== "experimental") return false;
+    if (!slot.weekday || !slot.professor_time) return false;
+    if (slot.weekday !== classWeekday || slot.professor_time !== classTime) return false;
+    const slotProfessorDigits = normalizePhoneDigits(slot.professor_phone);
+    if (slotProfessorDigits && classProfessorDigits) {
+      return slotProfessorDigits === classProfessorDigits;
+    }
+    return true;
+  });
+  return String(matchingSlot?.pair_id ?? "").trim();
+}
+
+export function buildExperimentalGroupPairUsage(params: {
+  settings: ExperimentalGroupClassSettings;
+  futureGroupClasses: ExperimentalGroupClassRecord[];
+  recurringMembers: RecurringGroupAssignedLeadRecord[];
+}): ExperimentalGroupPairUsageSummary {
+  const settings = normalizeExperimentalGroupClassSettings(params.settings);
+  const usage: ExperimentalGroupPairUsageSummary = {};
+  const membersByPair = new Map<
+    string,
+    Map<
+      string,
+      {
+        id: string;
+        lead_id: string;
+        full_name: string | null;
+        phone: string | null;
+        sourceExperimental: boolean;
+        sourceRecurring: boolean;
+      }
+    >
+  >();
+
+  const configuredPairIds = new Set(
+    settings.slots.map((slot) => String(slot.pair_id ?? "").trim()).filter(Boolean),
+  );
+  for (const pairId of configuredPairIds) {
+    usage[pairId] = {
+      assigned_count: 0,
+      has_assigned_members: false,
+      has_experimental_members: false,
+      has_recurring_members: false,
+      experimental_lead_ids: [],
+      recurring_lead_ids: [],
+      members: [],
+    };
+    membersByPair.set(pairId, new Map());
+  }
+
+  for (const groupClass of params.futureGroupClasses ?? []) {
+    const pairId = findPairIdForExperimentalClass({ settings, groupClass });
+    if (!pairId) continue;
+    const usageEntry = usage[pairId] ?? {
+      assigned_count: 0,
+      has_assigned_members: false,
+      has_experimental_members: false,
+      has_recurring_members: false,
+      experimental_lead_ids: [],
+      recurring_lead_ids: [],
+      members: [],
+    };
+    const pairMembers = membersByPair.get(pairId) ?? new Map();
+    for (const member of groupClass.members ?? []) {
+      if (String(member.status ?? "").trim().toLowerCase() !== "assigned") continue;
+      const leadId = String(member.lead_id ?? "").trim();
+      if (!leadId) continue;
+      const current =
+        pairMembers.get(leadId) ?? {
+          id: String(member.id ?? "").trim() || leadId,
+          lead_id: leadId,
+          full_name: member.full_name ?? null,
+          phone: member.phone ?? null,
+          sourceExperimental: false,
+          sourceRecurring: false,
+        };
+      current.id = current.id || String(member.id ?? "").trim() || leadId;
+      current.full_name = current.full_name ?? member.full_name ?? null;
+      current.phone = current.phone ?? member.phone ?? null;
+      current.sourceExperimental = true;
+      pairMembers.set(leadId, current);
+    }
+    membersByPair.set(pairId, pairMembers);
+    usage[pairId] = usageEntry;
+  }
+
+  for (const member of params.recurringMembers ?? []) {
+    const pairId = String(member.recurring_class_group_pair_id ?? "").trim();
+    if (!pairId) continue;
+    const usageEntry = usage[pairId] ?? {
+      assigned_count: 0,
+      has_assigned_members: false,
+      has_experimental_members: false,
+      has_recurring_members: false,
+      experimental_lead_ids: [],
+      recurring_lead_ids: [],
+      members: [],
+    };
+    const pairMembers = membersByPair.get(pairId) ?? new Map();
+    const leadId = String(member.id ?? "").trim();
+    if (!leadId) continue;
+    const current =
+      pairMembers.get(leadId) ?? {
+        id: leadId,
+        lead_id: leadId,
+        full_name: member.full_name ?? null,
+        phone: member.phone ?? null,
+        sourceExperimental: false,
+        sourceRecurring: false,
+      };
+    current.full_name = current.full_name ?? member.full_name ?? null;
+    current.phone = current.phone ?? member.phone ?? null;
+    current.sourceRecurring = true;
+    pairMembers.set(leadId, current);
+    membersByPair.set(pairId, pairMembers);
+    usage[pairId] = usageEntry;
+  }
+
+  for (const [pairId, pairMembers] of membersByPair.entries()) {
+    const allMembers = Array.from(pairMembers.values());
+    const experimentalLeadIds = allMembers
+      .filter((member) => member.sourceExperimental)
+      .map((member) => member.lead_id);
+    const recurringLeadIds = allMembers
+      .filter((member) => member.sourceRecurring)
+      .map((member) => member.lead_id);
+    usage[pairId] = {
+      assigned_count: allMembers.length,
+      has_assigned_members: allMembers.length > 0,
+      has_experimental_members: experimentalLeadIds.length > 0,
+      has_recurring_members: recurringLeadIds.length > 0,
+      experimental_lead_ids: experimentalLeadIds,
+      recurring_lead_ids: recurringLeadIds,
+      members: allMembers.map((member) => ({
+        id: member.id,
+        lead_id: member.lead_id,
+        full_name: member.full_name,
+        phone: member.phone,
+      })),
+    };
+  }
+
+  return usage;
 }
 
 function normalizeRecurringProfessorTime(row: Partial<RecurringGroupAssignedLeadRecord>): string {
@@ -360,6 +531,12 @@ export async function buildExperimentalGroupClassSlotsForLead(params: {
       startAt: interval.start_at,
       endAt: interval.end_at,
     }));
+  const recurringMembers = await listAssignedRecurringGroupMembers({ admin: params.admin });
+  const pairUsage = buildExperimentalGroupPairUsage({
+    settings,
+    futureGroupClasses: existingClasses,
+    recurringMembers,
+  });
 
   return listExperimentalGroupClassSlots({
     settings,
@@ -368,6 +545,7 @@ export async function buildExperimentalGroupClassSlotsForLead(params: {
     existingClasses,
     occupiedIntervals,
     bookedIndividualProfessorStartAts: bookedStarts,
+    pairUsage,
     now,
     lookAheadDays: params.lookAheadDays ?? 42,
   });
@@ -400,6 +578,14 @@ export async function buildRecurringGroupClassSlotsForLead(params: {
   const capacity = Math.min(4, Math.max(1, Number(normalizedSettings.capacity ?? 4)));
   const lookAheadDays = Math.max(14, Math.min(Number(params.lookAheadDays ?? 56), 84));
   const recurringMembers = await listAssignedRecurringGroupMembers({ admin: params.admin });
+  const pairUsage = buildExperimentalGroupPairUsage({
+    settings: normalizedSettings,
+    futureGroupClasses: await listFutureExperimentalGroupClasses({
+      admin: params.admin,
+      fromIso: now.toISOString(),
+    }),
+    recurringMembers,
+  });
   const occupiedIntervalsRaw = await loadRecurringCalendarOccupiedIntervals({
     admin: params.admin,
     now,
@@ -422,9 +608,20 @@ export async function buildRecurringGroupClassSlotsForLead(params: {
       (row) => String(row.recurring_class_group_pair_id ?? "").trim() === pairId,
     );
     const pairMemberIds = new Set(pairMembers.map((row) => row.id));
-    const isCurrentLeadAssigned = pairMemberIds.has(leadId);
-    const occupiedSeats = pairMembers.length;
+    const pairUsageEntry = pairUsage[pairId] ?? null;
+    const pairExperimentalLeadIds = new Set(pairUsageEntry?.experimental_lead_ids ?? []);
+    const pairAnyLeadIds = new Set([
+      ...(pairUsageEntry?.experimental_lead_ids ?? []),
+      ...(pairUsageEntry?.recurring_lead_ids ?? []),
+    ]);
+    const isCurrentLeadAssigned = pairAnyLeadIds.has(leadId);
+    const occupiedSeats = Math.max(0, Number(pairUsageEntry?.assigned_count ?? pairMembers.length));
     const availableSeats = Math.max(capacity - occupiedSeats, 0);
+    const blockedByExperimentalOccupants =
+      Boolean(pairUsageEntry?.has_experimental_members) && !pairExperimentalLeadIds.has(leadId);
+    if (blockedByExperimentalOccupants && !isCurrentLeadAssigned) {
+      continue;
+    }
 
     const blockedByOtherRecurringSchedules = recurringMembers.some((row) => {
       if (row.id === leadId) return false;
@@ -488,14 +685,23 @@ export async function buildRecurringGroupClassSlotsForLead(params: {
 
     if (!nextProfessorStartAt) continue;
 
-    const members: ExperimentalGroupClassMemberSummary[] = pairMembers.map((row) => ({
-      id: row.id,
-      lead_id: row.id,
-      full_name: row.full_name,
-      phone: row.phone,
-      status: "assigned",
-      student_notification_sent_at: null,
-    }));
+    const members: ExperimentalGroupClassMemberSummary[] = Array.isArray(pairUsageEntry?.members)
+      ? pairUsageEntry!.members.map((row) => ({
+          id: row.id,
+          lead_id: row.lead_id,
+          full_name: row.full_name,
+          phone: row.phone,
+          status: "assigned",
+          student_notification_sent_at: null,
+        }))
+      : pairMembers.map((row) => ({
+          id: row.id,
+          lead_id: row.id,
+          full_name: row.full_name,
+          phone: row.phone,
+          status: "assigned",
+          student_notification_sent_at: null,
+        }));
 
     slots.push({
       id: `recurring-${pairId}`,

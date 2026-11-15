@@ -455,6 +455,23 @@ export function listExperimentalGroupClassSlots(params: {
   existingClasses: ExperimentalGroupClassRecord[];
   occupiedIntervals: RecurringOccupiedInterval[];
   bookedIndividualProfessorStartAts: string[];
+  pairUsage?: Record<
+    string,
+    {
+      assigned_count: number;
+      has_assigned_members: boolean;
+      has_experimental_members: boolean;
+      has_recurring_members: boolean;
+      experimental_lead_ids: string[];
+      recurring_lead_ids: string[];
+      members: Array<{
+        id: string;
+        lead_id: string;
+        full_name: string | null;
+        phone: string | null;
+      }>;
+    }
+  >;
   now?: Date;
   lookAheadDays?: number;
 }): ExperimentalGroupSlotSummary[] {
@@ -518,15 +535,28 @@ export function listExperimentalGroupClassSlots(params: {
       const activeMembers = (existingClass?.members ?? []).filter(
         (member) => String(member.status ?? "").trim().toLowerCase() === "assigned",
       );
-      const isCurrentLeadAssigned = activeMembers.some(
-        (member) => String(member.lead_id ?? "").trim() === leadId,
+      const pairId = String(configuredSlot.pair_id ?? "").trim();
+      const pairUsageEntry = pairId ? params.pairUsage?.[pairId] ?? null : null;
+      const pairRecurringLeadIds = new Set(pairUsageEntry?.recurring_lead_ids ?? []);
+      const pairAnyLeadIds = new Set([
+        ...(pairUsageEntry?.experimental_lead_ids ?? []),
+        ...(pairUsageEntry?.recurring_lead_ids ?? []),
+      ]);
+      const isCurrentLeadAssigned = pairAnyLeadIds.has(leadId);
+      const occupiedSeats = Math.max(
+        activeMembers.length,
+        Number(pairUsageEntry?.assigned_count ?? activeMembers.length),
       );
-      const occupiedSeats = activeMembers.length;
       const capacity = Math.min(
         4,
         Math.max(1, Number(existingClass?.capacity ?? settings.capacity ?? 4)),
       );
       const availableSeats = Math.max(capacity - occupiedSeats, 0);
+      const blockedByRecurringOccupants =
+        Boolean(pairUsageEntry?.has_recurring_members) && !pairRecurringLeadIds.has(leadId);
+      if (blockedByRecurringOccupants && !isCurrentLeadAssigned) {
+        continue;
+      }
 
       const blockedByRecurring = professorStartAtConflictsWithRecurring({
         professorStartAt,
@@ -553,7 +583,7 @@ export function listExperimentalGroupClassSlots(params: {
       slots.push({
         id: existingClass?.id ?? professorStartAt,
         group_class_id: existingClass?.id ?? null,
-        pair_id: configuredSlot.pair_id ?? null,
+        pair_id: pairId || null,
         slot_type: "experimental",
         professor_name: existingClass?.professor_name ?? assignedProfessor?.name ?? null,
         professor_phone: existingClass?.professor_phone ?? assignedProfessor?.phone ?? null,
@@ -572,7 +602,23 @@ export function listExperimentalGroupClassSlots(params: {
         status,
         lesson_link: existingClass?.lesson_link ?? null,
         confirmed_at: existingClass?.confirmed_at ?? null,
-        members: activeMembers,
+        members: Array.isArray(pairUsageEntry?.members)
+          ? pairUsageEntry!.members.map((member) => ({
+              id: member.id,
+              lead_id: member.lead_id,
+              full_name: member.full_name,
+              phone: member.phone,
+              status: activeMembers.some(
+                (activeMember) => String(activeMember.lead_id ?? "").trim() === member.lead_id,
+              )
+                ? "assigned"
+                : "assigned",
+              student_notification_sent_at:
+                activeMembers.find(
+                  (activeMember) => String(activeMember.lead_id ?? "").trim() === member.lead_id,
+                )?.student_notification_sent_at ?? null,
+            }))
+          : activeMembers,
         is_full: !isCurrentLeadAssigned && availableSeats <= 0,
         is_current_lead_assigned: isCurrentLeadAssigned,
       });
