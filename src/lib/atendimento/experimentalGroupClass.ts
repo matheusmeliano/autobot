@@ -247,10 +247,6 @@ export function normalizeExperimentalGroupClassSettings(
     });
   }
 
-  while (normalizedSlots.length < 4) {
-    normalizedSlots.push(...buildDefaultExperimentalGroupPair(normalizedSlots.length / 2 + 1));
-  }
-
   const hasAnyEnabledConfiguredSlot = normalizedSlots.some(
     (slot) =>
       slot.slot_type === "experimental" &&
