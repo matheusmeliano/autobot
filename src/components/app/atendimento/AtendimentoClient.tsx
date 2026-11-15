@@ -9730,7 +9730,7 @@ export function AtendimentoClient() {
                       <div className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-2">
                         <div className="min-w-0">
                           <div className="text-[14px] font-bold text-[var(--app-text-85)]">
-                            {`Turma ${pair.experimentalIndex + 1}`}
+                            {`Turma ${pair.pairNumber}`}
                           </div>
                           <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
                             <div className="rounded-xl border border-[var(--app-border)] bg-[var(--app-solid-surface-2)] px-3 py-3">
