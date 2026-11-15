@@ -9679,28 +9679,27 @@ export function AtendimentoClient() {
                 </div>
               </div>
             </div>
-            <button
-              type="button"
-              aria-label="Fechar"
-              onClick={() => setExperimentalGroupSettingsOpen(false)}
-              className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-[var(--app-border)] bg-[var(--app-solid-surface)] text-[var(--app-text-70)] hover:bg-[var(--app-hover)] disabled:cursor-not-allowed disabled:opacity-60"
-            >
-              <X className="h-4 w-4" />
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                aria-label="Abrir Turmas"
+                onClick={handleOpenExperimentalGroupPairs}
+                className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-[var(--app-border)] bg-[var(--app-solid-surface)] text-[var(--app-text-70)] hover:bg-[var(--app-hover)] disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                <Plus className="h-4 w-4" />
+              </button>
+              <button
+                type="button"
+                aria-label="Fechar"
+                onClick={() => setExperimentalGroupSettingsOpen(false)}
+                className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-[var(--app-border)] bg-[var(--app-solid-surface)] text-[var(--app-text-70)] hover:bg-[var(--app-hover)] disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
           </div>
 
           <div className="mt-5 space-y-4">
-            <div className="flex justify-end">
-              <button
-                type="button"
-                onClick={handleOpenExperimentalGroupPairs}
-                className="inline-flex min-h-[42px] items-center justify-center gap-2 rounded-xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] px-4 text-[13px] font-semibold text-[var(--app-text-85)] transition hover:bg-[var(--app-hover)] disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                <Plus className="h-4 w-4" />
-                Abrir Turmas
-              </button>
-            </div>
-
             {experimentalGroupFormPairs.map((pair) => (
               (() => {
                 const dateOptions = experimentalGroupAvailability?.dates ?? [];
