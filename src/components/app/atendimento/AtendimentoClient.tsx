@@ -1816,6 +1816,9 @@ export function AtendimentoClient() {
   const [experimentalGroupSelectedDateId, setExperimentalGroupSelectedDateId] = useState<
     string | null
   >(null);
+  const [experimentalGroupSelectedPairId, setExperimentalGroupSelectedPairId] = useState<
+    string | null
+  >(null);
   const [experimentalGroupSelectedSlotId, setExperimentalGroupSelectedSlotId] = useState<
     string | null
   >(null);
@@ -2128,6 +2131,86 @@ export function AtendimentoClient() {
     );
   }, [experimentalGroupSlots]);
 
+  const experimentalGroupTurmaOptions = useMemo<
+    Array<{
+      pairId: string;
+      turmaNumber: number;
+      professorName: string | null;
+      professorPhone: string | null;
+      occupiedSeats: number;
+      capacity: number;
+      availableSeats: number;
+      hasCurrentLeadAssigned: boolean;
+      slotCount: number;
+    }>
+  >(() => {
+    const grouped = new Map<
+      string,
+      {
+        pairId: string;
+        professorName: string | null;
+        professorPhone: string | null;
+        occupiedSeats: number;
+        capacity: number;
+        availableSeats: number;
+        hasCurrentLeadAssigned: boolean;
+        slotCount: number;
+      }
+    >();
+
+    for (const slot of experimentalGroupVisibleSlots) {
+      const pairId = String(slot.pair_id ?? "").trim();
+      if (!pairId) continue;
+      const current = grouped.get(pairId) ?? {
+        pairId,
+        professorName: slot.professor_name ?? null,
+        professorPhone: slot.professor_phone ?? null,
+        occupiedSeats: slot.occupied_seats,
+        capacity: slot.capacity,
+        availableSeats: slot.available_seats,
+        hasCurrentLeadAssigned: Boolean(slot.is_current_lead_assigned),
+        slotCount: 0,
+      };
+      current.professorName = current.professorName ?? slot.professor_name ?? null;
+      current.professorPhone = current.professorPhone ?? slot.professor_phone ?? null;
+      current.occupiedSeats = Math.max(current.occupiedSeats, Number(slot.occupied_seats ?? 0));
+      current.capacity = Math.max(current.capacity, Number(slot.capacity ?? 0));
+      current.availableSeats = Math.max(
+        current.availableSeats,
+        Number(slot.available_seats ?? 0),
+      );
+      current.hasCurrentLeadAssigned =
+        current.hasCurrentLeadAssigned || Boolean(slot.is_current_lead_assigned);
+      current.slotCount += 1;
+      grouped.set(pairId, current);
+    }
+
+    return Array.from(grouped.values())
+      .sort((left, right) => {
+        const leftNumber = Number(String(left.pairId).match(/(\d+)/)?.[1] ?? Number.NaN);
+        const rightNumber = Number(String(right.pairId).match(/(\d+)/)?.[1] ?? Number.NaN);
+        if (
+          Number.isFinite(leftNumber) &&
+          Number.isFinite(rightNumber) &&
+          leftNumber !== rightNumber
+        ) {
+          return leftNumber - rightNumber;
+        }
+        return left.pairId.localeCompare(right.pairId);
+      })
+      .map((entry, index) => ({
+        pairId: entry.pairId,
+        turmaNumber: index + 1,
+        professorName: entry.professorName,
+        professorPhone: entry.professorPhone,
+        occupiedSeats: entry.occupiedSeats,
+        capacity: entry.capacity,
+        availableSeats: entry.availableSeats,
+        hasCurrentLeadAssigned: entry.hasCurrentLeadAssigned,
+        slotCount: entry.slotCount,
+      }));
+  }, [experimentalGroupVisibleSlots]);
+
   useEffect(() => {
     setExperimentalGroupSettingsAssignProfPairId("");
   }, [experimentalGroupLead?.id, isExperimentalGroupModalOpen]);
@@ -2216,6 +2299,13 @@ export function AtendimentoClient() {
       }));
   }, [experimentalGroupFormSlots, experimentalGroupPairUsage]);
 
+  const experimentalGroupSlotsForSelectedTurma = useMemo<ExperimentalGroupSlotPayload[]>(() => {
+    if (!experimentalGroupSelectedPairId) return experimentalGroupVisibleSlots;
+    return experimentalGroupVisibleSlots.filter(
+      (slot) => String(slot.pair_id ?? "").trim() === experimentalGroupSelectedPairId,
+    );
+  }, [experimentalGroupSelectedPairId, experimentalGroupVisibleSlots]);
+
   const experimentalGroupDateOptions = useMemo<
     Array<{
       id: string;
@@ -2234,7 +2324,7 @@ export function AtendimentoClient() {
       }
     >();
 
-    for (const slot of experimentalGroupVisibleSlots) {
+    for (const slot of experimentalGroupSlotsForSelectedTurma) {
       const dateId =
         String(slot.lead_date ?? "").trim() || String(slot.professor_date ?? "").trim();
       if (!dateId) continue;
@@ -2274,16 +2364,16 @@ export function AtendimentoClient() {
     }
 
     return Array.from(grouped.values()).sort((left, right) => left.id.localeCompare(right.id));
-  }, [experimentalGroupVisibleSlots]);
+  }, [experimentalGroupSlotsForSelectedTurma]);
 
   const experimentalGroupSelectedDateSlots = useMemo<ExperimentalGroupSlotPayload[]>(() => {
     if (!experimentalGroupSelectedDateId) return [];
-    return experimentalGroupVisibleSlots.filter((slot) => {
+    return experimentalGroupSlotsForSelectedTurma.filter((slot) => {
       const dateId =
         String(slot.lead_date ?? "").trim() || String(slot.professor_date ?? "").trim();
       return dateId === experimentalGroupSelectedDateId;
     });
-  }, [experimentalGroupSelectedDateId, experimentalGroupVisibleSlots]);
+  }, [experimentalGroupSelectedDateId, experimentalGroupSlotsForSelectedTurma]);
 
   const experimentalGroupDisplayProfessor = useMemo<{ name: string; phone: string } | null>(() => {
     const sourceSlots =
@@ -2291,7 +2381,7 @@ export function AtendimentoClient() {
         ? [selectedExperimentalGroupSlot]
         : experimentalGroupSelectedDateSlots.length > 0
           ? experimentalGroupSelectedDateSlots
-          : experimentalGroupVisibleSlots;
+          : experimentalGroupSlotsForSelectedTurma;
     const uniqueProfessors = Array.from(
       new Map(
         sourceSlots
@@ -2306,7 +2396,48 @@ export function AtendimentoClient() {
     );
     if (uniqueProfessors.length === 1) return uniqueProfessors[0] ?? null;
     return null;
-  }, [experimentalGroupSelectedDateSlots, experimentalGroupVisibleSlots, selectedExperimentalGroupSlot]);
+  }, [
+    experimentalGroupSelectedDateSlots,
+    experimentalGroupSlotsForSelectedTurma,
+    selectedExperimentalGroupSlot,
+  ]);
+
+  useEffect(() => {
+    if (!experimentalGroupSelectedPairId) return;
+    const pairSlots = experimentalGroupVisibleSlots.filter(
+      (slot) => String(slot.pair_id ?? "").trim() === experimentalGroupSelectedPairId,
+    );
+    if (!pairSlots.length) return;
+
+    const selectedSlotStillValid = pairSlots.some(
+      (slot) => String(slot.id) === String(experimentalGroupSelectedSlotId ?? ""),
+    );
+    if (!selectedSlotStillValid) {
+      const assignedSlot =
+        pairSlots.find((slot) => slot.is_current_lead_assigned) ??
+        pairSlots.find((slot) => slot.available_seats > 0) ??
+        null;
+      setExperimentalGroupSelectedSlotId(assignedSlot ? String(assignedSlot.id) : null);
+    }
+
+    const selectedDateStillValid = pairSlots.some((slot) => {
+      const dateId =
+        String(slot.lead_date ?? "").trim() || String(slot.professor_date ?? "").trim();
+      return dateId === experimentalGroupSelectedDateId;
+    });
+    if (!selectedDateStillValid) {
+      const assignedDate =
+        pairSlots.find((slot) => slot.is_current_lead_assigned)?.lead_date ??
+        pairSlots.find((slot) => slot.is_current_lead_assigned)?.professor_date ??
+        "";
+      setExperimentalGroupSelectedDateId(String(assignedDate ?? "").trim() || null);
+    }
+  }, [
+    experimentalGroupSelectedDateId,
+    experimentalGroupSelectedPairId,
+    experimentalGroupSelectedSlotId,
+    experimentalGroupVisibleSlots,
+  ]);
 
   const bookingLocationOk = useMemo<boolean>(() => {
     if (!selectedLead) return false;
@@ -4107,10 +4238,15 @@ export function AtendimentoClient() {
         slots.find((slot) => slot.available_seats > 0) ??
         slots[0] ??
         null;
+      const firstPairId =
+        String(firstAssigned?.pair_id ?? "").trim() ||
+        String(slots[0]?.pair_id ?? "").trim() ||
+        null;
       const firstAssignedDate =
         firstAssigned?.is_current_lead_assigned
           ? String(firstAssigned.lead_date ?? firstAssigned.professor_date ?? "").trim() || null
           : null;
+      setExperimentalGroupSelectedPairId(firstPairId);
       setExperimentalGroupSelectedDateId(firstAssignedDate);
       setExperimentalGroupSelectedSlotId(
         firstAssigned?.is_current_lead_assigned ? String(firstAssigned.id) : null,
@@ -10248,6 +10384,104 @@ export function AtendimentoClient() {
                     <div className="space-y-2">
                       <div className="flex items-center gap-3">
                         <label className="text-xs font-semibold text-[var(--app-text-70)]">
+                          Turmas disponíveis
+                          <span className="ml-2 font-normal text-[var(--app-text-45)]">
+                            ({experimentalGroupTurmaOptions.length})
+                          </span>
+                        </label>
+                      </div>
+
+                      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                        {experimentalGroupTurmaOptions.map((turma) => {
+                          const isSelected =
+                            experimentalGroupSelectedPairId === turma.pairId ||
+                            (!experimentalGroupSelectedPairId &&
+                              experimentalGroupTurmaOptions.length === 1);
+                          return (
+                            <button
+                              key={turma.pairId}
+                              type="button"
+                              onClick={() => {
+                                setExperimentalGroupSelectedPairId(turma.pairId);
+                                setExperimentalGroupSelectedDateId(null);
+                                setExperimentalGroupSelectedSlotId(null);
+                              }}
+                              className={[
+                                "rounded-2xl border px-4 py-4 text-left transition",
+                                isSelected
+                                  ? "!border-transparent !bg-[#ea580c] !text-white shadow-md"
+                                  : "border-[var(--app-border)] bg-[var(--app-solid-surface)] text-[var(--app-text-85)] hover:border-[#ea580c]/35 hover:bg-[var(--app-hover)]",
+                              ].join(" ")}
+                            >
+                              <div className="flex items-start justify-between gap-3">
+                                <div className="min-w-0">
+                                  <div
+                                    className={
+                                      "text-[14px] font-bold " +
+                                      (isSelected ? "!text-white" : "text-[var(--app-text-85)]")
+                                    }
+                                  >
+                                    Turma {turma.turmaNumber} disponível
+                                  </div>
+                                  <div
+                                    className={
+                                      "mt-1 text-[12px] " +
+                                      (isSelected ? "!text-white/90" : "text-[var(--app-text-55)]")
+                                    }
+                                  >
+                                    {turma.professorName || "Professor definido na turma"}
+                                  </div>
+                                </div>
+                                {turma.hasCurrentLeadAssigned ? (
+                                  <div className="inline-flex shrink-0 items-center gap-1 rounded-full border border-white/20 bg-white/15 px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.12em] text-white">
+                                    Atual
+                                  </div>
+                                ) : null}
+                              </div>
+                              <div
+                                className={
+                                  "mt-3 text-[12px] " +
+                                  (isSelected ? "!text-white/90" : "text-[var(--app-text-55)]")
+                                }
+                              >
+                                Alunos: {turma.occupiedSeats}/{turma.capacity} | Vagas:{" "}
+                                {turma.availableSeats}
+                              </div>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <label className="text-xs font-semibold text-[var(--app-text-70)]">
+                        Professor da turma
+                      </label>
+                      <div
+                        className="inline-flex min-h-[44px] w-full items-center justify-between gap-3 rounded-2xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] px-4 text-left text-[13px] font-semibold text-[var(--app-text-85)]"
+                        title={
+                          experimentalGroupDisplayProfessor?.name
+                            ? `Professor vinculado: ${experimentalGroupDisplayProfessor.name}`
+                            : "O professor será definido pela turma selecionada."
+                        }
+                      >
+                        <span className="flex min-w-0 items-center gap-2">
+                          <CheckCircle2 className="h-4 w-4 shrink-0 text-[var(--app-text-65)]" />
+                          <span className="min-w-0 truncate">
+                            {experimentalGroupDisplayProfessor?.name || "Professor definido pela turma"}
+                          </span>
+                        </span>
+                      </div>
+                      <div className="text-[12px] text-[var(--app-text-55)]">
+                        {experimentalGroupDisplayProfessor?.name
+                          ? `${experimentalGroupDisplayProfessor.name} (${experimentalGroupDisplayProfessor.phone})`
+                          : "As informações do professor seguem o que foi configurado na turma selecionada."}
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-3">
+                        <label className="text-xs font-semibold text-[var(--app-text-70)]">
                           Dias disponíveis
                           <span className="ml-2 font-normal text-[var(--app-text-45)]">
                             ({experimentalGroupDateOptions.length})
@@ -10301,32 +10535,6 @@ export function AtendimentoClient() {
                             </button>
                           );
                         })}
-                      </div>
-                    </div>
-
-                    <div className="space-y-2">
-                      <label className="text-xs font-semibold text-[var(--app-text-70)]">
-                        Professor da turma
-                      </label>
-                      <div
-                        className="inline-flex min-h-[44px] w-full items-center justify-between gap-3 rounded-2xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] px-4 text-left text-[13px] font-semibold text-[var(--app-text-85)]"
-                        title={
-                          experimentalGroupDisplayProfessor?.name
-                            ? `Professor vinculado: ${experimentalGroupDisplayProfessor.name}`
-                            : "O professor será definido pela turma selecionada."
-                        }
-                      >
-                        <span className="flex min-w-0 items-center gap-2">
-                          <CheckCircle2 className="h-4 w-4 shrink-0 text-[var(--app-text-65)]" />
-                          <span className="min-w-0 truncate">
-                            {experimentalGroupDisplayProfessor?.name || "Professor definido pela turma"}
-                          </span>
-                        </span>
-                      </div>
-                      <div className="text-[12px] text-[var(--app-text-55)]">
-                        {experimentalGroupDisplayProfessor?.name
-                          ? `${experimentalGroupDisplayProfessor.name} (${experimentalGroupDisplayProfessor.phone})`
-                          : "As informações do professor seguem o que foi configurado na turma selecionada."}
                       </div>
                     </div>
 
