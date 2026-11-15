@@ -10598,81 +10598,21 @@ export function AtendimentoClient() {
                 );
               })()}
 
-              {selectedExperimentalGroupSlot ? (
-                <div className="rounded-2xl border border-[var(--app-border)] bg-[var(--app-solid-surface-2)] p-4">
-                  <div className="text-[14px] font-semibold text-[var(--app-text-85)]">
-                    Turma — {selectedExperimentalGroupSlot.professor_weekday_label}, {selectedExperimentalGroupSlot.professor_time}
-                  </div>
-                  <div className="mt-1 text-[12px] text-[var(--app-text-55)]">
-                    Professor: {selectedExperimentalGroupSlot.professor_name ?? "—"} | Alunos: {selectedExperimentalGroupSlot.occupied_seats}/{selectedExperimentalGroupSlot.capacity} | Vagas disponíveis: {selectedExperimentalGroupSlot.available_seats}
-                  </div>
-
-                  <div className="mt-4 space-y-2">
-                    {(selectedExperimentalGroupSlot.members ?? []).length === 0 ? (
-                      <div className="text-[13px] text-[var(--app-text-55)]">
-                        Nenhum aluno atribuído ainda.
-                      </div>
-                    ) : (
-                      selectedExperimentalGroupSlot.members.map((member) => (
-                        <div
-                          key={member.id}
-                          className="flex items-center justify-between gap-3 rounded-xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] px-4 py-3"
-                        >
-                          <div className="min-w-0">
-                            <div className="truncate text-[13px] font-semibold text-[var(--app-text-85)]">
-                              {member.full_name ?? "Aluno"}
-                            </div>
-                            <div className="mt-1 text-[12px] text-[var(--app-text-55)]">
-                              {formatPhoneNumber(member.phone ?? "", { includeCountryCode: true }) || "Sem telefone"}
-                            </div>
-                          </div>
-                          <button
-                            type="button"
-                            disabled={experimentalGroupActionLoading}
-                            onClick={() => void handleRemoveLeadFromExperimentalGroup(selectedExperimentalGroupSlot, member.lead_id)}
-                            className="inline-flex h-9 items-center justify-center gap-1 rounded-xl border border-[var(--app-border)] px-3 text-[12px] font-semibold text-[var(--app-text-75)] disabled:cursor-not-allowed disabled:opacity-60"
-                          >
-                            <Trash2 className="h-3.5 w-3.5" />
-                            Remover
-                          </button>
-                        </div>
-                      ))
-                    )}
-                  </div>
-
-                  <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:justify-end">
-                    {selectedExperimentalGroupSlot.is_current_lead_assigned ? (
-                      <button
-                        type="button"
-                        disabled={experimentalGroupActionLoading}
-                        onClick={() =>
-                          void handleRemoveLeadFromExperimentalGroup(
-                            selectedExperimentalGroupSlot,
-                            String(experimentalGroupLead?.id ?? ""),
-                          )
-                        }
-                        className="inline-flex min-h-[42px] items-center justify-center gap-2 rounded-xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] px-4 text-[13px] font-semibold text-[var(--app-text-85)] disabled:cursor-not-allowed disabled:opacity-60"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                        Remover este aluno
-                      </button>
-                    ) : null}
-                    {selectedExperimentalGroupSlot.slot_type === "experimental" ? (
-                      <button
-                        type="button"
-                        disabled={
-                          experimentalGroupActionLoading ||
-                          selectedExperimentalGroupSlot.is_full ||
-                          !experimentalGroupCanOpenModal
-                        }
-                        onClick={() => void handleConfirmSelectedExperimentalGroup(selectedExperimentalGroupSlot)}
-                        className="inline-flex min-h-[42px] items-center justify-center gap-2 rounded-xl bg-[#ea580c] px-4 text-[13px] font-semibold !text-white disabled:cursor-not-allowed disabled:opacity-60"
-                      >
-                        {experimentalGroupActionLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
-                        Confirmar turma
-                      </button>
-                    ) : null}
-                  </div>
+              {selectedExperimentalGroupSlot?.slot_type === "experimental" ? (
+                <div className="flex justify-end">
+                  <button
+                    type="button"
+                    disabled={
+                      experimentalGroupActionLoading ||
+                      selectedExperimentalGroupSlot.is_full ||
+                      !experimentalGroupCanOpenModal
+                    }
+                    onClick={() => void handleConfirmSelectedExperimentalGroup(selectedExperimentalGroupSlot)}
+                    className="inline-flex min-h-[42px] items-center justify-center gap-2 rounded-xl bg-[#ea580c] px-4 text-[13px] font-semibold !text-white disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    {experimentalGroupActionLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
+                    Confirmar turma
+                  </button>
                 </div>
               ) : null}
             </>
