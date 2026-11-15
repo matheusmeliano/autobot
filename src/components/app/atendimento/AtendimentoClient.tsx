@@ -10498,7 +10498,7 @@ export function AtendimentoClient() {
                                   </div>
                                 </div>
                                 {turma.hasCurrentLeadAssigned ? (
-                                  <div className="inline-flex shrink-0 items-center gap-1 rounded-full border border-white/20 bg-white/15 px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.12em] text-white">
+                                  <div className="inline-flex shrink-0 items-center gap-1 rounded-full border border-white/20 bg-white/15 px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.12em] !text-white">
                                     Atual
                                   </div>
                                 ) : null}
