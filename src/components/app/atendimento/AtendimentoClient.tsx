@@ -9803,11 +9803,11 @@ export function AtendimentoClient() {
                           <div className="text-[14px] font-bold text-[var(--app-text-85)]">
                             {`Turma ${pair.pairNumber}`}
                           </div>
-                          <div className="mt-3 flex flex-wrap items-center gap-2">
-                            <div className="mt-2 inline-flex items-center rounded-full border border-[#ea580c]/25 bg-[rgba(234,88,12,0.10)] px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.12em] text-[#9a3412]">
+                          <div className="mt-3 flex flex-nowrap items-center gap-1.5">
+                            <div className="mt-2 inline-flex whitespace-nowrap items-center rounded-full border border-[#ea580c]/25 bg-[rgba(234,88,12,0.10)] px-2 py-1 text-[9px] font-bold uppercase tracking-[0.08em] text-[#9a3412] sm:px-2.5 sm:text-[10px] sm:tracking-[0.12em]">
                               Experimental
                             </div>
-                            <div className="mt-2 inline-flex items-center rounded-full border border-[#2563eb]/25 bg-[rgba(37,99,235,0.10)] px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.12em] text-[#1d4ed8]">
+                            <div className="mt-2 inline-flex whitespace-nowrap items-center rounded-full border border-[#2563eb]/25 bg-[rgba(37,99,235,0.10)] px-2 py-1 text-[9px] font-bold uppercase tracking-[0.08em] text-[#1d4ed8] sm:px-2.5 sm:text-[10px] sm:tracking-[0.12em]">
                               Recorrente
                             </div>
                           </div>
