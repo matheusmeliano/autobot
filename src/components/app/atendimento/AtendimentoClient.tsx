@@ -2413,10 +2413,7 @@ export function AtendimentoClient() {
       (slot) => String(slot.id) === String(experimentalGroupSelectedSlotId ?? ""),
     );
     if (!selectedSlotStillValid) {
-      const assignedSlot =
-        pairSlots.find((slot) => slot.is_current_lead_assigned) ??
-        pairSlots.find((slot) => slot.available_seats > 0) ??
-        null;
+      const assignedSlot = pairSlots.find((slot) => slot.is_current_lead_assigned) ?? null;
       setExperimentalGroupSelectedSlotId(assignedSlot ? String(assignedSlot.id) : null);
     }
 
@@ -4233,20 +4230,14 @@ export function AtendimentoClient() {
       const slots = Array.isArray(json?.slots) ? (json.slots as ExperimentalGroupSlotPayload[]) : [];
       setExperimentalGroupCanOpenModal(Boolean(json?.can_open_modal));
       setExperimentalGroupSlots(slots);
-      const firstAssigned =
-        slots.find((slot) => slot.is_current_lead_assigned) ??
-        slots.find((slot) => slot.available_seats > 0) ??
-        slots[0] ??
-        null;
-      const firstPairId =
-        String(firstAssigned?.pair_id ?? "").trim() ||
-        String(slots[0]?.pair_id ?? "").trim() ||
-        null;
+      const firstAssigned = slots.find((slot) => slot.is_current_lead_assigned) ?? null;
       const firstAssignedDate =
         firstAssigned?.is_current_lead_assigned
           ? String(firstAssigned.lead_date ?? firstAssigned.professor_date ?? "").trim() || null
           : null;
-      setExperimentalGroupSelectedPairId(firstPairId);
+      setExperimentalGroupSelectedPairId(
+        firstAssigned ? String(firstAssigned.pair_id ?? "").trim() || null : null,
+      );
       setExperimentalGroupSelectedDateId(firstAssignedDate);
       setExperimentalGroupSelectedSlotId(
         firstAssigned?.is_current_lead_assigned ? String(firstAssigned.id) : null,
@@ -10393,10 +10384,7 @@ export function AtendimentoClient() {
 
                       <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                         {experimentalGroupTurmaOptions.map((turma) => {
-                          const isSelected =
-                            experimentalGroupSelectedPairId === turma.pairId ||
-                            (!experimentalGroupSelectedPairId &&
-                              experimentalGroupTurmaOptions.length === 1);
+                          const isSelected = experimentalGroupSelectedPairId === turma.pairId;
                           return (
                             <button
                               key={turma.pairId}
@@ -10453,136 +10441,144 @@ export function AtendimentoClient() {
                       </div>
                     </div>
 
-                    <div className="space-y-2">
-                      <label className="text-xs font-semibold text-[var(--app-text-70)]">
-                        Professor da turma
-                      </label>
-                      <div
-                        className="inline-flex min-h-[44px] w-full items-center justify-between gap-3 rounded-2xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] px-4 text-left text-[13px] font-semibold text-[var(--app-text-85)]"
-                        title={
-                          experimentalGroupDisplayProfessor?.name
-                            ? `Professor vinculado: ${experimentalGroupDisplayProfessor.name}`
-                            : "O professor será definido pela turma selecionada."
-                        }
-                      >
-                        <span className="flex min-w-0 items-center gap-2">
-                          <CheckCircle2 className="h-4 w-4 shrink-0 text-[var(--app-text-65)]" />
-                          <span className="min-w-0 truncate">
-                            {experimentalGroupDisplayProfessor?.name || "Professor definido pela turma"}
-                          </span>
-                        </span>
-                      </div>
-                      <div className="text-[12px] text-[var(--app-text-55)]">
-                        {experimentalGroupDisplayProfessor?.name
-                          ? `${experimentalGroupDisplayProfessor.name} (${experimentalGroupDisplayProfessor.phone})`
-                          : "As informações do professor seguem o que foi configurado na turma selecionada."}
-                      </div>
-                    </div>
-
-                    <div className="space-y-2">
-                      <div className="flex items-center gap-3">
-                        <label className="text-xs font-semibold text-[var(--app-text-70)]">
-                          Dias disponíveis
-                          <span className="ml-2 font-normal text-[var(--app-text-45)]">
-                            ({experimentalGroupDateOptions.length})
-                          </span>
-                        </label>
-                      </div>
-
-                      <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 md:grid-cols-5">
-                        {experimentalGroupDateOptions.map((dateOption) => {
-                          const isSelected = experimentalGroupSelectedDateId === dateOption.id;
-                          return (
-                            <button
-                              key={dateOption.id}
-                              type="button"
-                              onClick={() => {
-                                setExperimentalGroupSelectedDateId(dateOption.id);
-                                setExperimentalGroupSelectedSlotId(null);
-                              }}
-                              className={
-                                "flex min-h-[76px] flex-col items-center justify-center gap-1 rounded-2xl border px-2 py-2 text-center transition duration-150 " +
-                                (isSelected
-                                  ? "!border-transparent !bg-[#ea580c] !text-white shadow-md"
-                                  : "border-[var(--app-border)] bg-[var(--app-solid-surface)] text-[var(--app-text-85)] hover:border-[#ea580c]/35 hover:bg-[var(--app-hover)] hover:text-[var(--app-text-90)]")
-                              }
-                            >
-                              <div
-                                className={
-                                  "text-[11px] uppercase tracking-wide font-semibold " +
-                                  (isSelected ? "!text-white/95" : "text-[var(--app-text-50)]")
-                                }
-                              >
-                                {dateOption.weekdayShort}
-                              </div>
-                              <div
-                                className={
-                                  "text-[20px] font-semibold leading-none " +
-                                  (isSelected ? "!text-white" : "text-[var(--app-text-92)]")
-                                }
-                              >
-                                {dateOption.dayLabel}
-                              </div>
-                              <div
-                                className={
-                                  "text-[10px] font-semibold " +
-                                  (isSelected ? "!text-white/90" : "text-[var(--app-text-55)]")
-                                }
-                              >
-                                {dateOption.slotCount}{" "}
-                                {dateOption.slotCount === 1 ? "horário" : "horários"}
-                              </div>
-                            </button>
-                          );
-                        })}
-                      </div>
-                    </div>
-
-                    <div className="space-y-2">
-                      <label className="text-xs font-semibold text-[var(--app-text-70)]">
-                        Horários disponíveis
-                        {experimentalGroupSelectedDateId ? (
-                          <span className="ml-2 font-normal text-[var(--app-text-45)]">
-                            (dia selecionado)
-                          </span>
-                        ) : (
-                          <span className="ml-2 font-normal text-[var(--app-text-45)]">
-                            (selecione um dia primeiro)
-                          </span>
-                        )}
-                      </label>
-
-                      {!experimentalGroupSelectedDateId ? (
-                        <div className="rounded-2xl border border-dashed border-[var(--app-border)] bg-[var(--app-solid-surface-2)] px-4 py-4 text-center text-[13px] text-[var(--app-text-55)]">
-                          Clique em um dia acima para ver os horários disponíveis.
+                    {experimentalGroupSelectedPairId ? (
+                      <>
+                        <div className="space-y-2">
+                          <label className="text-xs font-semibold text-[var(--app-text-70)]">
+                            Professor da turma
+                          </label>
+                          <div
+                            className="inline-flex min-h-[44px] w-full items-center justify-between gap-3 rounded-2xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] px-4 text-left text-[13px] font-semibold text-[var(--app-text-85)]"
+                            title={
+                              experimentalGroupDisplayProfessor?.name
+                                ? `Professor vinculado: ${experimentalGroupDisplayProfessor.name}`
+                                : "O professor será definido pela turma selecionada."
+                            }
+                          >
+                            <span className="flex min-w-0 items-center gap-2">
+                              <CheckCircle2 className="h-4 w-4 shrink-0 text-[var(--app-text-65)]" />
+                              <span className="min-w-0 truncate">
+                                {experimentalGroupDisplayProfessor?.name || "Professor definido pela turma"}
+                              </span>
+                            </span>
+                          </div>
+                          <div className="text-[12px] text-[var(--app-text-55)]">
+                            {experimentalGroupDisplayProfessor?.name
+                              ? `${experimentalGroupDisplayProfessor.name} (${experimentalGroupDisplayProfessor.phone})`
+                              : "As informações do professor seguem o que foi configurado na turma selecionada."}
+                          </div>
                         </div>
-                      ) : !experimentalGroupSelectedDateSlots.length ? (
-                        <div className="rounded-2xl border border-dashed border-[var(--app-border)] bg-[var(--app-solid-surface-2)] px-4 py-4 text-center text-[13px] text-[var(--app-text-55)]">
-                          Não há horários livres para este dia. Selecione outro dia disponível.
+
+                        <div className="space-y-2">
+                          <div className="flex items-center gap-3">
+                            <label className="text-xs font-semibold text-[var(--app-text-70)]">
+                              Dias disponíveis
+                              <span className="ml-2 font-normal text-[var(--app-text-45)]">
+                                ({experimentalGroupDateOptions.length})
+                              </span>
+                            </label>
+                          </div>
+
+                          <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 md:grid-cols-5">
+                            {experimentalGroupDateOptions.map((dateOption) => {
+                              const isSelected = experimentalGroupSelectedDateId === dateOption.id;
+                              return (
+                                <button
+                                  key={dateOption.id}
+                                  type="button"
+                                  onClick={() => {
+                                    setExperimentalGroupSelectedDateId(dateOption.id);
+                                    setExperimentalGroupSelectedSlotId(null);
+                                  }}
+                                  className={
+                                    "flex min-h-[76px] flex-col items-center justify-center gap-1 rounded-2xl border px-2 py-2 text-center transition duration-150 " +
+                                    (isSelected
+                                      ? "!border-transparent !bg-[#ea580c] !text-white shadow-md"
+                                      : "border-[var(--app-border)] bg-[var(--app-solid-surface)] text-[var(--app-text-85)] hover:border-[#ea580c]/35 hover:bg-[var(--app-hover)] hover:text-[var(--app-text-90)]")
+                                  }
+                                >
+                                  <div
+                                    className={
+                                      "text-[11px] uppercase tracking-wide font-semibold " +
+                                      (isSelected ? "!text-white/95" : "text-[var(--app-text-50)]")
+                                    }
+                                  >
+                                    {dateOption.weekdayShort}
+                                  </div>
+                                  <div
+                                    className={
+                                      "text-[20px] font-semibold leading-none " +
+                                      (isSelected ? "!text-white" : "text-[var(--app-text-92)]")
+                                    }
+                                  >
+                                    {dateOption.dayLabel}
+                                  </div>
+                                  <div
+                                    className={
+                                      "text-[10px] font-semibold " +
+                                      (isSelected ? "!text-white/90" : "text-[var(--app-text-55)]")
+                                    }
+                                  >
+                                    {dateOption.slotCount}{" "}
+                                    {dateOption.slotCount === 1 ? "horário" : "horários"}
+                                  </div>
+                                </button>
+                              );
+                            })}
+                          </div>
                         </div>
-                      ) : (
-                        <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 md:grid-cols-5">
-                          {experimentalGroupSelectedDateSlots.map((slot) => {
-                            const isSelected = selectedExperimentalGroupSlot?.id === slot.id;
-                            return (
-                              <button
-                                key={slot.id}
-                                type="button"
-                                onClick={() => setExperimentalGroupSelectedSlotId(slot.id)}
-                                className={
-                                  "flex h-12 items-center justify-center rounded-2xl border px-2 text-[15px] font-semibold transition duration-150 " +
-                                  (isSelected
-                                    ? "!border-transparent !bg-[#ea580c] !text-white shadow-md"
-                                    : "border-[var(--app-border)] bg-[var(--app-solid-surface)] text-[var(--app-text-85)] hover:border-[#ea580c]/35 hover:bg-[var(--app-hover)] hover:text-[var(--app-text-90)]")
-                                }
-                              >
-                                {slot.lead_time || slot.professor_time || "Horário"}
-                              </button>
-                            );
-                          })}
+
+                        <div className="space-y-2">
+                          <label className="text-xs font-semibold text-[var(--app-text-70)]">
+                            Horários disponíveis
+                            {experimentalGroupSelectedDateId ? (
+                              <span className="ml-2 font-normal text-[var(--app-text-45)]">
+                                (dia selecionado)
+                              </span>
+                            ) : (
+                              <span className="ml-2 font-normal text-[var(--app-text-45)]">
+                                (selecione um dia primeiro)
+                              </span>
+                            )}
+                          </label>
+
+                          {!experimentalGroupSelectedDateId ? (
+                            <div className="rounded-2xl border border-dashed border-[var(--app-border)] bg-[var(--app-solid-surface-2)] px-4 py-4 text-center text-[13px] text-[var(--app-text-55)]">
+                              Clique em um dia acima para ver os horários disponíveis.
+                            </div>
+                          ) : !experimentalGroupSelectedDateSlots.length ? (
+                            <div className="rounded-2xl border border-dashed border-[var(--app-border)] bg-[var(--app-solid-surface-2)] px-4 py-4 text-center text-[13px] text-[var(--app-text-55)]">
+                              Não há horários livres para este dia. Selecione outro dia disponível.
+                            </div>
+                          ) : (
+                            <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 md:grid-cols-5">
+                              {experimentalGroupSelectedDateSlots.map((slot) => {
+                                const isSelected = selectedExperimentalGroupSlot?.id === slot.id;
+                                return (
+                                  <button
+                                    key={slot.id}
+                                    type="button"
+                                    onClick={() => setExperimentalGroupSelectedSlotId(slot.id)}
+                                    className={
+                                      "flex h-12 items-center justify-center rounded-2xl border px-2 text-[15px] font-semibold transition duration-150 " +
+                                      (isSelected
+                                        ? "!border-transparent !bg-[#ea580c] !text-white shadow-md"
+                                        : "border-[var(--app-border)] bg-[var(--app-solid-surface)] text-[var(--app-text-85)] hover:border-[#ea580c]/35 hover:bg-[var(--app-hover)] hover:text-[var(--app-text-90)]")
+                                    }
+                                  >
+                                    {slot.lead_time || slot.professor_time || "Horário"}
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          )}
                         </div>
-                      )}
-                    </div>
+                      </>
+                    ) : (
+                      <div className="rounded-2xl border border-dashed border-[var(--app-border)] bg-[var(--app-solid-surface-2)] px-4 py-5 text-center text-[13px] text-[var(--app-text-55)]">
+                        Selecione uma turma disponível primeiro.
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
