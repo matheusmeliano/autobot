@@ -526,6 +526,21 @@ function leadHasNameForExperimentalGroup(
   return Boolean(nameRaw);
 }
 
+function normalizeExperimentalGroupErrorMessage(value: unknown, fallback: string): string {
+  const message = String(value ?? "").trim();
+  if (
+    /(atendimento_experimental_group_classes|atendimento_experimental_group_class_members)/i.test(
+      message,
+    ) &&
+    /(schema cache|could not find the table|relation .* does not exist|PGRST205|42P01)/i.test(
+      message,
+    )
+  ) {
+    return "As turmas em grupo ainda não estão disponíveis neste ambiente. Atualize a estrutura do banco e recarregue a página.";
+  }
+  return message || fallback;
+}
+
 function recurringAssignedProfessorForGroupLead(
   lead: AtendimentoLeadListItem | null | undefined,
 ): { name: string; phone: string } | null {
@@ -4239,7 +4254,12 @@ export function AtendimentoClient() {
       if (handleForbiddenResponse(res)) return;
       const json = await res.json().catch(() => null);
       if (!json?.ok) {
-        modalToast.error(String(json?.error ?? "Falha ao carregar turmas disponíveis."));
+        modalToast.error(
+          normalizeExperimentalGroupErrorMessage(
+            json?.error,
+            "Falha ao carregar turmas disponíveis.",
+          ),
+        );
         return null;
       }
       setExperimentalGroupLeadSlotType(
@@ -4269,7 +4289,12 @@ export function AtendimentoClient() {
         settings: (json?.settings ?? null) as ExperimentalGroupSettingsPayload | null,
       };
     } catch (error: any) {
-      modalToast.error(String(error?.message ?? "Falha ao carregar turmas disponíveis."));
+      modalToast.error(
+        normalizeExperimentalGroupErrorMessage(
+          error?.message,
+          "Falha ao carregar turmas disponíveis.",
+        ),
+      );
       return null;
     } finally {
       setExperimentalGroupLoading(false);
@@ -4344,7 +4369,12 @@ export function AtendimentoClient() {
         if (handleForbiddenResponse(assignRes)) return;
         const assignJson = await assignRes.json().catch(() => null);
         if (!assignJson?.ok) {
-          modalToast.error(String(assignJson?.error ?? "Falha ao atribuir registro à turma."));
+          modalToast.error(
+            normalizeExperimentalGroupErrorMessage(
+              assignJson?.error,
+              "Falha ao atribuir registro à turma.",
+            ),
+          );
           return;
         }
         groupClassId = String(assignJson?.group_class_id ?? groupClassId).trim();
@@ -4363,7 +4393,12 @@ export function AtendimentoClient() {
       if (handleForbiddenResponse(confirmRes)) return;
       const confirmJson = await confirmRes.json().catch(() => null);
       if (!confirmJson?.ok) {
-        modalToast.error(String(confirmJson?.error ?? "Falha ao confirmar a turma."));
+        modalToast.error(
+          normalizeExperimentalGroupErrorMessage(
+            confirmJson?.error,
+            "Falha ao confirmar a turma.",
+          ),
+        );
         return;
       }
       await Promise.all([
@@ -4375,7 +4410,9 @@ export function AtendimentoClient() {
         `Turma confirmada. ${Number(confirmJson?.sent_count ?? 0)} mensagem(ns) enviada(s).`,
       );
     } catch (error: any) {
-      modalToast.error(String(error?.message ?? "Falha ao confirmar a turma."));
+      modalToast.error(
+        normalizeExperimentalGroupErrorMessage(error?.message, "Falha ao confirmar a turma."),
+      );
     } finally {
       setExperimentalGroupActionLoading(false);
     }
@@ -4398,13 +4435,23 @@ export function AtendimentoClient() {
       if (handleForbiddenResponse(res)) return;
       const json = await res.json().catch(() => null);
       if (!json?.ok) {
-        modalToast.error(String(json?.error ?? "Falha ao remover aluno da turma."));
+        modalToast.error(
+          normalizeExperimentalGroupErrorMessage(
+            json?.error,
+            "Falha ao remover aluno da turma.",
+          ),
+        );
         return;
       }
       await Promise.all([loadPanelLeads(), loadExperimentalGroupLeadData(experimentalGroupLead)]);
       modalToast.success("Aluno removido da turma.");
     } catch (error: any) {
-      modalToast.error(String(error?.message ?? "Falha ao remover aluno da turma."));
+      modalToast.error(
+        normalizeExperimentalGroupErrorMessage(
+          error?.message,
+          "Falha ao remover aluno da turma.",
+        ),
+      );
     } finally {
       setExperimentalGroupActionLoading(false);
     }

@@ -16,6 +16,32 @@ const schema = z.object({
   group_class_id: z.string().trim().uuid(),
 });
 
+function isMissingExperimentalGroupRelation(error: unknown): boolean {
+  const code = String((error as any)?.code ?? "").trim();
+  const message = String((error as any)?.message ?? "");
+  return (
+    code === "42P01" ||
+    code === "PGRST205" ||
+    /relation .*atendimento_experimental_group_(classes|class_members).*does not exist/i.test(
+      message,
+    ) ||
+    /could not find the table .*atendimento_experimental_group_(classes|class_members).* in the schema cache/i.test(
+      message,
+    )
+  );
+}
+
+function groupSchemaUnavailableResponse() {
+  return Response.json(
+    {
+      ok: false,
+      error:
+        "As turmas em grupo ainda não estão disponíveis neste ambiente. Atualize a estrutura do banco e recarregue a página.",
+    },
+    { status: 409 },
+  );
+}
+
 export async function POST(req: Request) {
   try {
     const auth = await requireAtendimentoUser();
@@ -39,6 +65,9 @@ export async function POST(req: Request) {
       .maybeSingle();
 
     if (groupClassError) {
+      if (isMissingExperimentalGroupRelation(groupClassError)) {
+        return groupSchemaUnavailableResponse();
+      }
       return Response.json({ ok: false, error: groupClassError.message }, { status: 500 });
     }
     if (!groupClass?.id) {
@@ -53,6 +82,9 @@ export async function POST(req: Request) {
       .order("created_at", { ascending: true });
 
     if (membersError) {
+      if (isMissingExperimentalGroupRelation(membersError)) {
+        return groupSchemaUnavailableResponse();
+      }
       return Response.json({ ok: false, error: membersError.message }, { status: 500 });
     }
 
@@ -83,7 +115,7 @@ export async function POST(req: Request) {
       leadsById.set(leadId, lead);
     }
 
-    await admin
+    const { error: updateClassError } = await admin
       .from("atendimento_experimental_group_classes")
       .update({
         status: "confirmed",
@@ -91,6 +123,12 @@ export async function POST(req: Request) {
         updated_at: nowIso,
       })
       .eq("id", groupClassId);
+    if (updateClassError) {
+      if (isMissingExperimentalGroupRelation(updateClassError)) {
+        return groupSchemaUnavailableResponse();
+      }
+      return Response.json({ ok: false, error: updateClassError.message }, { status: 500 });
+    }
 
     let sentCount = 0;
     const errors: Array<{ lead_id: string; error: string }> = [];
@@ -124,13 +162,16 @@ export async function POST(req: Request) {
             message,
             allowNoInbound: true,
           });
-          await admin
+          const { error: updateMemberError } = await admin
             .from("atendimento_experimental_group_class_members")
             .update({
               student_notification_sent_at: nowIso,
               updated_at: nowIso,
             })
             .eq("id", String((member as any)?.id ?? ""));
+          if (updateMemberError && isMissingExperimentalGroupRelation(updateMemberError)) {
+            return groupSchemaUnavailableResponse();
+          }
           sentCount += 1;
         } catch (error: any) {
           errors.push({

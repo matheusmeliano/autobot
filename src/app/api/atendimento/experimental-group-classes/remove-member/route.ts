@@ -11,6 +11,32 @@ const schema = z.object({
   slot_type: z.enum(["experimental", "recorrente"]).optional(),
 });
 
+function isMissingExperimentalGroupRelation(error: unknown): boolean {
+  const code = String((error as any)?.code ?? "").trim();
+  const message = String((error as any)?.message ?? "");
+  return (
+    code === "42P01" ||
+    code === "PGRST205" ||
+    /relation .*atendimento_experimental_group_(classes|class_members).*does not exist/i.test(
+      message,
+    ) ||
+    /could not find the table .*atendimento_experimental_group_(classes|class_members).* in the schema cache/i.test(
+      message,
+    )
+  );
+}
+
+function groupSchemaUnavailableResponse() {
+  return Response.json(
+    {
+      ok: false,
+      error:
+        "As turmas em grupo ainda não estão disponíveis neste ambiente. Atualize a estrutura do banco e recarregue a página.",
+    },
+    { status: 409 },
+  );
+}
+
 export async function POST(req: Request) {
   try {
     const auth = await requireAtendimentoUser();
@@ -67,34 +93,55 @@ export async function POST(req: Request) {
       .maybeSingle();
 
     if (memberError) {
+      if (isMissingExperimentalGroupRelation(memberError)) {
+        return groupSchemaUnavailableResponse();
+      }
       return Response.json({ ok: false, error: memberError.message }, { status: 500 });
     }
     if (!member?.id) {
       return Response.json({ ok: false, error: "member_not_found" }, { status: 404 });
     }
 
-    await admin
+    const { error: updateMemberError } = await admin
       .from("atendimento_experimental_group_class_members")
       .update({
         status: "removed",
         updated_at: nowIso,
       })
       .eq("id", String((member as any)?.id ?? ""));
+    if (updateMemberError) {
+      if (isMissingExperimentalGroupRelation(updateMemberError)) {
+        return groupSchemaUnavailableResponse();
+      }
+      return Response.json({ ok: false, error: updateMemberError.message }, { status: 500 });
+    }
 
-    const { count: activeCount } = await admin
+    const { count: activeCount, error: activeCountError } = await admin
       .from("atendimento_experimental_group_class_members")
       .select("id", { count: "exact", head: true })
       .eq("group_class_id", parsed.data.group_class_id)
       .eq("status", "assigned");
+    if (activeCountError) {
+      if (isMissingExperimentalGroupRelation(activeCountError)) {
+        return groupSchemaUnavailableResponse();
+      }
+      return Response.json({ ok: false, error: activeCountError.message }, { status: 500 });
+    }
 
     if (Number(activeCount ?? 0) <= 0) {
-      await admin
+      const { error: updateClassError } = await admin
         .from("atendimento_experimental_group_classes")
         .update({
           status: "cancelled",
           updated_at: nowIso,
         })
         .eq("id", parsed.data.group_class_id);
+      if (updateClassError) {
+        if (isMissingExperimentalGroupRelation(updateClassError)) {
+          return groupSchemaUnavailableResponse();
+        }
+        return Response.json({ ok: false, error: updateClassError.message }, { status: 500 });
+      }
     }
 
     await admin

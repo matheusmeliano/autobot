@@ -62,6 +62,32 @@ function isMissingExperimentalBookingRelation(error: unknown): boolean {
   );
 }
 
+function isMissingExperimentalGroupRelation(error: unknown): boolean {
+  const code = String((error as any)?.code ?? "").trim();
+  const message = String((error as any)?.message ?? "");
+  return (
+    code === "42P01" ||
+    code === "PGRST205" ||
+    /relation .*atendimento_experimental_group_(classes|class_members).*does not exist/i.test(
+      message,
+    ) ||
+    /could not find the table .*atendimento_experimental_group_(classes|class_members).* in the schema cache/i.test(
+      message,
+    )
+  );
+}
+
+function groupSchemaUnavailableResponse() {
+  return Response.json(
+    {
+      ok: false,
+      error:
+        "As turmas em grupo ainda não estão disponíveis neste ambiente. Atualize a estrutura do banco e recarregue a página.",
+    },
+    { status: 409 },
+  );
+}
+
 async function assignLeadToExperimentalGroupDirect(params: {
   admin: ReturnType<typeof createSupabaseAdminClient>;
   leadId: string;
@@ -102,6 +128,9 @@ async function assignLeadToExperimentalGroupDirect(params: {
     .single();
 
   if (upsertGroupClassError) {
+    if (isMissingExperimentalGroupRelation(upsertGroupClassError)) {
+      return { ok: false as const, error: "experimental_group_schema_unavailable" };
+    }
     return { ok: false as const, error: upsertGroupClassError.message };
   }
 
@@ -121,6 +150,9 @@ async function assignLeadToExperimentalGroupDirect(params: {
       })
       .eq("id", groupClassId);
     if (reopenGroupError) {
+      if (isMissingExperimentalGroupRelation(reopenGroupError)) {
+        return { ok: false as const, error: "experimental_group_schema_unavailable" };
+      }
       return { ok: false as const, error: reopenGroupError.message };
     }
   }
@@ -135,6 +167,9 @@ async function assignLeadToExperimentalGroupDirect(params: {
     .maybeSingle();
 
   if (existingOtherGroupError) {
+    if (isMissingExperimentalGroupRelation(existingOtherGroupError)) {
+      return { ok: false as const, error: "experimental_group_schema_unavailable" };
+    }
     return { ok: false as const, error: existingOtherGroupError.message };
   }
   if (existingOtherGroupMember?.group_class_id) {
@@ -151,6 +186,9 @@ async function assignLeadToExperimentalGroupDirect(params: {
     .maybeSingle();
 
   if (existingMemberError) {
+    if (isMissingExperimentalGroupRelation(existingMemberError)) {
+      return { ok: false as const, error: "experimental_group_schema_unavailable" };
+    }
     return { ok: false as const, error: existingMemberError.message };
   }
 
@@ -161,6 +199,9 @@ async function assignLeadToExperimentalGroupDirect(params: {
     .eq("status", "assigned");
 
   if (occupiedBeforeError) {
+    if (isMissingExperimentalGroupRelation(occupiedBeforeError)) {
+      return { ok: false as const, error: "experimental_group_schema_unavailable" };
+    }
     return { ok: false as const, error: occupiedBeforeError.message };
   }
 
@@ -190,6 +231,9 @@ async function assignLeadToExperimentalGroupDirect(params: {
     .single();
 
   if (assignMemberError) {
+    if (isMissingExperimentalGroupRelation(assignMemberError)) {
+      return { ok: false as const, error: "experimental_group_schema_unavailable" };
+    }
     const message = String(assignMemberError.message ?? "");
     if (
       /atendimento_experimental_group_class_members_active_lead_key/i.test(message) ||
@@ -207,13 +251,19 @@ async function assignLeadToExperimentalGroupDirect(params: {
     .eq("status", "assigned");
 
   if (occupiedAfterError) {
+    if (isMissingExperimentalGroupRelation(occupiedAfterError)) {
+      return { ok: false as const, error: "experimental_group_schema_unavailable" };
+    }
     return { ok: false as const, error: occupiedAfterError.message };
   }
 
-  await admin
+  const { error: touchGroupError } = await admin
     .from("atendimento_experimental_group_classes")
     .update({ updated_at: nowIso })
     .eq("id", groupClassId);
+  if (touchGroupError && isMissingExperimentalGroupRelation(touchGroupError)) {
+    return { ok: false as const, error: "experimental_group_schema_unavailable" };
+  }
 
   return {
     ok: true as const,
@@ -427,6 +477,9 @@ export async function POST(req: Request) {
     });
 
     if (!assignmentResult.ok) {
+      if (assignmentResult.error.includes("experimental_group_schema_unavailable")) {
+        return groupSchemaUnavailableResponse();
+      }
       if (assignmentResult.error.includes("group_class_full")) {
         return Response.json(
           { ok: false, error: "A turma selecionada acabou de ficar lotada." },
