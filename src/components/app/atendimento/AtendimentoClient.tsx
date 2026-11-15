@@ -100,6 +100,8 @@ type ExperimentalAvailabilityPayload = {
 type ExperimentalGroupSlotPayload = {
   id: string;
   group_class_id: string | null;
+  pair_id: string | null;
+  slot_type: "experimental" | "recorrente";
   professor_name: string | null;
   professor_phone: string | null;
   professor_timezone: string;
@@ -517,11 +519,33 @@ function leadHasStateAndCityForExperimentalGroup(
   return Boolean(stateRaw && cityRaw);
 }
 
+function recurringAssignedProfessorForGroupLead(
+  lead: AtendimentoLeadListItem | null | undefined,
+): { name: string; phone: string } | null {
+  if (!lead) return null;
+  const nm = String((lead as any)?.recurring_class_professor_name ?? "").trim();
+  const ph = String((lead as any)?.recurring_class_professor_phone ?? "").trim();
+  if (!nm && !ph) return null;
+  return { name: nm || "Professor(a)", phone: ph };
+}
+
+function isLeadAssignedToRecurringGroup(lead: AtendimentoLeadListItem | null | undefined): boolean {
+  if (!lead) return false;
+  const assignedPairId = String((lead as any)?.recurring_class_group_pair_id ?? "").trim();
+  const assignedStatus = String((lead as any)?.recurring_class_group_status ?? "").trim().toLowerCase();
+  return Boolean(assignedPairId && assignedStatus !== "removed");
+}
+
+function isLeadAssignedToAnyGroup(lead: AtendimentoLeadListItem | null | undefined): boolean {
+  return isLeadAssignedToExperimentalGroup(lead) || isLeadAssignedToRecurringGroup(lead);
+}
+
 function deriveExperimentalGroupCardState(params: {
   lead: AtendimentoLeadListItem | null | undefined;
   settingsEnabled: boolean;
 }) {
   const lead = params.lead;
+  const isStudentLead = isLeadMatriculaConcluida(lead as AtendimentoLeadListItem);
   const reasons: string[] = [];
   const hardReasons: string[] = [];
   const phoneRaw = String(lead?.phone ?? "").trim();
@@ -531,12 +555,15 @@ function deriveExperimentalGroupCardState(params: {
     /^1\d{10}$/.test(phoneDigits) ||
     /^351\d{9}$/.test(phoneDigits) ||
     phoneDigits.length >= 10;
-  const hasAssignedProfessor = Boolean(experimentalAssignedProfessorForLead(lead));
+  const hasAssignedProfessor = isStudentLead
+    ? Boolean(recurringAssignedProfessorForGroupLead(lead))
+    : Boolean(experimentalAssignedProfessorForLead(lead));
   const assignedGroupId = String((lead as any)?.experimental_class_group_class_id ?? "").trim();
   const assignedStatus = String((lead as any)?.experimental_class_group_status ?? "").trim().toLowerCase();
   const alreadyAssignedToGroup = Boolean(
     assignedGroupId && assignedStatus && assignedStatus !== "removed",
   );
+  const alreadyAssignedToRecurringGroup = isLeadAssignedToRecurringGroup(lead);
   const hasScheduledExperimentalClass = leadHasScheduledExperimentalClassForGroupCard(lead);
 
   if (!params.settingsEnabled) reasons.push("Ative a funcionalidade e configure pelo menos uma turma com dia e horário.");
@@ -544,17 +571,21 @@ function deriveExperimentalGroupCardState(params: {
   if (!leadHasStateAndCityForExperimentalGroup(lead)) {
     reasons.push("Para atribuir uma turma a este registro, informe primeiro o estado e a cidade.");
   }
-  if (!hasAssignedProfessor && !alreadyAssignedToGroup) {
-    reasons.push("Selecione primeiro o professor deste registro.");
+  if (!hasAssignedProfessor && !alreadyAssignedToGroup && !alreadyAssignedToRecurringGroup) {
+    reasons.push(
+      isStudentLead
+        ? "Selecione primeiro o professor das aulas recorrentes."
+        : "Selecione primeiro o professor deste registro.",
+    );
   }
-  if (hasScheduledExperimentalClass && !alreadyAssignedToGroup) {
+  if (!isStudentLead && hasScheduledExperimentalClass && !alreadyAssignedToGroup) {
     hardReasons.push("O aluno já possui aula experimental definida.");
   }
 
   return {
-    disabled: hardReasons.length > 0 && !alreadyAssignedToGroup,
+    disabled: hardReasons.length > 0 && !alreadyAssignedToGroup && !alreadyAssignedToRecurringGroup,
     reasons: [...hardReasons, ...reasons],
-    alreadyAssignedToGroup,
+    alreadyAssignedToGroup: alreadyAssignedToGroup || alreadyAssignedToRecurringGroup,
     interestRegistered: Boolean((lead as any)?.experimental_class_group_interest),
   };
 }
@@ -568,7 +599,7 @@ function isLeadAssignedToExperimentalGroup(lead: AtendimentoLeadListItem | null 
 
 function isLeadMarkedForExperimentalGroup(lead: AtendimentoLeadListItem | null | undefined): boolean {
   if (!lead) return false;
-  if (isLeadAssignedToExperimentalGroup(lead)) return true;
+  if (isLeadAssignedToAnyGroup(lead)) return true;
   if (Boolean((lead as any)?.experimental_class_group_interest)) return true;
   return String((lead as any)?.experimental_class_mode_preference ?? "").trim().toLowerCase() === "group";
 }
@@ -2096,6 +2127,11 @@ export function AtendimentoClient() {
       null
     );
   }, [experimentalGroupSelectedSlotId, experimentalGroupSlots]);
+
+  const experimentalGroupLeadSlotType = useMemo<"experimental" | "recorrente">(
+    () => (isLeadMatriculaConcluida(experimentalGroupLead as AtendimentoLeadListItem) ? "recorrente" : "experimental"),
+    [experimentalGroupLead],
+  );
 
   const experimentalGroupVisibleSlots = useMemo<ExperimentalGroupSlotPayload[]>(() => {
     return experimentalGroupSlots.filter(
@@ -4064,7 +4100,7 @@ export function AtendimentoClient() {
 
   async function handleOpenExperimentalGroupModal(lead: AtendimentoLeadListItem) {
     if (
-      !isLeadAssignedToExperimentalGroup(lead) &&
+      !isLeadAssignedToAnyGroup(lead) &&
       !leadHasStateAndCityForExperimentalGroup(lead)
     ) {
       modalToast.warning(
@@ -4089,6 +4125,10 @@ export function AtendimentoClient() {
     }
     if (result.reasons.includes("missing_assigned_professor")) {
       modalToast.warning("Selecione primeiro o professor deste registro.");
+      return;
+    }
+    if (result.reasons.includes("missing_assigned_recurring_professor")) {
+      modalToast.warning("Selecione primeiro o professor das aulas recorrentes.");
       return;
     }
     if (result.reasons.includes("missing_valid_phone")) {
@@ -4122,6 +4162,8 @@ export function AtendimentoClient() {
           lead_id: experimentalGroupLead.id,
           group_class_id: slot.group_class_id,
           professor_start_at: slot.professor_start_at,
+          pair_id: slot.pair_id,
+          slot_type: slot.slot_type,
         }),
       });
       if (handleForbiddenResponse(res)) return;
@@ -4139,7 +4181,7 @@ export function AtendimentoClient() {
     }
   }
 
-  async function handleRemoveLeadFromExperimentalGroup(groupClassId: string, leadId: string) {
+  async function handleRemoveLeadFromExperimentalGroup(slot: ExperimentalGroupSlotPayload, leadId: string) {
     if (experimentalGroupActionLoading || !experimentalGroupLead) return;
     setExperimentalGroupActionLoading(true);
     try {
@@ -4147,7 +4189,9 @@ export function AtendimentoClient() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          group_class_id: groupClassId,
+          group_class_id: slot.group_class_id,
+          pair_id: slot.pair_id,
+          slot_type: slot.slot_type,
           lead_id: leadId,
         }),
       });
@@ -6645,14 +6689,14 @@ export function AtendimentoClient() {
                           lead: sl,
                           settingsEnabled: Boolean(experimentalGroupSettings?.enabled),
                         });
+                        const isStudentLead = isLeadMatriculaConcluida(sl);
                         const groupShortcutLocked =
                           groupCardState.disabled ||
-                          leadHasScheduledExperimentalClassForGroupCard(sl) ||
-                          isLeadMatriculaConcluida(sl);
+                          (!isStudentLead && leadHasScheduledExperimentalClassForGroupCard(sl));
                         return (
                           <button
                             type="button"
-                            aria-label="Selecionar aula experimental em grupo"
+                            aria-label="Selecionar aula em grupo"
                             aria-pressed={isLeadMarkedForExperimentalGroup(sl)}
                             onClick={() => {
                               if (groupShortcutLocked) return;
@@ -6671,10 +6715,10 @@ export function AtendimentoClient() {
                               groupShortcutLocked
                                 ? groupCardState.disabled
                                   ? groupCardState.reasons[0] ?? "Turma em grupo indisponível."
-                                  : isLeadMatriculaConcluida(sl)
-                                  ? "Esse registro já é aluno."
                                   : "Esse registro já possui aula experimental agendada."
-                                : "Selecionar este registro para aula experimental em grupo"
+                                : isStudentLead
+                                  ? "Selecionar este aluno para turma recorrente em grupo"
+                                  : "Selecionar este registro para aula experimental em grupo"
                             }
                           >
                             <Users className="h-5 w-5" strokeWidth={1.75} />
@@ -8259,14 +8303,14 @@ export function AtendimentoClient() {
                         lead: sl,
                         settingsEnabled: Boolean(experimentalGroupSettings?.enabled),
                       });
+                      const isStudentLead = isLeadMatriculaConcluida(sl);
                       const groupShortcutLocked =
                         groupCardState.disabled ||
-                        leadHasScheduledExperimentalClassForGroupCard(sl) ||
-                        isLeadMatriculaConcluida(sl);
+                        (!isStudentLead && leadHasScheduledExperimentalClassForGroupCard(sl));
                       return (
                         <button
                           type="button"
-                          aria-label="Selecionar aula experimental em grupo"
+                          aria-label="Selecionar aula em grupo"
                           aria-pressed={isLeadMarkedForExperimentalGroup(sl)}
                           onClick={() => {
                             if (groupShortcutLocked) return;
@@ -8285,10 +8329,10 @@ export function AtendimentoClient() {
                             groupShortcutLocked
                               ? groupCardState.disabled
                                 ? groupCardState.reasons[0] ?? "Turma em grupo indisponível."
-                                : isLeadMatriculaConcluida(sl)
-                                ? "Esse registro já é aluno."
                                 : "Esse registro já possui aula experimental agendada."
-                              : "Selecionar este registro para aula experimental em grupo"
+                              : isStudentLead
+                                ? "Selecionar este aluno para turma recorrente em grupo"
+                                : "Selecionar este registro para aula experimental em grupo"
                           }
                         >
                           <Users className="h-5 w-5" strokeWidth={1.75} />
@@ -10072,7 +10116,7 @@ export function AtendimentoClient() {
           <div className="flex items-center justify-between gap-3">
             <div>
               <h3 className="text-[18px] font-bold text-[var(--app-text-85)]">
-                Aula Experimental em Grupo
+                Aula em Grupo
               </h3>
               <div className="mt-1 text-[12px] text-[var(--app-text-55)]">
                 {String(experimentalGroupLead?.full_name ?? "").trim() || "Registro selecionado"}
@@ -10101,7 +10145,9 @@ export function AtendimentoClient() {
                 <div className="mt-1 text-[12px] text-[var(--app-text-55)]">
                   {experimentalGroupAssignedProfessor?.name
                     ? `${experimentalGroupAssignedProfessor.name} (${experimentalGroupAssignedProfessor.phone})`
-                    : "Selecione primeiro o professor no card de Aula experimental para liberar as turmas em grupo."}
+                    : experimentalGroupLeadSlotType === "recorrente"
+                      ? "Selecione primeiro o professor no card de Aulas recorrentes para liberar as turmas em grupo."
+                      : "Selecione primeiro o professor no card de Aula experimental para liberar as turmas em grupo."}
                 </div>
               </div>
               {(() => {
@@ -10254,7 +10300,7 @@ export function AtendimentoClient() {
                           <button
                             type="button"
                             disabled={experimentalGroupActionLoading}
-                            onClick={() => void handleRemoveLeadFromExperimentalGroup(String(selectedExperimentalGroupSlot.group_class_id ?? ""), member.lead_id)}
+                            onClick={() => void handleRemoveLeadFromExperimentalGroup(selectedExperimentalGroupSlot, member.lead_id)}
                             className="inline-flex h-9 items-center justify-center gap-1 rounded-xl border border-[var(--app-border)] px-3 text-[12px] font-semibold text-[var(--app-text-75)] disabled:cursor-not-allowed disabled:opacity-60"
                           >
                             <Trash2 className="h-3.5 w-3.5" />
@@ -10279,23 +10325,30 @@ export function AtendimentoClient() {
                     ) : (
                       <button
                         type="button"
-                        disabled={experimentalGroupActionLoading || !selectedExperimentalGroupSlot.group_class_id}
-                        onClick={() => void handleRemoveLeadFromExperimentalGroup(String(selectedExperimentalGroupSlot.group_class_id ?? ""), String(experimentalGroupLead?.id ?? ""))}
+                        disabled={experimentalGroupActionLoading}
+                        onClick={() =>
+                          void handleRemoveLeadFromExperimentalGroup(
+                            selectedExperimentalGroupSlot,
+                            String(experimentalGroupLead?.id ?? ""),
+                          )
+                        }
                         className="inline-flex min-h-[42px] items-center justify-center gap-2 rounded-xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] px-4 text-[13px] font-semibold text-[var(--app-text-85)] disabled:cursor-not-allowed disabled:opacity-60"
                       >
                         <Trash2 className="h-4 w-4" />
                         Remover este aluno
                       </button>
                     )}
-                    <button
-                      type="button"
-                      disabled={experimentalGroupActionLoading || !selectedExperimentalGroupSlot.group_class_id || selectedExperimentalGroupSlot.occupied_seats <= 0}
-                      onClick={() => void handleConfirmExperimentalGroup(String(selectedExperimentalGroupSlot.group_class_id ?? ""))}
-                      className="inline-flex min-h-[42px] items-center justify-center gap-2 rounded-xl bg-[#ea580c] px-4 text-[13px] font-semibold text-white disabled:cursor-not-allowed disabled:opacity-60"
-                    >
-                      {experimentalGroupActionLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
-                      Confirmar turma
-                    </button>
+                    {selectedExperimentalGroupSlot.slot_type === "experimental" ? (
+                      <button
+                        type="button"
+                        disabled={experimentalGroupActionLoading || !selectedExperimentalGroupSlot.group_class_id || selectedExperimentalGroupSlot.occupied_seats <= 0}
+                        onClick={() => void handleConfirmExperimentalGroup(String(selectedExperimentalGroupSlot.group_class_id ?? ""))}
+                        className="inline-flex min-h-[42px] items-center justify-center gap-2 rounded-xl bg-[#ea580c] px-4 text-[13px] font-semibold text-white disabled:cursor-not-allowed disabled:opacity-60"
+                      >
+                        {experimentalGroupActionLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
+                        Confirmar turma
+                      </button>
+                    ) : null}
                   </div>
                 </div>
               ) : null}

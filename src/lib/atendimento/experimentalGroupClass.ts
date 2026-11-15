@@ -61,6 +61,8 @@ export type ExperimentalGroupClassRecord = {
 export type ExperimentalGroupSlotSummary = {
   id: string;
   group_class_id: string | null;
+  pair_id: string | null;
+  slot_type: ExperimentalGroupSlotType;
   professor_name: string | null;
   professor_phone: string | null;
   professor_timezone: string;
@@ -299,6 +301,34 @@ export function resolveExperimentalGroupProfessorFromLead(lead: Record<string, u
   return null;
 }
 
+export function resolveRecurringGroupProfessorFromLead(lead: Record<string, unknown> | null): {
+  name: string;
+  phone: string;
+} | null {
+  if (!lead) return null;
+  const flatName = String((lead as any)?.recurring_class_professor_name ?? "").trim();
+  const flatPhone = String((lead as any)?.recurring_class_professor_phone ?? "").trim();
+  const normalizedFlat = normalizarExperimentalProfessorParaAllowlist({
+    name: flatName || null,
+    phone: flatPhone || null,
+  });
+  if (normalizedFlat?.name && normalizedFlat?.phone) {
+    return {
+      name: normalizedFlat.name,
+      phone: normalizedFlat.phone,
+    };
+  }
+
+  if (flatName || flatPhone) {
+    return {
+      name: flatName || "Professor(a)",
+      phone: flatPhone,
+    };
+  }
+
+  return null;
+}
+
 export function experimentalGroupWeekdayLabel(weekday: ExperimentalGroupWeekdayKey): string {
   return WEEKDAY_LABELS_PT_BR[weekday] ?? weekday;
 }
@@ -503,6 +533,8 @@ export function listExperimentalGroupClassSlots(params: {
       slots.push({
         id: existingClass?.id ?? professorStartAt,
         group_class_id: existingClass?.id ?? null,
+        pair_id: configuredSlot.pair_id ?? null,
+        slot_type: "experimental",
         professor_name: existingClass?.professor_name ?? assignedProfessor?.name ?? null,
         professor_phone: existingClass?.professor_phone ?? assignedProfessor?.phone ?? null,
         professor_timezone: professorTimeZone,

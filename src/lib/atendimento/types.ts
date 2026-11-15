@@ -41,6 +41,8 @@ export type AtendimentoLead = {
   recurring_class_weekday_label?: string | null;
   recurring_class_professor_time?: string | null;
   recurring_class_lead_time?: string | null;
+  recurring_class_group_pair_id?: string | null;
+  recurring_class_group_status?: string | null;
   recurring_class_created_at?: string | null;
   recurring_class_student_start_notification_sent_at?: string | null;
   recurring_class_attendant_start_notification_sent_at?: string | null;

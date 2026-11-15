@@ -2,11 +2,13 @@ import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { requireAtendimentoUser } from "@/lib/atendimento/server";
 import {
   buildExperimentalGroupClassSlotsForLead,
+  buildRecurringGroupClassSlotsForLead,
   loadExperimentalGroupClassSettings,
 } from "@/lib/atendimento/experimentalGroupClassServer";
 import {
   isLeadPhoneEligibleForExperimentalGroup,
   resolveExperimentalGroupProfessorFromLead,
+  resolveRecurringGroupProfessorFromLead,
 } from "@/lib/atendimento/experimentalGroupClass";
 
 export const dynamic = "force-dynamic";
@@ -18,6 +20,24 @@ function hasIndividualExperimentalScheduled(lead: Record<string, unknown> | null
   const flatStartAt = String((lead as any)?.experimental_class_professor_start_at ?? "").trim();
   if (statusRaw && statusRaw !== "cancelled" && flatStartAt) return true;
   return false;
+}
+
+function isLeadRecurringStudent(lead: Record<string, unknown> | null): boolean {
+  if (!lead) return false;
+  const payStatusRaw = String((lead as any)?.payment_status ?? "").trim().toLowerCase();
+  const payConfirmedAtRaw = String((lead as any)?.payment_confirmed_at ?? "").trim();
+  const leadStatusRaw = String((lead as any)?.status ?? "").trim().toLowerCase();
+  const funnelRaw = String((lead as any)?.funnel_stage ?? "").trim().toLowerCase();
+  return (
+    payStatusRaw === "confirmado" ||
+    payStatusRaw === "matriculado" ||
+    Boolean(payConfirmedAtRaw && payConfirmedAtRaw !== "null") ||
+    leadStatusRaw === "matriculado" ||
+    leadStatusRaw === "matricula_confirmada" ||
+    funnelRaw === "matriculado" ||
+    funnelRaw === "matricula_confirmada" ||
+    Boolean(String((lead as any)?.enrollment_number ?? "").trim())
+  );
 }
 
 export async function GET(_req: Request, { params }: { params: Promise<{ leadId: string }> }) {
@@ -48,8 +68,11 @@ export async function GET(_req: Request, { params }: { params: Promise<{ leadId:
     }
 
     const { settings, updatedAt } = await loadExperimentalGroupClassSettings({ admin });
+    const isStudentLead = isLeadRecurringStudent(lead as any);
     const hasPhone = isLeadPhoneEligibleForExperimentalGroup((lead as any)?.phone ?? null);
-    const assignedProfessor = resolveExperimentalGroupProfessorFromLead(lead as any);
+    const assignedProfessor = isStudentLead
+      ? resolveRecurringGroupProfessorFromLead(lead as any)
+      : resolveExperimentalGroupProfessorFromLead(lead as any);
 
     const { data: activeIndividualBookings, error: activeIndividualBookingsError } = await admin
       .from("atendimento_experimental_class_bookings")
@@ -65,14 +88,22 @@ export async function GET(_req: Request, { params }: { params: Promise<{ leadId:
     const hasScheduledIndividual =
       Boolean((activeIndividualBookings ?? []).length) || hasIndividualExperimentalScheduled(lead as any);
 
-    const slots = await buildExperimentalGroupClassSlotsForLead({
-      admin,
-      lead: lead as Record<string, unknown>,
-      settings,
-      now: new Date(),
-      lookAheadDays: 42,
-      excludeLeadIdFromIndividualBookings: false,
-    });
+    const slots = isStudentLead
+      ? await buildRecurringGroupClassSlotsForLead({
+          admin,
+          lead: lead as Record<string, unknown>,
+          settings,
+          now: new Date(),
+          lookAheadDays: 56,
+        })
+      : await buildExperimentalGroupClassSlotsForLead({
+          admin,
+          lead: lead as Record<string, unknown>,
+          settings,
+          now: new Date(),
+          lookAheadDays: 42,
+          excludeLeadIdFromIndividualBookings: false,
+        });
 
     const currentAssignedSlot =
       slots.find((slot) => slot.is_current_lead_assigned) ?? null;
@@ -80,11 +111,16 @@ export async function GET(_req: Request, { params }: { params: Promise<{ leadId:
     const reasons: string[] = [];
     if (!settings.enabled) reasons.push("feature_disabled");
     if (!hasPhone) reasons.push("missing_valid_phone");
-    if (!assignedProfessor) reasons.push("missing_assigned_professor");
-    if (hasScheduledIndividual) reasons.push("individual_experimental_already_scheduled");
+    if (!assignedProfessor) {
+      reasons.push(isStudentLead ? "missing_assigned_recurring_professor" : "missing_assigned_professor");
+    }
+    if (!isStudentLead && hasScheduledIndividual) {
+      reasons.push("individual_experimental_already_scheduled");
+    }
 
     return Response.json({
       ok: true,
+      lead_slot_type: isStudentLead ? "recorrente" : "experimental",
       settings,
       settings_updated_at: updatedAt,
       assigned_professor: assignedProfessor,

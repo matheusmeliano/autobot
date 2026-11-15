@@ -5,8 +5,10 @@ import { appendHistoryEvent, requireAtendimentoUser } from "@/lib/atendimento/se
 export const runtime = "nodejs";
 
 const schema = z.object({
-  group_class_id: z.string().trim().uuid(),
+  group_class_id: z.string().trim().uuid().optional(),
   lead_id: z.string().trim().uuid(),
+  pair_id: z.string().trim().min(1).optional(),
+  slot_type: z.enum(["experimental", "recorrente"]).optional(),
 });
 
 export async function POST(req: Request) {
@@ -23,6 +25,39 @@ export async function POST(req: Request) {
 
     const admin = createSupabaseAdminClient();
     const nowIso = new Date().toISOString();
+
+    if (parsed.data.slot_type === "recorrente" || (!parsed.data.group_class_id && parsed.data.pair_id)) {
+      await admin
+        .from("atendimento_leads")
+        .update({
+          recurring_class_group_pair_id: null,
+          recurring_class_group_status: "removed",
+          recurring_class_weekday: null,
+          recurring_class_weekday_label: null,
+          recurring_class_professor_time: null,
+          recurring_class_lead_time: null,
+          updated_at: nowIso,
+        })
+        .eq("id", parsed.data.lead_id);
+
+      await appendHistoryEvent({
+        leadId: parsed.data.lead_id,
+        conversationId: null,
+        eventType: "recurring_group_class_member_removed",
+        title: "Aluno removido de uma turma recorrente em grupo",
+        details: {
+          pair_id: String(parsed.data.pair_id ?? "").trim() || null,
+        },
+        actorType: "attendant",
+        actorEmail: auth.user.email,
+      });
+
+      return Response.json({ ok: true });
+    }
+
+    if (!parsed.data.group_class_id) {
+      return Response.json({ ok: false, error: "invalid_payload" }, { status: 400 });
+    }
 
     const { data: member, error: memberError } = await admin
       .from("atendimento_experimental_group_class_members")

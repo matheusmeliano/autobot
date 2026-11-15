@@ -1,14 +1,21 @@
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
+import { resolveLeadTimeZoneFromRecord, zonedDateTimeToUtcIso } from "@/lib/timezone";
+import { normalizePhoneDigits } from "@/lib/phone";
 import {
+  experimentalGroupWeekdayLabel,
   getDefaultExperimentalGroupClassSettings,
   listExperimentalGroupClassSlots,
   normalizeExperimentalGroupClassSettings,
   resolveExperimentalGroupProfessorFromLead,
+  resolveRecurringGroupProfessorFromLead,
   type ExperimentalGroupClassRecord,
   type ExperimentalGroupClassSettings,
   type ExperimentalGroupClassMemberSummary,
+  type ExperimentalGroupSlotType,
   type ExperimentalGroupSlotSummary,
 } from "./experimentalGroupClass";
+import { ATENDIMENTO_PROFESSOR_TIME_ZONE } from "./constants";
+import { EXPERIMENTAL_CLASS_DURATION_MINUTES } from "./experimentalClass";
 import { loadRecurringCalendarOccupiedIntervals } from "./server";
 
 export const EXPERIMENTAL_GROUP_CLASS_SETTINGS_KEY =
@@ -20,9 +27,129 @@ function isMissingRelationError(error: unknown): boolean {
   return (
     code === "42P01" ||
     code === "PGRST205" ||
+    code === "42703" ||
     /relation .* does not exist/i.test(message) ||
+    /column .* does not exist/i.test(message) ||
     /could not find the table .* in the schema cache/i.test(message)
   );
+}
+
+type RecurringGroupAssignedLeadRecord = {
+  id: string;
+  full_name: string | null;
+  phone: string | null;
+  recurring_class_weekday: string | null;
+  recurring_class_weekday_label: string | null;
+  recurring_class_professor_time: string | null;
+  recurring_class_lead_time: string | null;
+  recurring_class_professor_phone: string | null;
+  recurring_class_group_pair_id: string | null;
+  recurring_class_group_status: string | null;
+};
+
+function localDateInTimeZone(value: Date | string | number, timeZone: string): string {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(new Date(value));
+  const map = Object.fromEntries(
+    parts.filter((part) => part.type !== "literal").map((part) => [part.type, part.value]),
+  );
+  return `${map.year}-${map.month}-${map.day}`;
+}
+
+function weekdayInTimeZone(value: Date | string | number, timeZone: string): string {
+  return new Intl.DateTimeFormat("en-US", {
+    timeZone,
+    weekday: "short",
+  })
+    .format(new Date(value))
+    .toLowerCase()
+    .slice(0, 3);
+}
+
+function formatTimeInTimeZone(iso: string, timeZone: string): string {
+  return new Intl.DateTimeFormat("pt-BR", {
+    timeZone,
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  }).format(new Date(iso));
+}
+
+function normalizeRecurringProfessorTime(row: Partial<RecurringGroupAssignedLeadRecord>): string {
+  const professorTime = String(row.recurring_class_professor_time ?? "").trim();
+  if (/^\d{2}:\d{2}$/.test(professorTime)) return professorTime;
+  const leadTime = String(row.recurring_class_lead_time ?? "").trim();
+  return /^\d{2}:\d{2}$/.test(leadTime) ? leadTime : "";
+}
+
+function startAtConflicts(params: {
+  professorStartAt: string;
+  occupiedIntervals: Array<{ start_at: string; end_at: string; lead_id: string | null; professor_phone_digits: string | null }>;
+  professorPhoneDigits: string;
+}) {
+  const startMs = new Date(params.professorStartAt).getTime();
+  if (!Number.isFinite(startMs) || startMs <= 0) return false;
+  const endMs = startMs + EXPERIMENTAL_CLASS_DURATION_MINUTES * 60 * 1000;
+  return params.occupiedIntervals.some((interval) => {
+    if (
+      params.professorPhoneDigits &&
+      interval.professor_phone_digits &&
+      interval.professor_phone_digits !== params.professorPhoneDigits
+    ) {
+      return false;
+    }
+    const intervalStartMs = new Date(String(interval.start_at ?? "")).getTime();
+    const intervalEndMs = new Date(String(interval.end_at ?? "")).getTime();
+    if (!Number.isFinite(intervalStartMs) || !Number.isFinite(intervalEndMs)) return false;
+    return startMs < intervalEndMs && intervalStartMs < endMs;
+  });
+}
+
+export async function listAssignedRecurringGroupMembers(params: {
+  admin: ReturnType<typeof createSupabaseAdminClient>;
+}): Promise<RecurringGroupAssignedLeadRecord[]> {
+  try {
+    const { data, error } = await params.admin
+      .from("atendimento_leads")
+      .select(
+        "id, full_name, phone, recurring_class_weekday, recurring_class_weekday_label, recurring_class_professor_time, recurring_class_lead_time, recurring_class_professor_phone, recurring_class_group_pair_id, recurring_class_group_status",
+      )
+      .not("recurring_class_group_pair_id", "is", null);
+    if (error) {
+      if (isMissingRelationError(error)) return [];
+      throw error;
+    }
+    return (Array.isArray(data) ? data : [])
+      .map((row) => ({
+        id: String((row as any)?.id ?? "").trim(),
+        full_name: String((row as any)?.full_name ?? "").trim() || null,
+        phone: String((row as any)?.phone ?? "").trim() || null,
+        recurring_class_weekday: String((row as any)?.recurring_class_weekday ?? "").trim() || null,
+        recurring_class_weekday_label:
+          String((row as any)?.recurring_class_weekday_label ?? "").trim() || null,
+        recurring_class_professor_time:
+          String((row as any)?.recurring_class_professor_time ?? "").trim() || null,
+        recurring_class_lead_time: String((row as any)?.recurring_class_lead_time ?? "").trim() || null,
+        recurring_class_professor_phone:
+          String((row as any)?.recurring_class_professor_phone ?? "").trim() || null,
+        recurring_class_group_pair_id:
+          String((row as any)?.recurring_class_group_pair_id ?? "").trim() || null,
+        recurring_class_group_status:
+          String((row as any)?.recurring_class_group_status ?? "").trim() || null,
+      }))
+      .filter(
+        (row) =>
+          Boolean(row.id && row.recurring_class_group_pair_id) &&
+          String(row.recurring_class_group_status ?? "").trim().toLowerCase() !== "removed",
+      );
+  } catch (error) {
+    if (isMissingRelationError(error)) return [];
+    throw error;
+  }
 }
 
 export async function loadExperimentalGroupClassSettings(params: {
@@ -244,4 +371,163 @@ export async function buildExperimentalGroupClassSlotsForLead(params: {
     now,
     lookAheadDays: params.lookAheadDays ?? 42,
   });
+}
+
+export async function buildRecurringGroupClassSlotsForLead(params: {
+  admin: ReturnType<typeof createSupabaseAdminClient>;
+  lead: Record<string, unknown> | null;
+  settings?: ExperimentalGroupClassSettings | null;
+  now?: Date;
+  lookAheadDays?: number;
+}): Promise<ExperimentalGroupSlotSummary[]> {
+  const now = params.now ?? new Date();
+  const settings =
+    params.settings ?? (await loadExperimentalGroupClassSettings({ admin: params.admin })).settings;
+  const normalizedSettings = normalizeExperimentalGroupClassSettings(settings);
+  if (!normalizedSettings.slots.length) return [];
+
+  const assignedProfessor = resolveRecurringGroupProfessorFromLead(params.lead ?? null);
+  if (!assignedProfessor?.phone) return [];
+
+  const professorTimeZone =
+    String(normalizedSettings.professor_timezone ?? "").trim() || ATENDIMENTO_PROFESSOR_TIME_ZONE;
+  const leadTimeZone = resolveLeadTimeZoneFromRecord({
+    lead: params.lead ?? null,
+    fallbackTimeZone: professorTimeZone,
+  });
+  const leadId = String((params.lead as any)?.id ?? "").trim();
+  const professorPhoneDigits = normalizePhoneDigits(assignedProfessor.phone);
+  const capacity = Math.min(4, Math.max(1, Number(normalizedSettings.capacity ?? 4)));
+  const lookAheadDays = Math.max(14, Math.min(Number(params.lookAheadDays ?? 56), 84));
+  const recurringMembers = await listAssignedRecurringGroupMembers({ admin: params.admin });
+  const occupiedIntervalsRaw = await loadRecurringCalendarOccupiedIntervals({
+    admin: params.admin,
+    now,
+    lookAheadWeeks: 8,
+  });
+  const recurringSlots = normalizedSettings.slots.filter(
+    (slot) =>
+      slot.slot_type === ("recorrente" as ExperimentalGroupSlotType) &&
+      slot.enabled &&
+      slot.weekday &&
+      slot.professor_time,
+  );
+
+  const slots: ExperimentalGroupSlotSummary[] = [];
+  for (const configuredSlot of recurringSlots) {
+    const pairId = String(configuredSlot.pair_id ?? "").trim();
+    if (!pairId || !configuredSlot.weekday || !configuredSlot.professor_time) continue;
+
+    const pairMembers = recurringMembers.filter(
+      (row) => String(row.recurring_class_group_pair_id ?? "").trim() === pairId,
+    );
+    const pairMemberIds = new Set(pairMembers.map((row) => row.id));
+    const isCurrentLeadAssigned = pairMemberIds.has(leadId);
+    const occupiedSeats = pairMembers.length;
+    const availableSeats = Math.max(capacity - occupiedSeats, 0);
+
+    const blockedByOtherRecurringSchedules = recurringMembers.some((row) => {
+      if (row.id === leadId) return false;
+      if (String(row.recurring_class_group_pair_id ?? "").trim() === pairId) return false;
+      if (
+        normalizePhoneDigits(row.recurring_class_professor_phone) !== professorPhoneDigits ||
+        String(row.recurring_class_weekday ?? "").trim().toLowerCase() !== configuredSlot.weekday ||
+        normalizeRecurringProfessorTime(row) !== configuredSlot.professor_time
+      ) {
+        return false;
+      }
+      return true;
+    });
+    if (blockedByOtherRecurringSchedules && !isCurrentLeadAssigned) {
+      continue;
+    }
+
+    const occupiedIntervals = occupiedIntervalsRaw
+      .filter((interval) => {
+        const intervalLeadId = String(interval.lead_id ?? "").trim() || null;
+        if (intervalLeadId && (intervalLeadId === leadId || pairMemberIds.has(intervalLeadId))) {
+          return false;
+        }
+        return true;
+      })
+      .map((interval) => ({
+        start_at: interval.start_at,
+        end_at: interval.end_at,
+        lead_id: interval.lead_id,
+        professor_phone_digits: interval.professor_phone_digits,
+      }));
+
+    let nextProfessorStartAt: string | null = null;
+    let nextProfessorDate = "";
+    for (let offset = 0; offset < lookAheadDays; offset += 1) {
+      const candidateDate = new Date(now.getTime() + offset * 24 * 60 * 60 * 1000);
+      const professorDate = localDateInTimeZone(candidateDate, professorTimeZone);
+      if (!professorDate) continue;
+      if (weekdayInTimeZone(candidateDate, professorTimeZone) !== configuredSlot.weekday) continue;
+      const professorStartAt = zonedDateTimeToUtcIso({
+        date: professorDate,
+        time: configuredSlot.professor_time,
+        timeZone: professorTimeZone,
+      });
+      if (!professorStartAt) continue;
+      const startMs = new Date(professorStartAt).getTime();
+      if (!Number.isFinite(startMs) || startMs <= now.getTime()) continue;
+      if (
+        startAtConflicts({
+          professorStartAt,
+          occupiedIntervals,
+          professorPhoneDigits,
+        })
+      ) {
+        continue;
+      }
+      nextProfessorStartAt = professorStartAt;
+      nextProfessorDate = professorDate;
+      break;
+    }
+
+    if (!nextProfessorStartAt) continue;
+
+    const members: ExperimentalGroupClassMemberSummary[] = pairMembers.map((row) => ({
+      id: row.id,
+      lead_id: row.id,
+      full_name: row.full_name,
+      phone: row.phone,
+      status: "assigned",
+      student_notification_sent_at: null,
+    }));
+
+    slots.push({
+      id: `recurring-${pairId}`,
+      group_class_id: null,
+      pair_id: pairId,
+      slot_type: "recorrente",
+      professor_name: assignedProfessor.name ?? null,
+      professor_phone: assignedProfessor.phone ?? null,
+      professor_timezone: professorTimeZone,
+      professor_weekday: configuredSlot.weekday,
+      professor_weekday_label: experimentalGroupWeekdayLabel(configuredSlot.weekday),
+      professor_date: nextProfessorDate,
+      professor_time: configuredSlot.professor_time,
+      professor_start_at: nextProfessorStartAt,
+      lead_timezone: leadTimeZone,
+      lead_date: localDateInTimeZone(nextProfessorStartAt, leadTimeZone),
+      lead_time: formatTimeInTimeZone(nextProfessorStartAt, leadTimeZone),
+      capacity,
+      occupied_seats: occupiedSeats,
+      available_seats: availableSeats,
+      status: isCurrentLeadAssigned ? "assigned" : "draft",
+      lesson_link: null,
+      confirmed_at: null,
+      members,
+      is_full: !isCurrentLeadAssigned && availableSeats <= 0,
+      is_current_lead_assigned: isCurrentLeadAssigned,
+    });
+  }
+
+  return slots.sort(
+    (left, right) =>
+      new Date(left.professor_start_at).getTime() -
+      new Date(right.professor_start_at).getTime(),
+  );
 }

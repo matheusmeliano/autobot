@@ -3,8 +3,10 @@ import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { appendHistoryEvent, requireAtendimentoUser } from "@/lib/atendimento/server";
 import {
   buildExperimentalGroupClassSlotsForLead,
+  buildRecurringGroupClassSlotsForLead,
   loadExperimentalGroupClassSettings,
 } from "@/lib/atendimento/experimentalGroupClassServer";
+import { resolveLeadTimeZoneFromRecord } from "@/lib/timezone";
 
 export const runtime = "nodejs";
 
@@ -12,7 +14,27 @@ const schema = z.object({
   lead_id: z.string().trim().uuid(),
   group_class_id: z.string().trim().uuid().nullable().optional(),
   professor_start_at: z.string().trim().datetime().optional(),
+  pair_id: z.string().trim().min(1).nullable().optional(),
+  slot_type: z.enum(["experimental", "recorrente"]).optional(),
 });
+
+function isLeadRecurringStudent(lead: Record<string, unknown> | null): boolean {
+  if (!lead) return false;
+  const payStatusRaw = String((lead as any)?.payment_status ?? "").trim().toLowerCase();
+  const payConfirmedAtRaw = String((lead as any)?.payment_confirmed_at ?? "").trim();
+  const leadStatusRaw = String((lead as any)?.status ?? "").trim().toLowerCase();
+  const funnelRaw = String((lead as any)?.funnel_stage ?? "").trim().toLowerCase();
+  return (
+    payStatusRaw === "confirmado" ||
+    payStatusRaw === "matriculado" ||
+    Boolean(payConfirmedAtRaw && payConfirmedAtRaw !== "null") ||
+    leadStatusRaw === "matriculado" ||
+    leadStatusRaw === "matricula_confirmada" ||
+    funnelRaw === "matriculado" ||
+    funnelRaw === "matricula_confirmada" ||
+    Boolean(String((lead as any)?.enrollment_number ?? "").trim())
+  );
+}
 
 export async function POST(req: Request) {
   try {
@@ -50,18 +72,30 @@ export async function POST(req: Request) {
       );
     }
 
-    const slots = await buildExperimentalGroupClassSlotsForLead({
-      admin,
-      lead: lead as Record<string, unknown>,
-      settings,
-      now: new Date(),
-      lookAheadDays: 42,
-      excludeLeadIdFromIndividualBookings: false,
-    });
+    const isStudentLead = isLeadRecurringStudent(lead as any);
+    const slots = isStudentLead
+      ? await buildRecurringGroupClassSlotsForLead({
+          admin,
+          lead: lead as Record<string, unknown>,
+          settings,
+          now: new Date(),
+          lookAheadDays: 56,
+        })
+      : await buildExperimentalGroupClassSlotsForLead({
+          admin,
+          lead: lead as Record<string, unknown>,
+          settings,
+          now: new Date(),
+          lookAheadDays: 42,
+          excludeLeadIdFromIndividualBookings: false,
+        });
 
     const targetSlot =
       slots.find(
         (slot) =>
+          (parsed.data.slot_type === "recorrente" &&
+            parsed.data.pair_id &&
+            String(slot.pair_id ?? "").trim() === parsed.data.pair_id) ||
           (parsed.data.group_class_id &&
             String(slot.group_class_id ?? "").trim() === parsed.data.group_class_id) ||
           (parsed.data.professor_start_at &&
@@ -89,6 +123,55 @@ export async function POST(req: Request) {
       .order("updated_at", { ascending: false })
       .limit(1)
       .maybeSingle();
+
+    const nowIso = new Date().toISOString();
+    if (isStudentLead || targetSlot.slot_type === "recorrente") {
+      const leadTimeZone = resolveLeadTimeZoneFromRecord({
+        lead: lead as Record<string, unknown>,
+        fallbackTimeZone:
+          String((lead as any)?.recurring_class_lead_timezone ?? (lead as any)?.timezone ?? "").trim() ||
+          targetSlot.lead_timezone ||
+          targetSlot.professor_timezone,
+      });
+      await admin
+        .from("atendimento_leads")
+        .update({
+          recurring_class_group_pair_id: String(targetSlot.pair_id ?? "").trim() || null,
+          recurring_class_group_status: "assigned",
+          recurring_class_professor_name: targetSlot.professor_name,
+          recurring_class_professor_phone: targetSlot.professor_phone,
+          recurring_class_weekday: targetSlot.professor_weekday,
+          recurring_class_weekday_label: targetSlot.professor_weekday_label,
+          recurring_class_professor_time: targetSlot.professor_time,
+          recurring_class_lead_time: targetSlot.lead_time || targetSlot.professor_time,
+          recurring_class_professor_timezone: targetSlot.professor_timezone,
+          recurring_class_lead_timezone: leadTimeZone,
+          updated_at: nowIso,
+        })
+        .eq("id", leadId);
+
+      await appendHistoryEvent({
+        leadId,
+        conversationId: String((latestConversation as any)?.id ?? "").trim() || null,
+        eventType: "recurring_group_class_assigned",
+        title: "Aluno atribuído a uma turma recorrente em grupo",
+        details: {
+          pair_id: String(targetSlot.pair_id ?? "").trim() || null,
+          professor_name: targetSlot.professor_name,
+          professor_phone: targetSlot.professor_phone,
+          professor_weekday: targetSlot.professor_weekday,
+          professor_time: targetSlot.professor_time,
+          professor_start_at: targetSlot.professor_start_at,
+        },
+        actorType: "attendant",
+        actorEmail: auth.user.email,
+      });
+
+      return Response.json({
+        ok: true,
+        pair_id: String(targetSlot.pair_id ?? "").trim() || null,
+      });
+    }
 
     const rpcResult = await admin.rpc("assign_atendimento_experimental_group_member", {
       p_lead_id: leadId,
@@ -122,7 +205,6 @@ export async function POST(req: Request) {
 
     const rpcRow = Array.isArray(rpcResult.data) ? rpcResult.data[0] : (rpcResult.data as any);
     const groupClassId = String((rpcRow as any)?.group_class_id ?? "").trim();
-    const nowIso = new Date().toISOString();
     await admin
       .from("atendimento_leads")
       .update({
