@@ -50,6 +50,14 @@ type ExperimentalGroupSettingsPayload = {
 
 type ExperimentalGroupSlotType = "experimental" | "recorrente";
 
+type ExperimentalGroupPairUsagePayload = Record<
+  string,
+  {
+    assigned_count?: number;
+    has_assigned_members?: boolean;
+  }
+>;
+
 type ExperimentalGroupFormSlot = {
   enabled: boolean;
   weekday: string;
@@ -1724,6 +1732,8 @@ export function AtendimentoClient() {
   const [experimentalGroupSettingsSaving, setExperimentalGroupSettingsSaving] = useState(false);
   const [experimentalGroupAvailability, setExperimentalGroupAvailability] =
     useState<ExperimentalAvailabilityPayload | null>(null);
+  const [experimentalGroupPairUsage, setExperimentalGroupPairUsage] =
+    useState<ExperimentalGroupPairUsagePayload>({});
   const [experimentalGroupFormSlots, setExperimentalGroupFormSlots] = useState<
     ExperimentalGroupFormSlot[]
   >(createDefaultExperimentalGroupFormSlots);
@@ -2093,6 +2103,8 @@ export function AtendimentoClient() {
       pairNumber: number;
       experimentalIndex: number;
       recurringIndex: number;
+      assignedCount: number;
+      hasAssignedMembers: boolean;
       experimentalSlot: ExperimentalGroupFormSlot;
       recurringSlot: ExperimentalGroupFormSlot;
     }>
@@ -2143,10 +2155,17 @@ export function AtendimentoClient() {
         pairNumber: index + 1,
         experimentalIndex: pair.experimentalIndex,
         recurringIndex: pair.recurringIndex,
+        assignedCount: Math.max(
+          0,
+          Number(experimentalGroupPairUsage[pair.pairId]?.assigned_count ?? 0),
+        ),
+        hasAssignedMembers: Boolean(
+          experimentalGroupPairUsage[pair.pairId]?.has_assigned_members,
+        ),
         experimentalSlot: pair.experimentalSlot as ExperimentalGroupFormSlot,
         recurringSlot: pair.recurringSlot as ExperimentalGroupFormSlot,
       }));
-  }, [experimentalGroupFormSlots]);
+  }, [experimentalGroupFormSlots, experimentalGroupPairUsage]);
 
   const experimentalGroupDateOptions = useMemo<
     Array<{
@@ -3776,8 +3795,12 @@ export function AtendimentoClient() {
   function syncExperimentalGroupSettingsFromPayload(json: any) {
     const settings = (json?.settings ?? null) as ExperimentalGroupSettingsPayload | null;
     const availability = normalizeExperimentalAvailabilityPayload(json?.availability ?? null);
+    const pairUsageRaw = (json?.pair_usage ?? null) as ExperimentalGroupPairUsagePayload | null;
     setExperimentalGroupSettings(settings);
     setExperimentalGroupAvailability(availability);
+    setExperimentalGroupPairUsage(
+      pairUsageRaw && typeof pairUsageRaw === "object" ? pairUsageRaw : {},
+    );
     setExperimentalGroupWeekdayOptions(
       Array.isArray(json?.weekday_options) ? (json.weekday_options as Array<{ value: string; label: string }>) : [],
     );
@@ -3943,6 +3966,34 @@ export function AtendimentoClient() {
       return [...prev, ...buildExperimentalGroupFormPair(pairCount + 1)];
     });
     setExperimentalGroupFormDateIds((prev) => [...prev, "", ""]);
+  }
+
+  function handleRemoveExperimentalGroupPair(pairId: string) {
+    const normalizedPairId = String(pairId ?? "").trim();
+    if (!normalizedPairId) return;
+    if (experimentalGroupFormPairs.length <= 1) {
+      modalToast.warning("Mantenha pelo menos 1 turma criada no modal.");
+      return;
+    }
+    if (experimentalGroupPairUsage[normalizedPairId]?.has_assigned_members) {
+      modalToast.warning("Nao e possivel excluir uma turma que possui registros atribuidos.");
+      return;
+    }
+
+    const pairIdsByIndex = experimentalGroupFormSlots.map((slot) =>
+      String(slot.pairId ?? "").trim(),
+    );
+    setExperimentalGroupFormSlots((prev) =>
+      prev.filter((slot) => String(slot.pairId ?? "").trim() !== normalizedPairId),
+    );
+    setExperimentalGroupFormDateIds((prev) =>
+      prev.filter((_, index) => pairIdsByIndex[index] !== normalizedPairId),
+    );
+    setExperimentalGroupPairUsage((prev) => {
+      const next = { ...prev };
+      delete next[normalizedPairId];
+      return next;
+    });
   }
 
   async function loadExperimentalGroupLeadData(lead: AtendimentoLeadListItem) {
@@ -9779,6 +9830,26 @@ export function AtendimentoClient() {
                                 ].join(" ")}
                               />
                             </span>
+                          </button>
+                          <button
+                            type="button"
+                            aria-label={`Excluir turma ${pair.pairNumber}`}
+                            title={
+                              pair.hasAssignedMembers
+                                ? `Turma com ${pair.assignedCount} registro(s) atribuido(s)`
+                                : experimentalGroupFormPairs.length <= 1
+                                  ? "Mantenha pelo menos 1 turma criada no modal"
+                                  : `Excluir turma ${pair.pairNumber}`
+                            }
+                            onClick={() => handleRemoveExperimentalGroupPair(pair.pairId)}
+                            className={[
+                              "inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border transition",
+                              pair.hasAssignedMembers
+                                ? "border-[#ef4444]/25 bg-[rgba(239,68,68,0.08)] text-[#b91c1c]"
+                                : "border-[var(--app-border)] bg-[var(--app-solid-surface)] text-[var(--app-text-70)] hover:bg-[var(--app-hover)] hover:text-[#b91c1c]",
+                            ].join(" ")}
+                          >
+                            <X className="h-4 w-4" />
                           </button>
                         </div>
                       </div>

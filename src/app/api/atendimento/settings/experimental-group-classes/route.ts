@@ -12,6 +12,8 @@ import {
 import {
   experimentalGroupWeekdayLabel,
   normalizeExperimentalGroupClassSettings,
+  type ExperimentalGroupClassRecord,
+  type ExperimentalGroupClassSettings,
   type ExperimentalGroupWeekdayKey,
 } from "@/lib/atendimento/experimentalGroupClass";
 import { ATENDIMENTO_PROFESSOR_TIME_ZONE } from "@/lib/atendimento/constants";
@@ -88,6 +90,7 @@ async function listScheduledIndividualExperimentalProfessorStarts(params: {
 
 async function buildExperimentalGroupAvailability(
   admin: ReturnType<typeof createSupabaseAdminClient>,
+  futureGroupClasses?: ExperimentalGroupClassRecord[],
 ) {
   const now = new Date();
   const nowIso = now.toISOString();
@@ -95,11 +98,13 @@ async function buildExperimentalGroupAvailability(
     admin,
     fromIso: nowIso,
   });
-  const futureGroupClasses = await listFutureExperimentalGroupClasses({
-    admin,
-    fromIso: nowIso,
-  });
-  const groupStarts = futureGroupClasses
+  const effectiveFutureGroupClasses =
+    futureGroupClasses ??
+    (await listFutureExperimentalGroupClasses({
+      admin,
+      fromIso: nowIso,
+    }));
+  const groupStarts = effectiveFutureGroupClasses
     .map((row) => String(row.professor_start_at ?? "").trim())
     .filter(Boolean);
   const occupiedIntervals = (await loadRecurringCalendarOccupiedIntervals({
@@ -129,6 +134,57 @@ async function buildExperimentalGroupAvailability(
   };
 }
 
+function buildExperimentalGroupPairUsage(
+  settings: ExperimentalGroupClassSettings,
+  futureGroupClasses: ExperimentalGroupClassRecord[],
+) {
+  const usage: Record<
+    string,
+    {
+      assigned_count: number;
+      has_assigned_members: boolean;
+    }
+  > = {};
+
+  const experimentalSlots = settings.slots.filter(
+    (slot) => slot.slot_type === "experimental" && slot.weekday && slot.professor_time,
+  );
+
+  for (const slot of experimentalSlots) {
+    usage[String(slot.pair_id ?? "").trim()] = {
+      assigned_count: 0,
+      has_assigned_members: false,
+    };
+  }
+
+  for (const groupClass of futureGroupClasses) {
+    const assignedCount = (groupClass.members ?? []).filter(
+      (member) => String(member.status ?? "").trim().toLowerCase() === "assigned",
+    ).length;
+    if (assignedCount <= 0) continue;
+
+    const matchingSlot = experimentalSlots.find(
+      (slot) =>
+        slot.weekday === groupClass.professor_weekday &&
+        slot.professor_time === groupClass.professor_time,
+    );
+    if (!matchingSlot) continue;
+
+    const pairId = String(matchingSlot.pair_id ?? "").trim();
+    if (!pairId) continue;
+
+    const current = usage[pairId] ?? {
+      assigned_count: 0,
+      has_assigned_members: false,
+    };
+    current.assigned_count += assignedCount;
+    current.has_assigned_members = current.assigned_count > 0;
+    usage[pairId] = current;
+  }
+
+  return usage;
+}
+
 export async function GET() {
   try {
     const auth = await requireAtendimentoUser();
@@ -138,7 +194,12 @@ export async function GET() {
 
     const admin = createSupabaseAdminClient();
     const { settings, updatedAt } = await loadExperimentalGroupClassSettings({ admin });
-    const availability = await buildExperimentalGroupAvailability(admin);
+    const futureGroupClasses = await listFutureExperimentalGroupClasses({
+      admin,
+      fromIso: new Date().toISOString(),
+    });
+    const availability = await buildExperimentalGroupAvailability(admin, futureGroupClasses);
+    const pairUsage = buildExperimentalGroupPairUsage(settings, futureGroupClasses);
 
     return Response.json({
       ok: true,
@@ -146,6 +207,7 @@ export async function GET() {
       updated_at: updatedAt,
       weekday_options: buildWeekdayOptions(),
       preview_slots: [],
+      pair_usage: pairUsage,
       availability,
     });
   } catch (error: any) {
@@ -189,8 +251,41 @@ export async function PATCH(req: Request) {
       );
     }
     const admin = createSupabaseAdminClient();
+    const currentSettingsResult = await loadExperimentalGroupClassSettings({ admin });
+    const futureGroupClasses = await listFutureExperimentalGroupClasses({
+      admin,
+      fromIso: new Date().toISOString(),
+    });
+    const currentPairUsage = buildExperimentalGroupPairUsage(
+      currentSettingsResult.settings,
+      futureGroupClasses,
+    );
+    const nextPairIds = new Set(
+      settings.slots.map((slot) => String(slot.pair_id ?? "").trim()).filter(Boolean),
+    );
+    const currentPairIds = Array.from(
+      new Set(
+        currentSettingsResult.settings.slots
+          .map((slot) => String(slot.pair_id ?? "").trim())
+          .filter(Boolean),
+      ),
+    );
+    const removedPairWithMembers = currentPairIds.find(
+      (pairId) => !nextPairIds.has(pairId) && currentPairUsage[pairId]?.has_assigned_members,
+    );
+    if (removedPairWithMembers) {
+      return Response.json(
+        {
+          ok: false,
+          error: "Nao e possivel excluir uma turma que possui registros atribuidos.",
+        },
+        { status: 400 },
+      );
+    }
+
     const updatedAt = await saveExperimentalGroupClassSettings({ admin, settings });
-    const availability = await buildExperimentalGroupAvailability(admin);
+    const availability = await buildExperimentalGroupAvailability(admin, futureGroupClasses);
+    const pairUsage = buildExperimentalGroupPairUsage(settings, futureGroupClasses);
 
     return Response.json({
       ok: true,
@@ -198,6 +293,7 @@ export async function PATCH(req: Request) {
       updated_at: updatedAt,
       weekday_options: buildWeekdayOptions(),
       preview_slots: [],
+      pair_usage: pairUsage,
       availability,
     });
   } catch (error: any) {
