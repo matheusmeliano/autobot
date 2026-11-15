@@ -5,12 +5,7 @@ import {
   buildRecurringGroupClassSlotsForLead,
   loadExperimentalGroupClassSettings,
 } from "@/lib/atendimento/experimentalGroupClassServer";
-import {
-  isLeadPhoneEligibleForExperimentalGroup,
-  resolveConfiguredProfessorFromExperimentalGroupSettings,
-  resolveExperimentalGroupProfessorFromLead,
-  resolveRecurringGroupProfessorFromLead,
-} from "@/lib/atendimento/experimentalGroupClass";
+import { isLeadPhoneEligibleForExperimentalGroup } from "@/lib/atendimento/experimentalGroupClass";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -71,15 +66,6 @@ export async function GET(_req: Request, { params }: { params: Promise<{ leadId:
     const isStudentLead = isLeadRecurringStudent(lead as any);
     const hasPhone = isLeadPhoneEligibleForExperimentalGroup((lead as any)?.phone ?? null);
     const hasStateAndCity = leadHasStateAndCity(lead as any);
-    const assignedProfessor =
-      (isStudentLead
-        ? resolveRecurringGroupProfessorFromLead(lead as any)
-        : resolveExperimentalGroupProfessorFromLead(lead as any)) ??
-      resolveConfiguredProfessorFromExperimentalGroupSettings(
-        settings,
-        isStudentLead ? "recorrente" : "experimental",
-      );
-
     const slots = isStudentLead
       ? await buildRecurringGroupClassSlotsForLead({
           admin,
@@ -104,15 +90,11 @@ export async function GET(_req: Request, { params }: { params: Promise<{ leadId:
     if (!settings.enabled) reasons.push("feature_disabled");
     if (!hasPhone) reasons.push("missing_valid_phone");
     if (!hasStateAndCity) reasons.push("missing_state_city");
-    if (!assignedProfessor) {
-      reasons.push(isStudentLead ? "missing_assigned_recurring_professor" : "missing_assigned_professor");
-    }
     return Response.json({
       ok: true,
       lead_slot_type: isStudentLead ? "recorrente" : "experimental",
       settings,
       settings_updated_at: updatedAt,
-      assigned_professor: assignedProfessor,
       lead: {
         id: String((lead as any)?.id ?? ""),
         experimental_class_mode_preference:

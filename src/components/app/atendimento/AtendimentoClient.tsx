@@ -1813,10 +1813,6 @@ export function AtendimentoClient() {
   const [experimentalGroupCanOpenModal, setExperimentalGroupCanOpenModal] = useState(false);
   const [experimentalGroupSettingsAssignProfPairId, setExperimentalGroupSettingsAssignProfPairId] =
     useState("");
-  const [experimentalGroupAssignedProfessor, setExperimentalGroupAssignedProfessor] = useState<{
-    name: string;
-    phone: string;
-  } | null>(null);
   const [experimentalGroupSelectedDateId, setExperimentalGroupSelectedDateId] = useState<
     string | null
   >(null);
@@ -2309,13 +2305,8 @@ export function AtendimentoClient() {
       ).values(),
     );
     if (uniqueProfessors.length === 1) return uniqueProfessors[0] ?? null;
-    return experimentalGroupAssignedProfessor;
-  }, [
-    experimentalGroupAssignedProfessor,
-    experimentalGroupSelectedDateSlots,
-    experimentalGroupVisibleSlots,
-    selectedExperimentalGroupSlot,
-  ]);
+    return null;
+  }, [experimentalGroupSelectedDateSlots, experimentalGroupVisibleSlots, selectedExperimentalGroupSlot]);
 
   const bookingLocationOk = useMemo<boolean>(() => {
     if (!selectedLead) return false;
@@ -4110,7 +4101,6 @@ export function AtendimentoClient() {
       }
       const slots = Array.isArray(json?.slots) ? (json.slots as ExperimentalGroupSlotPayload[]) : [];
       setExperimentalGroupCanOpenModal(Boolean(json?.can_open_modal));
-      setExperimentalGroupAssignedProfessor((json?.assigned_professor ?? null) as { name: string; phone: string } | null);
       setExperimentalGroupSlots(slots);
       const firstAssigned =
         slots.find((slot) => slot.is_current_lead_assigned) ??
@@ -4168,14 +4158,6 @@ export function AtendimentoClient() {
       modalToast.warning("Esse registro precisa ter um telefone válido para entrar em uma turma.");
       return;
     }
-    const isMissingProfessor =
-      result.reasons.includes("missing_assigned_professor") ||
-      result.reasons.includes("missing_assigned_recurring_professor");
-    if (isMissingProfessor) {
-      modalToast.warning("Defina o professor da turma no modal Aulas em Grupo antes de atribuir o registro.");
-      return;
-    }
-
     if (!result.slots.length) {
       modalToast.warning("Não tem nenhuma turma aberta no momento.");
       return;
