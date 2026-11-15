@@ -143,6 +143,12 @@ function buildExperimentalGroupPairUsage(
     {
       assigned_count: number;
       has_assigned_members: boolean;
+      members: Array<{
+        id: string;
+        lead_id: string;
+        full_name: string | null;
+        phone: string | null;
+      }>;
     }
   > = {};
 
@@ -154,6 +160,7 @@ function buildExperimentalGroupPairUsage(
     usage[String(slot.pair_id ?? "").trim()] = {
       assigned_count: 0,
       has_assigned_members: false,
+      members: [],
     };
   }
 
@@ -176,9 +183,22 @@ function buildExperimentalGroupPairUsage(
     const current = usage[pairId] ?? {
       assigned_count: 0,
       has_assigned_members: false,
+      members: [],
     };
     current.assigned_count += assignedCount;
     current.has_assigned_members = current.assigned_count > 0;
+    for (const member of groupClass.members ?? []) {
+      if (String(member.status ?? "").trim().toLowerCase() !== "assigned") continue;
+      const leadId = String(member.lead_id ?? "").trim();
+      if (!leadId) continue;
+      if (current.members.some((currentMember) => currentMember.lead_id === leadId)) continue;
+      current.members.push({
+        id: String(member.id ?? "").trim(),
+        lead_id: leadId,
+        full_name: member.full_name ?? null,
+        phone: member.phone ?? null,
+      });
+    }
     usage[pairId] = current;
   }
 

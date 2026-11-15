@@ -55,6 +55,12 @@ type ExperimentalGroupPairUsagePayload = Record<
   {
     assigned_count?: number;
     has_assigned_members?: boolean;
+    members?: Array<{
+      id: string;
+      lead_id: string;
+      full_name: string | null;
+      phone: string | null;
+    }>;
   }
 >;
 
@@ -2105,6 +2111,12 @@ export function AtendimentoClient() {
       recurringIndex: number;
       assignedCount: number;
       hasAssignedMembers: boolean;
+      members: Array<{
+        id: string;
+        lead_id: string;
+        full_name: string | null;
+        phone: string | null;
+      }>;
       experimentalSlot: ExperimentalGroupFormSlot;
       recurringSlot: ExperimentalGroupFormSlot;
     }>
@@ -2162,6 +2174,14 @@ export function AtendimentoClient() {
         hasAssignedMembers: Boolean(
           experimentalGroupPairUsage[pair.pairId]?.has_assigned_members,
         ),
+        members: Array.isArray(experimentalGroupPairUsage[pair.pairId]?.members)
+          ? (experimentalGroupPairUsage[pair.pairId]?.members as Array<{
+              id: string;
+              lead_id: string;
+              full_name: string | null;
+              phone: string | null;
+            }>)
+          : [],
         experimentalSlot: pair.experimentalSlot as ExperimentalGroupFormSlot,
         recurringSlot: pair.recurringSlot as ExperimentalGroupFormSlot,
       }));
@@ -9973,6 +9993,39 @@ export function AtendimentoClient() {
                                 >
                                   {timeOption.professorTime}
                                 </button>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="space-y-2">
+                        <div className="flex items-center gap-3">
+                          <label className="text-xs font-semibold text-[var(--app-text-70)]">
+                            Registros vinculados
+                          </label>
+                        </div>
+                        {pair.members.length === 0 ? (
+                          <div className="rounded-2xl border border-dashed border-[var(--app-border)] bg-[var(--app-solid-surface-2)] px-4 py-5 text-center text-[12px] font-medium text-[var(--app-text-55)]">
+                            Nenhum registro vinculado a esta turma.
+                          </div>
+                        ) : (
+                          <div className="space-y-2">
+                            {pair.members.map((member) => {
+                              const memberName = String(member.full_name ?? "").trim() || "Sem nome";
+                              const memberPhone = String(member.phone ?? "").trim();
+                              return (
+                                <div
+                                  key={`group-pair-member-${pair.pairId}-${member.lead_id}`}
+                                  className="rounded-2xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] px-3 py-3"
+                                >
+                                  <div className="text-[13px] font-semibold text-[var(--app-text-85)]">
+                                    {memberName}
+                                  </div>
+                                  <div className="mt-1 text-[12px] text-[var(--app-text-60)]">
+                                    {memberPhone ? formatPhoneNumber(memberPhone) : "Telefone nao informado"}
+                                  </div>
+                                </div>
                               );
                             })}
                           </div>
