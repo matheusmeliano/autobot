@@ -7,6 +7,7 @@ import {
 } from "@/lib/atendimento/experimentalGroupClassServer";
 import {
   isLeadPhoneEligibleForExperimentalGroup,
+  resolveConfiguredProfessorFromExperimentalGroupSettings,
   resolveExperimentalGroupProfessorFromLead,
   resolveRecurringGroupProfessorFromLead,
 } from "@/lib/atendimento/experimentalGroupClass";
@@ -70,9 +71,14 @@ export async function GET(_req: Request, { params }: { params: Promise<{ leadId:
     const isStudentLead = isLeadRecurringStudent(lead as any);
     const hasPhone = isLeadPhoneEligibleForExperimentalGroup((lead as any)?.phone ?? null);
     const hasStateAndCity = leadHasStateAndCity(lead as any);
-    const assignedProfessor = isStudentLead
-      ? resolveRecurringGroupProfessorFromLead(lead as any)
-      : resolveExperimentalGroupProfessorFromLead(lead as any);
+    const assignedProfessor =
+      (isStudentLead
+        ? resolveRecurringGroupProfessorFromLead(lead as any)
+        : resolveExperimentalGroupProfessorFromLead(lead as any)) ??
+      resolveConfiguredProfessorFromExperimentalGroupSettings(
+        settings,
+        isStudentLead ? "recorrente" : "experimental",
+      );
 
     const slots = isStudentLead
       ? await buildRecurringGroupClassSlotsForLead({

@@ -349,6 +349,36 @@ export function resolveRecurringGroupProfessorFromLead(lead: Record<string, unkn
   return null;
 }
 
+export function resolveConfiguredProfessorFromExperimentalGroupSettings(
+  settings: ExperimentalGroupClassSettings | null | undefined,
+  slotType: ExperimentalGroupSlotType,
+): {
+  name: string;
+  phone: string;
+} | null {
+  const normalizedSettings = normalizeExperimentalGroupClassSettings(settings ?? null);
+  const configuredSlots = normalizedSettings.slots.filter(
+    (slot) =>
+      slot.slot_type === slotType &&
+      slot.enabled &&
+      Boolean(String(slot.professor_name ?? "").trim()) &&
+      Boolean(String(slot.professor_phone ?? "").trim()),
+  );
+  if (!configuredSlots.length) return null;
+  const uniqueProfessors = Array.from(
+    new Map(
+      configuredSlots.map((slot) => [
+        `${String(slot.professor_phone ?? "").trim()}::${String(slot.professor_name ?? "").trim()}`,
+        {
+          name: String(slot.professor_name ?? "").trim(),
+          phone: String(slot.professor_phone ?? "").trim(),
+        },
+      ]),
+    ).values(),
+  );
+  return uniqueProfessors[0] ?? null;
+}
+
 export function experimentalGroupWeekdayLabel(weekday: ExperimentalGroupWeekdayKey): string {
   return WEEKDAY_LABELS_PT_BR[weekday] ?? weekday;
 }
@@ -564,11 +594,15 @@ export function listExperimentalGroupClassSlots(params: {
       });
       const blockedByIndividual =
         individualStarts.has(professorStartAt) && !existingClass;
+      const slotProfessorName =
+        String(configuredSlot.professor_name ?? "").trim() || assignedProfessor?.name || "";
+      const slotProfessorPhone =
+        String(configuredSlot.professor_phone ?? "").trim() || assignedProfessor?.phone || "";
 
       if (!existingClass && (blockedByRecurring || blockedByIndividual)) {
         continue;
       }
-      if (!existingClass && !assignedProfessor?.name && !assignedProfessor?.phone) {
+      if (!existingClass && !slotProfessorName && !slotProfessorPhone) {
         continue;
       }
 
@@ -585,8 +619,12 @@ export function listExperimentalGroupClassSlots(params: {
         group_class_id: existingClass?.id ?? null,
         pair_id: pairId || null,
         slot_type: "experimental",
-        professor_name: existingClass?.professor_name ?? assignedProfessor?.name ?? null,
-        professor_phone: existingClass?.professor_phone ?? assignedProfessor?.phone ?? null,
+        professor_name:
+          existingClass?.professor_name ??
+          (slotProfessorName ? slotProfessorName : null),
+        professor_phone:
+          existingClass?.professor_phone ??
+          (slotProfessorPhone ? slotProfessorPhone : null),
         professor_timezone: professorTimeZone,
         professor_weekday: configuredSlot.weekday,
         professor_weekday_label: experimentalGroupWeekdayLabel(configuredSlot.weekday),

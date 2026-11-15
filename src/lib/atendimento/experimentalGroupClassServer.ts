@@ -6,6 +6,7 @@ import {
   getDefaultExperimentalGroupClassSettings,
   listExperimentalGroupClassSlots,
   normalizeExperimentalGroupClassSettings,
+  resolveConfiguredProfessorFromExperimentalGroupSettings,
   resolveExperimentalGroupProfessorFromLead,
   resolveRecurringGroupProfessorFromLead,
   type ExperimentalGroupClassRecord,
@@ -564,8 +565,9 @@ export async function buildRecurringGroupClassSlotsForLead(params: {
   const normalizedSettings = normalizeExperimentalGroupClassSettings(settings);
   if (!normalizedSettings.slots.length) return [];
 
-  const assignedProfessor = resolveRecurringGroupProfessorFromLead(params.lead ?? null);
-  if (!assignedProfessor?.phone) return [];
+  const assignedProfessor =
+    resolveRecurringGroupProfessorFromLead(params.lead ?? null) ??
+    resolveConfiguredProfessorFromExperimentalGroupSettings(normalizedSettings, "recorrente");
 
   const professorTimeZone =
     String(normalizedSettings.professor_timezone ?? "").trim() || ATENDIMENTO_PROFESSOR_TIME_ZONE;
@@ -574,7 +576,6 @@ export async function buildRecurringGroupClassSlotsForLead(params: {
     fallbackTimeZone: professorTimeZone,
   });
   const leadId = String((params.lead as any)?.id ?? "").trim();
-  const professorPhoneDigits = normalizePhoneDigits(assignedProfessor.phone);
   const capacity = Math.min(4, Math.max(1, Number(normalizedSettings.capacity ?? 4)));
   const lookAheadDays = Math.max(14, Math.min(Number(params.lookAheadDays ?? 56), 84));
   const recurringMembers = await listAssignedRecurringGroupMembers({ admin: params.admin });
@@ -603,6 +604,12 @@ export async function buildRecurringGroupClassSlotsForLead(params: {
   for (const configuredSlot of recurringSlots) {
     const pairId = String(configuredSlot.pair_id ?? "").trim();
     if (!pairId || !configuredSlot.weekday || !configuredSlot.professor_time) continue;
+    const slotProfessorName =
+      String(configuredSlot.professor_name ?? "").trim() || assignedProfessor?.name || "";
+    const slotProfessorPhone =
+      String(configuredSlot.professor_phone ?? "").trim() || assignedProfessor?.phone || "";
+    const professorPhoneDigits = normalizePhoneDigits(slotProfessorPhone);
+    if (!professorPhoneDigits) continue;
 
     const pairMembers = recurringMembers.filter(
       (row) => String(row.recurring_class_group_pair_id ?? "").trim() === pairId,
@@ -708,8 +715,8 @@ export async function buildRecurringGroupClassSlotsForLead(params: {
       group_class_id: null,
       pair_id: pairId,
       slot_type: "recorrente",
-      professor_name: assignedProfessor.name ?? null,
-      professor_phone: assignedProfessor.phone ?? null,
+      professor_name: slotProfessorName || null,
+      professor_phone: slotProfessorPhone || null,
       professor_timezone: professorTimeZone,
       professor_weekday: configuredSlot.weekday,
       professor_weekday_label: experimentalGroupWeekdayLabel(configuredSlot.weekday),
