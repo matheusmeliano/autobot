@@ -10078,14 +10078,7 @@ export function AtendimentoClient() {
               })()
             ))}
 
-            <div className="mt-2 flex shrink-0 flex-col-reverse gap-2 sm:flex-row sm:items-center sm:justify-end">
-              <button
-                type="button"
-                onClick={() => setExperimentalGroupSettingsOpen(false)}
-                className="inline-flex min-h-[44px] items-center justify-center gap-1.5 rounded-xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] px-5 text-[13px] font-semibold text-[var(--app-text-85)] hover:bg-[var(--app-hover)] disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                Cancelar
-              </button>
+            <div className="mt-2 flex shrink-0 justify-end">
               <button
                 type="button"
                 onClick={() => void handleSaveExperimentalGroupSettings()}
