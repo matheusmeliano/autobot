@@ -22,6 +22,8 @@ export type ExperimentalGroupConfiguredSlot = {
   enabled: boolean;
   weekday: ExperimentalGroupWeekdayKey | null;
   professor_time: string | null;
+  professor_name: string | null;
+  professor_phone: string | null;
   slot_type: ExperimentalGroupSlotType;
   pair_id: string;
 };
@@ -114,6 +116,8 @@ function buildDefaultExperimentalGroupPair(pairNumber: number): ExperimentalGrou
       enabled: false,
       weekday: null,
       professor_time: null,
+      professor_name: null,
+      professor_phone: null,
       slot_type: "experimental",
       pair_id: pairId,
     },
@@ -121,6 +125,8 @@ function buildDefaultExperimentalGroupPair(pairNumber: number): ExperimentalGrou
       enabled: false,
       weekday: null,
       professor_time: null,
+      professor_name: null,
+      professor_phone: null,
       slot_type: "recorrente",
       pair_id: pairId,
     },
@@ -184,6 +190,10 @@ export function normalizeExperimentalGroupClassSettings(
     const slotType =
       normalizeSlotType(slotValue.slot_type) ??
       (index % 2 === 0 ? "experimental" : "recorrente");
+    const normalizedProfessor = normalizarExperimentalProfessorParaAllowlist({
+      name: String(slotValue.professor_name ?? "").trim() || null,
+      phone: String(slotValue.professor_phone ?? "").trim() || null,
+    });
     parsedSlots.push({
       enabled:
         slotValue.enabled === true ||
@@ -192,6 +202,8 @@ export function normalizeExperimentalGroupClassSettings(
         slotValue.enabled === "1",
       weekday,
       professor_time: professorTime,
+      professor_name: normalizedProfessor?.name ?? null,
+      professor_phone: normalizedProfessor?.phone ?? null,
       slot_type: slotType,
       pair_id: pairId,
     });
@@ -229,6 +241,10 @@ export function normalizeExperimentalGroupClassSettings(
       experimentalSlot?.weekday ?? recurringSlot?.weekday ?? null;
     const fallbackProfessorTime =
       experimentalSlot?.professor_time ?? recurringSlot?.professor_time ?? null;
+    const fallbackProfessorName =
+      experimentalSlot?.professor_name ?? recurringSlot?.professor_name ?? null;
+    const fallbackProfessorPhone =
+      experimentalSlot?.professor_phone ?? recurringSlot?.professor_phone ?? null;
     const fallbackEnabled = Boolean(
       experimentalSlot?.enabled ?? recurringSlot?.enabled ?? false,
     );
@@ -237,6 +253,8 @@ export function normalizeExperimentalGroupClassSettings(
       enabled: Boolean(experimentalSlot?.enabled ?? fallbackEnabled),
       weekday: experimentalSlot?.weekday ?? fallbackWeekday,
       professor_time: experimentalSlot?.professor_time ?? fallbackProfessorTime,
+      professor_name: experimentalSlot?.professor_name ?? fallbackProfessorName,
+      professor_phone: experimentalSlot?.professor_phone ?? fallbackProfessorPhone,
       slot_type: "experimental",
       pair_id: canonicalPairId,
     });
@@ -244,6 +262,8 @@ export function normalizeExperimentalGroupClassSettings(
       enabled: Boolean(recurringSlot?.enabled ?? fallbackEnabled),
       weekday: recurringSlot?.weekday ?? fallbackWeekday,
       professor_time: recurringSlot?.professor_time ?? fallbackProfessorTime,
+      professor_name: recurringSlot?.professor_name ?? fallbackProfessorName,
+      professor_phone: recurringSlot?.professor_phone ?? fallbackProfessorPhone,
       slot_type: "recorrente",
       pair_id: canonicalPairId,
     });

@@ -43,6 +43,8 @@ type ExperimentalGroupSettingsPayload = {
     enabled?: boolean;
     weekday?: string | null;
     professor_time?: string | null;
+    professor_name?: string | null;
+    professor_phone?: string | null;
     slot_type?: "experimental" | "recorrente";
     pair_id?: string | null;
   }>;
@@ -68,6 +70,8 @@ type ExperimentalGroupFormSlot = {
   enabled: boolean;
   weekday: string;
   professor_time: string;
+  professorName: string;
+  professorPhone: string;
   slotType: ExperimentalGroupSlotType;
   pairId: string;
 };
@@ -96,6 +100,8 @@ type ExperimentalAvailabilityPayload = {
   slotsByDate: Record<string, ExperimentalAvailabilityTimeOption[]>;
   professor_timezone: string;
 };
+
+type ExperimentalAvailabilityByProfessorPayload = Record<string, ExperimentalAvailabilityPayload>;
 
 type ExperimentalGroupSlotPayload = {
   id: string;
@@ -153,6 +159,8 @@ function buildExperimentalGroupFormPair(pairNumber: number): ExperimentalGroupFo
       enabled: false,
       weekday: "",
       professor_time: "",
+      professorName: "",
+      professorPhone: "",
       slotType: "experimental",
       pairId,
     },
@@ -160,6 +168,8 @@ function buildExperimentalGroupFormPair(pairNumber: number): ExperimentalGroupFo
       enabled: false,
       weekday: "",
       professor_time: "",
+      professorName: "",
+      professorPhone: "",
       slotType: "recorrente",
       pairId,
     },
@@ -246,6 +256,18 @@ function normalizeExperimentalAvailabilityPayload(value: any): ExperimentalAvail
     professor_timezone:
       String(value?.professor_timezone ?? "").trim() || ATENDIMENTO_PROFESSOR_TIME_ZONE,
   };
+}
+
+function normalizeExperimentalAvailabilityByProfessorPayload(
+  value: unknown,
+): ExperimentalAvailabilityByProfessorPayload {
+  if (!value || typeof value !== "object") return {};
+  const result: ExperimentalAvailabilityByProfessorPayload = {};
+  for (const [key, entry] of Object.entries(value as Record<string, unknown>)) {
+    const normalized = normalizeExperimentalAvailabilityPayload(entry);
+    if (normalized) result[String(key)] = normalized;
+  }
+  return result;
 }
 
 function getExperimentalAvailabilitySlotsForDate(
@@ -1769,6 +1791,8 @@ export function AtendimentoClient() {
   const [experimentalGroupSettingsSaving, setExperimentalGroupSettingsSaving] = useState(false);
   const [experimentalGroupAvailability, setExperimentalGroupAvailability] =
     useState<ExperimentalAvailabilityPayload | null>(null);
+  const [experimentalGroupAvailabilityByProfessor, setExperimentalGroupAvailabilityByProfessor] =
+    useState<ExperimentalAvailabilityByProfessorPayload>({});
   const [experimentalGroupPairUsage, setExperimentalGroupPairUsage] =
     useState<ExperimentalGroupPairUsagePayload>({});
   const [experimentalGroupFormSlots, setExperimentalGroupFormSlots] = useState<
@@ -1817,6 +1841,8 @@ export function AtendimentoClient() {
   const [experimentalGroupCanOpenModal, setExperimentalGroupCanOpenModal] = useState(false);
   const [experimentalGroupAssignProfDropdownOpen, setExperimentalGroupAssignProfDropdownOpen] =
     useState(false);
+  const [experimentalGroupSettingsAssignProfPairId, setExperimentalGroupSettingsAssignProfPairId] =
+    useState("");
   const [experimentalGroupAssignedProfessor, setExperimentalGroupAssignedProfessor] = useState<{
     name: string;
     phone: string;
@@ -2149,6 +2175,7 @@ export function AtendimentoClient() {
 
   useEffect(() => {
     setExperimentalGroupAssignProfDropdownOpen(false);
+    setExperimentalGroupSettingsAssignProfPairId("");
   }, [experimentalGroupLead?.id, isExperimentalGroupModalOpen]);
 
   const experimentalGroupFormPairs = useMemo<
@@ -3863,9 +3890,13 @@ export function AtendimentoClient() {
   function syncExperimentalGroupSettingsFromPayload(json: any) {
     const settings = (json?.settings ?? null) as ExperimentalGroupSettingsPayload | null;
     const availability = normalizeExperimentalAvailabilityPayload(json?.availability ?? null);
+    const availabilityByProfessor = normalizeExperimentalAvailabilityByProfessorPayload(
+      json?.availability_by_professor ?? null,
+    );
     const pairUsageRaw = (json?.pair_usage ?? null) as ExperimentalGroupPairUsagePayload | null;
     setExperimentalGroupSettings(settings);
     setExperimentalGroupAvailability(availability);
+    setExperimentalGroupAvailabilityByProfessor(availabilityByProfessor);
     setExperimentalGroupPairUsage(
       pairUsageRaw && typeof pairUsageRaw === "object" ? pairUsageRaw : {},
     );
@@ -3879,6 +3910,8 @@ export function AtendimentoClient() {
             enabled: Boolean(slot?.enabled),
             weekday: String(slot?.weekday ?? "").trim(),
             professor_time: String(slot?.professor_time ?? "").trim(),
+            professorName: String(slot?.professor_name ?? "").trim(),
+            professorPhone: String(slot?.professor_phone ?? "").trim(),
             slotType:
               String(slot?.slot_type ?? "").trim().toLowerCase() === "recorrente"
                 ? "recorrente"
@@ -3889,7 +3922,12 @@ export function AtendimentoClient() {
         : createDefaultExperimentalGroupFormSlots();
     setExperimentalGroupFormSlots(normalizedSlots);
     setExperimentalGroupFormDateIds(
-      normalizedSlots.map((slot) => resolveExperimentalAvailabilityDateIdForGroupSlot(availability, slot)),
+      normalizedSlots.map((slot) =>
+        resolveExperimentalAvailabilityDateIdForGroupSlot(
+          availabilityByProfessor[String(slot.professorPhone ?? "").trim()] ?? availability,
+          slot,
+        ),
+      ),
     );
   }
 
@@ -3948,6 +3986,8 @@ export function AtendimentoClient() {
             enabled: slot.enabled,
             weekday: slot.weekday || null,
             professor_time: slot.professor_time || null,
+            professor_name: slot.professorName || null,
+            professor_phone: slot.professorPhone || null,
             slot_type: slot.slotType,
             pair_id: slot.pairId,
           })),
@@ -3993,12 +4033,15 @@ export function AtendimentoClient() {
 
   function updateExperimentalGroupFormDateSelection(index: number, dateId: string) {
     const normalizedDateId = String(dateId ?? "").trim();
+    const pairProfessorPhone = String(experimentalGroupFormSlots[index]?.professorPhone ?? "").trim();
+    const pairAvailability =
+      experimentalGroupAvailabilityByProfessor[pairProfessorPhone] ?? experimentalGroupAvailability;
     const selectedSlots = getExperimentalAvailabilitySlotsForDate(
-      experimentalGroupAvailability,
+      pairAvailability,
       normalizedDateId,
     );
     const weekday = getExperimentalAvailabilityWeekdayForDate(
-      experimentalGroupAvailability,
+      pairAvailability,
       normalizedDateId,
     );
     const targetPairId = String(experimentalGroupFormSlots[index]?.pairId ?? "").trim();
@@ -9840,17 +9883,20 @@ export function AtendimentoClient() {
           <div className="mt-5 space-y-4">
             {experimentalGroupFormPairs.map((pair) => (
               (() => {
-                const dateOptions = experimentalGroupAvailability?.dates ?? [];
                 const card = pair.experimentalSlot;
                 const index = pair.experimentalIndex;
+                const pairAvailability =
+                  experimentalGroupAvailabilityByProfessor[String(card.professorPhone ?? "").trim()] ??
+                  experimentalGroupAvailability;
+                const dateOptions = pairAvailability?.dates ?? [];
                 const selectedDateId =
                   String(experimentalGroupFormDateIds[index] ?? "").trim() ||
                   resolveExperimentalAvailabilityDateIdForGroupSlot(
-                    experimentalGroupAvailability,
+                    pairAvailability,
                     card,
                   );
                 const selectedDateSlots = getExperimentalAvailabilitySlotsForDate(
-                  experimentalGroupAvailability,
+                  pairAvailability,
                   selectedDateId,
                 );
 
@@ -9942,7 +9988,11 @@ export function AtendimentoClient() {
                             Dias disponíveis
                           </label>
                         </div>
-                        {!dateOptions.length ? (
+                        {!card.professorPhone ? (
+                          <div className="rounded-2xl border border-dashed border-[var(--app-border)] bg-[var(--app-solid-surface-2)] px-4 py-5 text-center text-[12px] font-medium text-[var(--app-text-55)]">
+                            Selecione o professor primeiro.
+                          </div>
+                        ) : !dateOptions.length ? (
                           <div className="rounded-2xl border border-dashed border-[var(--app-border)] bg-[var(--app-solid-surface-2)] px-4 py-5 text-center text-[12px] font-medium text-[var(--app-text-55)]">
                             Nao ha dias disponiveis no momento.
                           </div>
@@ -9950,11 +10000,11 @@ export function AtendimentoClient() {
                           <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
                             {dateOptions.map((dateOption) => {
                               const dateSlots = getExperimentalAvailabilitySlotsForDate(
-                                experimentalGroupAvailability,
+                                pairAvailability,
                                 dateOption.id,
                               );
                               const weekdayKey = getExperimentalAvailabilityWeekdayForDate(
-                                experimentalGroupAvailability,
+                                pairAvailability,
                                 dateOption.id,
                               );
                               const shortLabel =
@@ -9964,7 +10014,7 @@ export function AtendimentoClient() {
                                 <button
                                   key={`group-slot-${index}-${dateOption.id}`}
                                   type="button"
-                                  disabled={!card.enabled}
+                                  disabled={!card.enabled || !card.professorPhone}
                                   onClick={() =>
                                     updateExperimentalGroupFormDateSelection(index, dateOption.id)
                                   }
@@ -10012,10 +10062,94 @@ export function AtendimentoClient() {
                       <div className="space-y-2">
                         <div className="flex items-center gap-3">
                           <label className="text-xs font-semibold text-[var(--app-text-70)]">
+                            Professor da turma
+                          </label>
+                        </div>
+                        <div className="relative">
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setExperimentalGroupSettingsAssignProfPairId((value) =>
+                                value === pair.pairId ? "" : pair.pairId,
+                              )
+                            }
+                            onBlur={() => {
+                              setTimeout(() => setExperimentalGroupSettingsAssignProfPairId(""), 180);
+                            }}
+                            className="inline-flex min-h-[44px] w-full items-center justify-between gap-3 rounded-2xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] px-4 text-left text-[13px] font-semibold text-[var(--app-text-85)] transition hover:bg-[var(--app-hover)]"
+                          >
+                            <span className="flex min-w-0 items-center gap-2">
+                              <CheckCircle2 className="h-4 w-4 shrink-0 text-[var(--app-text-65)]" />
+                              <span className="min-w-0 truncate">
+                                {card.professorName || "Selecionar professor"}
+                              </span>
+                            </span>
+                            <ChevronDown className="h-4 w-4 shrink-0 text-[var(--app-text-65)]" />
+                          </button>
+                          {experimentalGroupSettingsAssignProfPairId === pair.pairId ? (
+                            <div className="absolute left-0 top-full z-[380] mt-2 flex w-full flex-col gap-1 overflow-hidden rounded-2xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] p-1.5 shadow-lg">
+                              {EXPERIMENTAL_PROFESSOR_OPTIONS_CLIENT.map((opt) => {
+                                const isActive =
+                                  card.professorPhone === opt.phone && card.professorName === opt.name;
+                                return (
+                                  <button
+                                    key={`group-settings-prof-${pair.pairId}-${opt.phone}`}
+                                    type="button"
+                                    onClick={() => {
+                                      setExperimentalGroupSettingsAssignProfPairId("");
+                                      updateExperimentalGroupFormSlot(
+                                        index,
+                                        {
+                                          professorName: opt.name,
+                                          professorPhone: opt.phone,
+                                          weekday: "",
+                                          professor_time: "",
+                                        },
+                                        { syncPair: true },
+                                      );
+                                      setExperimentalGroupFormDateIds((prev) =>
+                                        prev.map((value, slotIndex) =>
+                                          experimentalGroupFormSlots[slotIndex]?.pairId === pair.pairId ? "" : value,
+                                        ),
+                                      );
+                                    }}
+                                    className={[
+                                      "flex w-full items-center justify-between gap-3 rounded-xl px-3.5 py-3 text-left transition",
+                                      isActive
+                                        ? "border border-emerald-500/30 bg-emerald-500/10"
+                                        : "border border-transparent hover:bg-[var(--app-hover)]",
+                                    ].join(" ")}
+                                  >
+                                    <div className="min-w-0 flex-1">
+                                      <div className="truncate text-[13px] font-semibold text-[var(--app-text-85)]">
+                                        {opt.name}
+                                      </div>
+                                    </div>
+                                    {isActive ? (
+                                      <div className="inline-flex shrink-0 items-center gap-1 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.12em] text-emerald-700">
+                                        <Check className="h-3 w-3 shrink-0" />
+                                        Atual
+                                      </div>
+                                    ) : null}
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          ) : null}
+                        </div>
+                      </div>
+
+                      <div className="space-y-2">
+                        <div className="flex items-center gap-3">
+                          <label className="text-xs font-semibold text-[var(--app-text-70)]">
                             Horários disponíveis
                           </label>
                         </div>
-                        {!selectedDateId ? (
+                        {!card.professorPhone ? (
+                          <div className="rounded-2xl border border-dashed border-[var(--app-border)] bg-[var(--app-solid-surface-2)] px-4 py-5 text-center text-[12px] font-medium text-[var(--app-text-55)]">
+                            Selecione o professor primeiro.
+                          </div>
+                        ) : !selectedDateId ? (
                           <div className="rounded-2xl border border-dashed border-[var(--app-border)] bg-[var(--app-solid-surface-2)] px-4 py-5 text-center text-[12px] font-medium text-[var(--app-text-55)]">
                             Selecione o dia primeiro.
                           </div>
@@ -10031,14 +10165,14 @@ export function AtendimentoClient() {
                                 <button
                                   key={`group-slot-${index}-${timeOption.id}`}
                                   type="button"
-                                  disabled={!card.enabled}
+                                  disabled={!card.enabled || !card.professorPhone}
                                   onClick={() =>
                                     updateExperimentalGroupFormSlot(
                                       index,
                                       {
                                         weekday:
                                           getExperimentalAvailabilityWeekdayForDate(
-                                            experimentalGroupAvailability,
+                                            pairAvailability,
                                             selectedDateId,
                                           ) || card.weekday,
                                         professor_time: timeOption.professorTime,

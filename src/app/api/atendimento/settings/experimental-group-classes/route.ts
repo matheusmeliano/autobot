@@ -18,7 +18,10 @@ import {
   type ExperimentalGroupWeekdayKey,
 } from "@/lib/atendimento/experimentalGroupClass";
 import { ATENDIMENTO_PROFESSOR_TIME_ZONE } from "@/lib/atendimento/constants";
-import { listExperimentalClassAvailability } from "@/lib/atendimento/experimentalClass";
+import {
+  EXPERIMENTAL_CLASS_PROFESSOR_ASSIGNMENT_ALLOWLIST,
+  listExperimentalClassAvailability,
+} from "@/lib/atendimento/experimentalClass";
 
 const weekdaySchema = z.enum(["mon", "tue", "wed", "thu", "fri", "sat", "sun"]);
 const slotTypeSchema = z.enum(["experimental", "recorrente"]);
@@ -35,6 +38,8 @@ const schema = z.object({
           .regex(/^\d{2}:\d{2}$/)
           .nullable()
           .optional(),
+        professor_name: z.string().trim().nullable().optional(),
+        professor_phone: z.string().trim().nullable().optional(),
         slot_type: slotTypeSchema.optional(),
         pair_id: z.string().trim().min(1).optional(),
       }),
@@ -65,21 +70,26 @@ function isMissingRelationError(error: unknown): boolean {
 async function listScheduledIndividualExperimentalProfessorStarts(params: {
   admin: ReturnType<typeof createSupabaseAdminClient>;
   fromIso: string;
+  professorPhone?: string | null;
 }): Promise<string[]> {
   try {
     const { data, error } = await params.admin
       .from("atendimento_experimental_class_bookings")
-      .select("professor_start_at, status")
+      .select("professor_start_at, status, assigned_professor_phone")
       .not("professor_start_at", "is", null)
       .gte("professor_start_at", params.fromIso);
     if (error) {
       if (isMissingRelationError(error)) return [];
       throw error;
     }
+    const targetPhoneDigits = String(params.professorPhone ?? "").replace(/\D/g, "");
     return (data ?? [])
       .filter((row: any) => {
         const status = String(row?.status ?? "").trim().toLowerCase();
-        return status !== "cancelled" && status !== "completed";
+        if (status === "cancelled" || status === "completed") return false;
+        if (!targetPhoneDigits) return true;
+        const rowPhoneDigits = String(row?.assigned_professor_phone ?? "").replace(/\D/g, "");
+        return rowPhoneDigits === targetPhoneDigits;
       })
       .map((row: any) => String(row?.professor_start_at ?? "").trim())
       .filter(Boolean);
@@ -92,13 +102,16 @@ async function listScheduledIndividualExperimentalProfessorStarts(params: {
 async function buildExperimentalGroupAvailability(
   admin: ReturnType<typeof createSupabaseAdminClient>,
   futureGroupClasses?: ExperimentalGroupClassRecord[],
+  professorPhone?: string | null,
 ) {
   const now = new Date();
   const nowIso = now.toISOString();
   const individualStarts = await listScheduledIndividualExperimentalProfessorStarts({
     admin,
     fromIso: nowIso,
+    professorPhone,
   });
+  const targetPhoneDigits = String(professorPhone ?? "").replace(/\D/g, "");
   const effectiveFutureGroupClasses =
     futureGroupClasses ??
     (await listFutureExperimentalGroupClasses({
@@ -106,6 +119,10 @@ async function buildExperimentalGroupAvailability(
       fromIso: nowIso,
     }));
   const groupStarts = effectiveFutureGroupClasses
+    .filter((row) => {
+      if (!targetPhoneDigits) return true;
+      return String(row.professor_phone ?? "").replace(/\D/g, "") === targetPhoneDigits;
+    })
     .map((row) => String(row.professor_start_at ?? "").trim())
     .filter(Boolean);
   const occupiedIntervals = (await loadRecurringCalendarOccupiedIntervals({
@@ -113,7 +130,11 @@ async function buildExperimentalGroupAvailability(
     now,
     lookAheadWeeks: 8,
   }))
-    .filter((interval) => interval.source === "recurring_schedule")
+    .filter((interval) => {
+      if (interval.source !== "recurring_schedule") return false;
+      if (!targetPhoneDigits) return true;
+      return String((interval as any)?.professor_phone_digits ?? "").trim() === targetPhoneDigits;
+    })
     .map((interval) => ({
       startAt: interval.start_at,
       endAt: interval.end_at,
@@ -133,6 +154,21 @@ async function buildExperimentalGroupAvailability(
     slotsByDate,
     professor_timezone: ATENDIMENTO_PROFESSOR_TIME_ZONE,
   };
+}
+
+async function buildExperimentalGroupAvailabilityByProfessor(
+  admin: ReturnType<typeof createSupabaseAdminClient>,
+  futureGroupClasses?: ExperimentalGroupClassRecord[],
+) {
+  const result: Record<string, Awaited<ReturnType<typeof buildExperimentalGroupAvailability>>> = {};
+  for (const professor of EXPERIMENTAL_CLASS_PROFESSOR_ASSIGNMENT_ALLOWLIST) {
+    result[professor.phone] = await buildExperimentalGroupAvailability(
+      admin,
+      futureGroupClasses,
+      professor.phone,
+    );
+  }
+  return result;
 }
 
 function buildExperimentalGroupPairUsage(
@@ -248,6 +284,10 @@ export async function GET() {
     });
     const recurringMembers = await listAssignedRecurringGroupMembers({ admin });
     const availability = await buildExperimentalGroupAvailability(admin, futureGroupClasses);
+    const availabilityByProfessor = await buildExperimentalGroupAvailabilityByProfessor(
+      admin,
+      futureGroupClasses,
+    );
     const pairUsage = buildExperimentalGroupPairUsage(
       settings,
       futureGroupClasses,
@@ -262,6 +302,7 @@ export async function GET() {
       preview_slots: [],
       pair_usage: pairUsage,
       availability,
+      availability_by_professor: availabilityByProfessor,
     });
   } catch (error: any) {
     return Response.json(
@@ -296,7 +337,10 @@ export async function PATCH(req: Request) {
           slot.weekday &&
           slot.professor_time,
       )
-      .map((slot) => `${slot.weekday}-${slot.professor_time}`);
+      .map(
+        (slot) =>
+          `${String(slot.professor_phone ?? "").replace(/\D/g, "")}-${slot.weekday}-${slot.professor_time}`,
+      );
     if (new Set(activeCombinations).size !== activeCombinations.length) {
       return Response.json(
         { ok: false, error: "Nao repita a mesma combinacao de dia e horario entre as turmas." },
@@ -339,6 +383,10 @@ export async function PATCH(req: Request) {
 
     const updatedAt = await saveExperimentalGroupClassSettings({ admin, settings });
     const availability = await buildExperimentalGroupAvailability(admin, futureGroupClasses);
+    const availabilityByProfessor = await buildExperimentalGroupAvailabilityByProfessor(
+      admin,
+      futureGroupClasses,
+    );
     const pairUsage = buildExperimentalGroupPairUsage(
       settings,
       futureGroupClasses,
@@ -353,6 +401,7 @@ export async function PATCH(req: Request) {
       preview_slots: [],
       pair_usage: pairUsage,
       availability,
+      availability_by_professor: availabilityByProfessor,
     });
   } catch (error: any) {
     return Response.json(
