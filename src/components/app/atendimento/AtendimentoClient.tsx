@@ -4170,31 +4170,59 @@ export function AtendimentoClient() {
     setIsExperimentalGroupModalOpen(true);
   }
 
-  async function handleAssignLeadToExperimentalGroup(slot: ExperimentalGroupSlotPayload) {
+  async function handleConfirmSelectedExperimentalGroup(slot: ExperimentalGroupSlotPayload) {
     if (!experimentalGroupLead || experimentalGroupActionLoading) return;
     setExperimentalGroupActionLoading(true);
     try {
-      const res = await fetch("/api/atendimento/experimental-group-classes/assign", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          lead_id: experimentalGroupLead.id,
-          group_class_id: slot.group_class_id,
-          professor_start_at: slot.professor_start_at,
-          pair_id: slot.pair_id,
-          slot_type: slot.slot_type,
-        }),
-      });
-      if (handleForbiddenResponse(res)) return;
-      const json = await res.json().catch(() => null);
-      if (!json?.ok) {
-        modalToast.error(String(json?.error ?? "Falha ao atribuir registro à turma."));
+      let groupClassId = String(slot.group_class_id ?? "").trim();
+
+      if (!slot.is_current_lead_assigned) {
+        const assignRes = await fetch("/api/atendimento/experimental-group-classes/assign", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            lead_id: experimentalGroupLead.id,
+            group_class_id: slot.group_class_id,
+            professor_start_at: slot.professor_start_at,
+            pair_id: slot.pair_id,
+            slot_type: slot.slot_type,
+          }),
+        });
+        if (handleForbiddenResponse(assignRes)) return;
+        const assignJson = await assignRes.json().catch(() => null);
+        if (!assignJson?.ok) {
+          modalToast.error(String(assignJson?.error ?? "Falha ao atribuir registro à turma."));
+          return;
+        }
+        groupClassId = String(assignJson?.group_class_id ?? groupClassId).trim();
+      }
+
+      if (!groupClassId) {
+        modalToast.error("A turma selecionada não pôde ser preparada para confirmação.");
         return;
       }
-      await Promise.all([loadPanelLeads(), loadExperimentalGroupLeadData(experimentalGroupLead)]);
-      modalToast.success("Registro vinculado à turma.");
+
+      const confirmRes = await fetch("/api/atendimento/experimental-group-classes/confirm", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ group_class_id: groupClassId }),
+      });
+      if (handleForbiddenResponse(confirmRes)) return;
+      const confirmJson = await confirmRes.json().catch(() => null);
+      if (!confirmJson?.ok) {
+        modalToast.error(String(confirmJson?.error ?? "Falha ao confirmar a turma."));
+        return;
+      }
+      await Promise.all([
+        loadPanelLeads(),
+        loadSummary({ silent: true }),
+        loadExperimentalGroupLeadData(experimentalGroupLead),
+      ]);
+      modalToast.success(
+        `Turma confirmada. ${Number(confirmJson?.sent_count ?? 0)} mensagem(ns) enviada(s).`,
+      );
     } catch (error: any) {
-      modalToast.error(String(error?.message ?? "Falha ao atribuir registro à turma."));
+      modalToast.error(String(error?.message ?? "Falha ao confirmar a turma."));
     } finally {
       setExperimentalGroupActionLoading(false);
     }
@@ -4224,30 +4252,6 @@ export function AtendimentoClient() {
       modalToast.success("Aluno removido da turma.");
     } catch (error: any) {
       modalToast.error(String(error?.message ?? "Falha ao remover aluno da turma."));
-    } finally {
-      setExperimentalGroupActionLoading(false);
-    }
-  }
-
-  async function handleConfirmExperimentalGroup(groupClassId: string) {
-    if (experimentalGroupActionLoading || !experimentalGroupLead) return;
-    setExperimentalGroupActionLoading(true);
-    try {
-      const res = await fetch("/api/atendimento/experimental-group-classes/confirm", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ group_class_id: groupClassId }),
-      });
-      if (handleForbiddenResponse(res)) return;
-      const json = await res.json().catch(() => null);
-      if (!json?.ok) {
-        modalToast.error(String(json?.error ?? "Falha ao confirmar a turma."));
-        return;
-      }
-      await Promise.all([loadPanelLeads(), loadSummary({ silent: true }), loadExperimentalGroupLeadData(experimentalGroupLead)]);
-      modalToast.success(`Turma confirmada. ${Number(json?.sent_count ?? 0)} mensagem(ns) enviada(s).`);
-    } catch (error: any) {
-      modalToast.error(String(error?.message ?? "Falha ao confirmar a turma."));
     } finally {
       setExperimentalGroupActionLoading(false);
     }
@@ -10420,17 +10424,7 @@ export function AtendimentoClient() {
                   </div>
 
                   <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:justify-end">
-                    {!selectedExperimentalGroupSlot.is_current_lead_assigned ? (
-                      <button
-                        type="button"
-                        disabled={experimentalGroupActionLoading || selectedExperimentalGroupSlot.is_full || !experimentalGroupCanOpenModal}
-                        onClick={() => void handleAssignLeadToExperimentalGroup(selectedExperimentalGroupSlot)}
-                        className="inline-flex min-h-[42px] items-center justify-center gap-2 rounded-xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] px-4 text-[13px] font-semibold text-[var(--app-text-85)] disabled:cursor-not-allowed disabled:opacity-60"
-                      >
-                        <Plus className="h-4 w-4" />
-                        Adicionar este aluno
-                      </button>
-                    ) : (
+                    {selectedExperimentalGroupSlot.is_current_lead_assigned ? (
                       <button
                         type="button"
                         disabled={experimentalGroupActionLoading}
@@ -10445,13 +10439,17 @@ export function AtendimentoClient() {
                         <Trash2 className="h-4 w-4" />
                         Remover este aluno
                       </button>
-                    )}
+                    ) : null}
                     {selectedExperimentalGroupSlot.slot_type === "experimental" ? (
                       <button
                         type="button"
-                        disabled={experimentalGroupActionLoading || !selectedExperimentalGroupSlot.group_class_id || selectedExperimentalGroupSlot.occupied_seats <= 0}
-                        onClick={() => void handleConfirmExperimentalGroup(String(selectedExperimentalGroupSlot.group_class_id ?? ""))}
-                        className="inline-flex min-h-[42px] items-center justify-center gap-2 rounded-xl bg-[#ea580c] px-4 text-[13px] font-semibold text-white disabled:cursor-not-allowed disabled:opacity-60"
+                        disabled={
+                          experimentalGroupActionLoading ||
+                          selectedExperimentalGroupSlot.is_full ||
+                          !experimentalGroupCanOpenModal
+                        }
+                        onClick={() => void handleConfirmSelectedExperimentalGroup(selectedExperimentalGroupSlot)}
+                        className="inline-flex min-h-[42px] items-center justify-center gap-2 rounded-xl bg-[#ea580c] px-4 text-[13px] font-semibold !text-white disabled:cursor-not-allowed disabled:opacity-60"
                       >
                         {experimentalGroupActionLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
                         Confirmar turma

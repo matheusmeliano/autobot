@@ -56,6 +56,168 @@ function isMissingExperimentalBookingRelation(error: unknown): boolean {
   );
 }
 
+async function assignLeadToExperimentalGroupDirect(params: {
+  admin: ReturnType<typeof createSupabaseAdminClient>;
+  leadId: string;
+  conversationId: string | null;
+  targetSlot: {
+    professor_name: string | null;
+    professor_phone: string | null;
+    professor_timezone: string | null;
+    professor_weekday: string | null;
+    professor_date: string | null;
+    professor_time: string | null;
+    professor_start_at: string;
+    capacity: number;
+  };
+}) {
+  const nowIso = new Date().toISOString();
+  const admin = params.admin;
+  const slot = params.targetSlot;
+
+  const { data: upsertedGroupClass, error: upsertGroupClassError } = await admin
+    .from("atendimento_experimental_group_classes")
+    .upsert(
+      {
+        professor_name: String(slot.professor_name ?? "").trim() || "Professor",
+        professor_phone: String(slot.professor_phone ?? "").trim() || "",
+        professor_timezone: String(slot.professor_timezone ?? "").trim() || "America/Cuiaba",
+        professor_weekday: String(slot.professor_weekday ?? "").trim().toLowerCase() || "mon",
+        professor_date: String(slot.professor_date ?? "").trim() || null,
+        professor_time: String(slot.professor_time ?? "").trim() || "08:00",
+        professor_start_at: slot.professor_start_at,
+        capacity: Math.min(4, Math.max(1, Number(slot.capacity ?? 4))),
+        status: "draft",
+        updated_at: nowIso,
+      },
+      { onConflict: "professor_start_at" },
+    )
+    .select("*")
+    .single();
+
+  if (upsertGroupClassError) {
+    return { ok: false as const, error: upsertGroupClassError.message };
+  }
+
+  const groupClassId = String((upsertedGroupClass as any)?.id ?? "").trim();
+  if (!groupClassId) {
+    return { ok: false as const, error: "group_class_not_found" };
+  }
+
+  const groupStatus = String((upsertedGroupClass as any)?.status ?? "").trim().toLowerCase();
+  if (groupStatus === "cancelled" || groupStatus === "completed") {
+    const { error: reopenGroupError } = await admin
+      .from("atendimento_experimental_group_classes")
+      .update({
+        status: "draft",
+        confirmed_at: null,
+        updated_at: nowIso,
+      })
+      .eq("id", groupClassId);
+    if (reopenGroupError) {
+      return { ok: false as const, error: reopenGroupError.message };
+    }
+  }
+
+  const { data: existingOtherGroupMember, error: existingOtherGroupError } = await admin
+    .from("atendimento_experimental_group_class_members")
+    .select("group_class_id")
+    .eq("lead_id", params.leadId)
+    .eq("status", "assigned")
+    .neq("group_class_id", groupClassId)
+    .limit(1)
+    .maybeSingle();
+
+  if (existingOtherGroupError) {
+    return { ok: false as const, error: existingOtherGroupError.message };
+  }
+  if (existingOtherGroupMember?.group_class_id) {
+    return { ok: false as const, error: "lead_already_assigned_to_other_group" };
+  }
+
+  const { data: existingMember, error: existingMemberError } = await admin
+    .from("atendimento_experimental_group_class_members")
+    .select("id")
+    .eq("group_class_id", groupClassId)
+    .eq("lead_id", params.leadId)
+    .eq("status", "assigned")
+    .limit(1)
+    .maybeSingle();
+
+  if (existingMemberError) {
+    return { ok: false as const, error: existingMemberError.message };
+  }
+
+  const { count: occupiedBefore, error: occupiedBeforeError } = await admin
+    .from("atendimento_experimental_group_class_members")
+    .select("id", { count: "exact", head: true })
+    .eq("group_class_id", groupClassId)
+    .eq("status", "assigned");
+
+  if (occupiedBeforeError) {
+    return { ok: false as const, error: occupiedBeforeError.message };
+  }
+
+  const capacity = Math.min(
+    4,
+    Math.max(1, Number((upsertedGroupClass as any)?.capacity ?? slot.capacity ?? 4)),
+  );
+  const alreadyAssigned = Boolean(existingMember?.id);
+  if (!alreadyAssigned && Number(occupiedBefore ?? 0) >= capacity) {
+    return { ok: false as const, error: "group_class_full" };
+  }
+
+  const { data: assignedMember, error: assignMemberError } = await admin
+    .from("atendimento_experimental_group_class_members")
+    .upsert(
+      {
+        group_class_id: groupClassId,
+        lead_id: params.leadId,
+        conversation_id: params.conversationId,
+        status: "assigned",
+        assigned_at: nowIso,
+        updated_at: nowIso,
+      },
+      { onConflict: "group_class_id,lead_id" },
+    )
+    .select("id")
+    .single();
+
+  if (assignMemberError) {
+    const message = String(assignMemberError.message ?? "");
+    if (
+      /atendimento_experimental_group_class_members_active_lead_key/i.test(message) ||
+      /duplicate key value violates unique constraint/i.test(message)
+    ) {
+      return { ok: false as const, error: "lead_already_assigned_to_other_group" };
+    }
+    return { ok: false as const, error: assignMemberError.message };
+  }
+
+  const { count: occupiedAfter, error: occupiedAfterError } = await admin
+    .from("atendimento_experimental_group_class_members")
+    .select("id", { count: "exact", head: true })
+    .eq("group_class_id", groupClassId)
+    .eq("status", "assigned");
+
+  if (occupiedAfterError) {
+    return { ok: false as const, error: occupiedAfterError.message };
+  }
+
+  await admin
+    .from("atendimento_experimental_group_classes")
+    .update({ updated_at: nowIso })
+    .eq("id", groupClassId);
+
+  return {
+    ok: true as const,
+    group_class_id: groupClassId,
+    member_id: String((assignedMember as any)?.id ?? "").trim() || null,
+    occupied_seats: Number(occupiedAfter ?? occupiedBefore ?? 0),
+    available_seats: Math.max(capacity - Number(occupiedAfter ?? occupiedBefore ?? 0), 0),
+  };
+}
+
 export async function POST(req: Request) {
   try {
     const auth = await requireAtendimentoUser();
@@ -233,38 +395,39 @@ export async function POST(req: Request) {
       }
     }
 
-    const rpcResult = await admin.rpc("assign_atendimento_experimental_group_member", {
-      p_lead_id: leadId,
-      p_conversation_id: String((latestConversation as any)?.id ?? "").trim() || null,
-      p_professor_name: targetSlot.professor_name,
-      p_professor_phone: targetSlot.professor_phone,
-      p_professor_timezone: targetSlot.professor_timezone,
-      p_professor_weekday: targetSlot.professor_weekday,
-      p_professor_date: targetSlot.professor_date,
-      p_professor_time: targetSlot.professor_time,
-      p_professor_start_at: targetSlot.professor_start_at,
-      p_capacity: targetSlot.capacity,
+    const assignmentResult = await assignLeadToExperimentalGroupDirect({
+      admin,
+      leadId,
+      conversationId: String((latestConversation as any)?.id ?? "").trim() || null,
+      targetSlot: {
+        professor_name: targetSlot.professor_name,
+        professor_phone: targetSlot.professor_phone,
+        professor_timezone: targetSlot.professor_timezone,
+        professor_weekday: targetSlot.professor_weekday,
+        professor_date: targetSlot.professor_date,
+        professor_time: targetSlot.professor_time,
+        professor_start_at: targetSlot.professor_start_at,
+        capacity: targetSlot.capacity,
+      },
     });
 
-    if (rpcResult.error) {
-      const message = String(rpcResult.error.message ?? "");
-      if (message.includes("group_class_full")) {
+    if (!assignmentResult.ok) {
+      if (assignmentResult.error.includes("group_class_full")) {
         return Response.json(
           { ok: false, error: "A turma selecionada acabou de ficar lotada." },
           { status: 409 },
         );
       }
-      if (message.includes("lead_already_assigned_to_other_group")) {
+      if (assignmentResult.error.includes("lead_already_assigned_to_other_group")) {
         return Response.json(
           { ok: false, error: "Este registro já está atribuído a outra turma." },
           { status: 409 },
         );
       }
-      return Response.json({ ok: false, error: rpcResult.error.message }, { status: 500 });
+      return Response.json({ ok: false, error: assignmentResult.error }, { status: 500 });
     }
 
-    const rpcRow = Array.isArray(rpcResult.data) ? rpcResult.data[0] : (rpcResult.data as any);
-    const groupClassId = String((rpcRow as any)?.group_class_id ?? "").trim();
+    const groupClassId = String(assignmentResult.group_class_id ?? "").trim();
     await admin
       .from("atendimento_leads")
       .update({
