@@ -1811,6 +1811,9 @@ export function AtendimentoClient() {
     ExperimentalGroupSlotPayload[]
   >([]);
   const [experimentalGroupCanOpenModal, setExperimentalGroupCanOpenModal] = useState(false);
+  const [experimentalGroupLeadSlotType, setExperimentalGroupLeadSlotType] = useState<
+    "experimental" | "recorrente" | null
+  >(null);
   const [experimentalGroupSettingsAssignProfPairId, setExperimentalGroupSettingsAssignProfPairId] =
     useState("");
   const [experimentalGroupSelectedDateId, setExperimentalGroupSelectedDateId] = useState<
@@ -4216,6 +4219,7 @@ export function AtendimentoClient() {
 
   async function loadExperimentalGroupLeadData(lead: AtendimentoLeadListItem) {
     setExperimentalGroupLoading(true);
+    setExperimentalGroupLeadSlotType(null);
     try {
       const res = await fetch(
         `/api/atendimento/leads/${encodeURIComponent(lead.id)}/experimental-group-classes`,
@@ -4227,6 +4231,11 @@ export function AtendimentoClient() {
         modalToast.error(String(json?.error ?? "Falha ao carregar turmas disponíveis."));
         return null;
       }
+      setExperimentalGroupLeadSlotType(
+        String(json?.lead_slot_type ?? "").trim().toLowerCase() === "recorrente"
+          ? "recorrente"
+          : "experimental",
+      );
       const slots = Array.isArray(json?.slots) ? (json.slots as ExperimentalGroupSlotPayload[]) : [];
       setExperimentalGroupCanOpenModal(Boolean(json?.can_open_modal));
       setExperimentalGroupSlots(slots);
@@ -10344,7 +10353,11 @@ export function AtendimentoClient() {
                 Aula em Grupo
               </h3>
               <div className="mt-1 text-[12px] text-[var(--app-text-55)]">
-                {String(experimentalGroupLead?.full_name ?? "").trim() || "Registro selecionado"}
+                {experimentalGroupLeadSlotType === "recorrente"
+                  ? "Registro recorrente"
+                  : experimentalGroupLeadSlotType === "experimental"
+                    ? "Registro experimental"
+                    : "Registro selecionado"}
               </div>
             </div>
             <button
