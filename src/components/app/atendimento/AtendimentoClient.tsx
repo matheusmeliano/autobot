@@ -1906,6 +1906,7 @@ export function AtendimentoClient() {
     useState<AtendimentoLeadListItem | null>(null);
   const [experimentalGroupLoading, setExperimentalGroupLoading] = useState(false);
   const [experimentalGroupActionLoading, setExperimentalGroupActionLoading] = useState(false);
+  const [experimentalGroupLessonLinkDraft, setExperimentalGroupLessonLinkDraft] = useState("");
   const [experimentalGroupSlots, setExperimentalGroupSlots] = useState<
     ExperimentalGroupSlotPayload[]
   >([]);
@@ -2227,6 +2228,19 @@ export function AtendimentoClient() {
       null
     );
   }, [experimentalGroupSelectedSlotId, experimentalGroupSlots]);
+
+  useEffect(() => {
+    if (
+      experimentalGroupLeadSlotType === "experimental" &&
+      selectedExperimentalGroupSlot?.slot_type === "experimental"
+    ) {
+      setExperimentalGroupLessonLinkDraft(
+        String(selectedExperimentalGroupSlot.lesson_link ?? "").trim(),
+      );
+      return;
+    }
+    setExperimentalGroupLessonLinkDraft("");
+  }, [experimentalGroupLeadSlotType, selectedExperimentalGroupSlot]);
 
   const experimentalGroupVisibleSlots = useMemo<ExperimentalGroupSlotPayload[]>(() => {
     return experimentalGroupSlots.filter(
@@ -4635,14 +4649,30 @@ export function AtendimentoClient() {
         return;
       }
 
+      const lessonLinkForConfirmation =
+        String(experimentalGroupLessonLinkDraft ?? "").trim() ||
+        String(slot.lesson_link ?? "").trim() ||
+        null;
+      if (!lessonLinkForConfirmation) {
+        modalToast.error("Adicione o link da aula experimental antes de confirmar a turma.");
+        return;
+      }
+
       const confirmRes = await fetch("/api/atendimento/experimental-group-classes/confirm", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ group_class_id: groupClassId }),
+        body: JSON.stringify({
+          group_class_id: groupClassId,
+          lesson_link: lessonLinkForConfirmation,
+        }),
       });
       if (handleForbiddenResponse(confirmRes)) return;
       const confirmJson = await confirmRes.json().catch(() => null);
       if (!confirmJson?.ok) {
+        if (confirmJson?.error === "missing_lesson_link") {
+          modalToast.error("Adicione o link da aula experimental antes de confirmar a turma.");
+          return;
+        }
         modalToast.error(
           normalizeExperimentalGroupErrorMessage(
             confirmJson?.error,
@@ -11093,6 +11123,32 @@ export function AtendimentoClient() {
                             </div>
                           )}
                         </div>
+
+                        {experimentalGroupLeadSlotType === "experimental" ? (
+                          <div className="space-y-2">
+                            <label className="text-xs font-semibold text-[var(--app-text-70)]">
+                              Link da aula
+                            </label>
+                            <div className="flex flex-col items-stretch gap-3 min-[600px]:flex-row min-[600px]:items-end">
+                              <div className="min-w-0 flex-1">
+                                <input
+                                  type="url"
+                                  inputMode="url"
+                                  placeholder="https://meet.google.com/..."
+                                  value={experimentalGroupLessonLinkDraft}
+                                  onChange={(e) =>
+                                    setExperimentalGroupLessonLinkDraft(e.target.value)
+                                  }
+                                  className="w-full min-w-0 rounded-xl border border-[var(--app-border)] bg-[var(--app-solid-surface-2)] px-4 py-3 text-[13px] font-semibold text-[var(--app-text-85)] placeholder:text-[var(--app-text-45)] transition focus:border-[var(--app-border-strong)] focus:outline-none disabled:cursor-not-allowed disabled:opacity-60"
+                                  disabled={experimentalGroupActionLoading}
+                                />
+                              </div>
+                            </div>
+                            <div className="text-[12px] text-[var(--app-text-55)]">
+                              Esse link sera enviado na notificacao da turma experimental.
+                            </div>
+                          </div>
+                        ) : null}
                       </>
                     ) : (
                       <div className="rounded-2xl border border-dashed border-[var(--app-border)] bg-[var(--app-solid-surface-2)] px-4 py-5 text-center text-[13px] text-[var(--app-text-55)]">
@@ -11111,11 +11167,18 @@ export function AtendimentoClient() {
                     const isCurrentLeadAssigned = Boolean(
                       selectedExperimentalGroupSlot.is_current_lead_assigned,
                     );
+                    const needsLessonLinkForExperimental =
+                      !isCurrentLeadAssigned &&
+                      experimentalGroupLeadSlotType === "experimental" &&
+                      selectedExperimentalGroupSlot.slot_type === "experimental" &&
+                      !String(experimentalGroupLessonLinkDraft ?? "").trim() &&
+                      !String(selectedExperimentalGroupSlot.lesson_link ?? "").trim();
                     const actionDisabled = isCurrentLeadAssigned
                       ? experimentalGroupActionLoading
                       : experimentalGroupActionLoading ||
                         selectedExperimentalGroupSlot.is_full ||
-                        !experimentalGroupCanOpenModal;
+                        !experimentalGroupCanOpenModal ||
+                        needsLessonLinkForExperimental;
                     return (
                   <button
                     type="button"

@@ -506,22 +506,28 @@ export function buildExperimentalGroupClassConfirmationMessage(params: {
   professorStartAt: string;
   leadTimeZone: string;
   professorTimeZone?: string | null;
+  lessonLink?: string | null;
 }): string {
   const safeFirstName =
     String(params.leadName ?? "").trim().split(/\s+/)[0] || "Aluno(a)";
   const professorTimeZone =
     String(params.professorTimeZone ?? "").trim() || ATENDIMENTO_PROFESSOR_TIME_ZONE;
   const professorName = String(params.professorName ?? "").trim() || "Professor(a)";
+  const lessonLink = String(params.lessonLink ?? "").trim() || null;
   const leadDate = localDateLabel(params.professorStartAt, params.leadTimeZone);
   const leadTime = formatTimeInTimeZone(params.professorStartAt, params.leadTimeZone);
   const professorDate = localDateLabel(params.professorStartAt, professorTimeZone);
   const professorTime = formatTimeInTimeZone(params.professorStartAt, professorTimeZone);
-  return [
+  const lines = [
     `Perfeito, ${safeFirstName}! Sua aula experimental em grupo foi confirmada. 🎶`,
     `Professor: ${professorName}`,
     `Horário na sua região: ${leadDate}, às ${leadTime}`,
     `Horário do professor (Cuiabá/MT): ${professorDate}, às ${professorTime}`,
-  ].join("\n\n");
+  ];
+  if (lessonLink) {
+    lines.push(`Link da aula: ${lessonLink}`);
+  }
+  return lines.join("\n\n");
 }
 
 export function listExperimentalGroupClassSlots(params: {

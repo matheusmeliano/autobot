@@ -14,6 +14,7 @@ export const runtime = "nodejs";
 
 const schema = z.object({
   group_class_id: z.string().trim().uuid(),
+  lesson_link: z.string().trim().max(500).nullable().optional(),
 });
 
 function isMissingExperimentalGroupRelation(error: unknown): boolean {
@@ -57,6 +58,7 @@ export async function POST(req: Request) {
     const admin = createSupabaseAdminClient();
     const nowIso = new Date().toISOString();
     const groupClassId = parsed.data.group_class_id;
+    const lessonLink = String(parsed.data.lesson_link ?? "").trim() || null;
 
     const { data: groupClass, error: groupClassError } = await admin
       .from("atendimento_experimental_group_classes")
@@ -72,6 +74,12 @@ export async function POST(req: Request) {
     }
     if (!groupClass?.id) {
       return Response.json({ ok: false, error: "group_class_not_found" }, { status: 404 });
+    }
+
+    const effectiveLessonLink =
+      lessonLink || String((groupClass as any)?.lesson_link ?? "").trim() || null;
+    if (!effectiveLessonLink) {
+      return Response.json({ ok: false, error: "missing_lesson_link" }, { status: 409 });
     }
 
     const { data: members, error: membersError } = await admin
@@ -120,6 +128,7 @@ export async function POST(req: Request) {
       .update({
         status: "confirmed",
         confirmed_at: String((groupClass as any)?.confirmed_at ?? "").trim() || nowIso,
+        lesson_link: effectiveLessonLink,
         updated_at: nowIso,
       })
       .eq("id", groupClassId);
@@ -150,6 +159,7 @@ export async function POST(req: Request) {
         leadTimeZone,
         professorTimeZone:
           String((groupClass as any)?.professor_timezone ?? "").trim() || null,
+        lessonLink: effectiveLessonLink,
       });
 
       if (
@@ -218,6 +228,7 @@ export async function POST(req: Request) {
             String((groupClass as any)?.professor_name ?? "").trim() || null,
           experimental_class_professor_phone:
             String((groupClass as any)?.professor_phone ?? "").trim() || null,
+          experimental_class_link: effectiveLessonLink,
           updated_at: nowIso,
         })
         .eq("id", leadId);
@@ -244,6 +255,7 @@ export async function POST(req: Request) {
           lead_date: leadDate || null,
           lead_time: leadTime || null,
           lead_timezone: leadTimeZone,
+          lesson_link: effectiveLessonLink,
           student_notification_sent: !errors.some((entry) => entry.lead_id === leadId),
         },
         actorType: "attendant",
