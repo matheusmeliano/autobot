@@ -5,9 +5,9 @@ import { appendHistoryEvent, requireAtendimentoUser } from "@/lib/atendimento/se
 export const runtime = "nodejs";
 
 const schema = z.object({
-  group_class_id: z.string().trim().uuid().optional(),
+  group_class_id: z.string().trim().uuid().nullable().optional(),
   lead_id: z.string().trim().uuid(),
-  pair_id: z.string().trim().min(1).optional(),
+  pair_id: z.string().trim().min(1).nullable().optional(),
   slot_type: z.enum(["experimental", "recorrente"]).optional(),
 });
 
