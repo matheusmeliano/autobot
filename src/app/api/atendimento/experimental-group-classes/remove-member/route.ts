@@ -106,12 +106,46 @@ export async function POST(req: Request) {
       return Response.json({ ok: false, error: "invalid_payload" }, { status: 400 });
     }
 
-    const { data: member, error: memberError } = await admin
-      .from("atendimento_experimental_group_class_members")
-      .select("id, conversation_id, status")
-      .eq("group_class_id", parsed.data.group_class_id)
-      .eq("lead_id", parsed.data.lead_id)
+    const { data: lead, error: leadError } = await admin
+      .from("atendimento_leads")
+      .select(
+        "id, experimental_class_group_class_id, experimental_class_group_status, experimental_class_professor_start_at, experimental_class_professor_date, experimental_class_professor_time, experimental_class_professor_phone",
+      )
+      .eq("id", parsed.data.lead_id)
       .maybeSingle();
+
+    if (leadError) {
+      if (isMissingExperimentalGroupRelation(leadError)) {
+        return groupSchemaUnavailableResponse();
+      }
+      return Response.json({ ok: false, error: leadError.message }, { status: 500 });
+    }
+
+    const leadAssignedGroupClassId =
+      String((lead as any)?.experimental_class_group_class_id ?? "").trim() || null;
+    const requestedGroupClassId = String(parsed.data.group_class_id ?? "").trim() || null;
+    const effectiveGroupClassId = leadAssignedGroupClassId || requestedGroupClassId;
+
+    let member:
+      | {
+          id: string;
+          conversation_id: string | null;
+          status: string | null;
+          group_class_id?: string | null;
+        }
+      | null = null;
+
+    let memberError: any = null;
+    if (effectiveGroupClassId) {
+      const memberResult = await admin
+        .from("atendimento_experimental_group_class_members")
+        .select("id, conversation_id, status, group_class_id")
+        .eq("group_class_id", effectiveGroupClassId)
+        .eq("lead_id", parsed.data.lead_id)
+        .maybeSingle();
+      member = (memberResult.data as any) ?? null;
+      memberError = memberResult.error;
+    }
 
     if (memberError) {
       if (isMissingExperimentalGroupRelation(memberError)) {
@@ -119,49 +153,76 @@ export async function POST(req: Request) {
       }
       return Response.json({ ok: false, error: memberError.message }, { status: 500 });
     }
+
     if (!member?.id) {
-      return Response.json({ ok: false, error: "member_not_found" }, { status: 404 });
-    }
-
-    const { error: updateMemberError } = await admin
-      .from("atendimento_experimental_group_class_members")
-      .update({
-        status: "removed",
-        updated_at: nowIso,
-      })
-      .eq("id", String((member as any)?.id ?? ""));
-    if (updateMemberError) {
-      if (isMissingExperimentalGroupRelation(updateMemberError)) {
-        return groupSchemaUnavailableResponse();
-      }
-      return Response.json({ ok: false, error: updateMemberError.message }, { status: 500 });
-    }
-
-    const { count: activeCount, error: activeCountError } = await admin
-      .from("atendimento_experimental_group_class_members")
-      .select("id", { count: "exact", head: true })
-      .eq("group_class_id", parsed.data.group_class_id)
-      .eq("status", "assigned");
-    if (activeCountError) {
-      if (isMissingExperimentalGroupRelation(activeCountError)) {
-        return groupSchemaUnavailableResponse();
-      }
-      return Response.json({ ok: false, error: activeCountError.message }, { status: 500 });
-    }
-
-    if (Number(activeCount ?? 0) <= 0) {
-      const { error: updateClassError } = await admin
-        .from("atendimento_experimental_group_classes")
-        .update({
-          status: "cancelled",
-          updated_at: nowIso,
-        })
-        .eq("id", parsed.data.group_class_id);
-      if (updateClassError) {
-        if (isMissingExperimentalGroupRelation(updateClassError)) {
+      const fallbackMemberResult = await admin
+        .from("atendimento_experimental_group_class_members")
+        .select("id, conversation_id, status, group_class_id")
+        .eq("lead_id", parsed.data.lead_id)
+        .eq("status", "assigned")
+        .maybeSingle();
+      if (fallbackMemberResult.error) {
+        if (isMissingExperimentalGroupRelation(fallbackMemberResult.error)) {
           return groupSchemaUnavailableResponse();
         }
-        return Response.json({ ok: false, error: updateClassError.message }, { status: 500 });
+        return Response.json({ ok: false, error: fallbackMemberResult.error.message }, { status: 500 });
+      }
+      member = (fallbackMemberResult.data as any) ?? null;
+    }
+
+    if (!member?.id) {
+      const leadGroupStatus = String((lead as any)?.experimental_class_group_status ?? "").trim().toLowerCase();
+      if (!leadGroupStatus || leadGroupStatus === "removed") {
+        return Response.json({ ok: false, error: "member_not_found" }, { status: 404 });
+      }
+    }
+
+    const memberGroupClassId =
+      String((member as any)?.group_class_id ?? "").trim() || effectiveGroupClassId;
+
+    if (member?.id) {
+      const { error: updateMemberError } = await admin
+        .from("atendimento_experimental_group_class_members")
+        .update({
+          status: "removed",
+          updated_at: nowIso,
+        })
+        .eq("id", String((member as any)?.id ?? ""));
+      if (updateMemberError) {
+        if (isMissingExperimentalGroupRelation(updateMemberError)) {
+          return groupSchemaUnavailableResponse();
+        }
+        return Response.json({ ok: false, error: updateMemberError.message }, { status: 500 });
+      }
+    }
+
+    if (memberGroupClassId) {
+      const { count: activeCount, error: activeCountError } = await admin
+        .from("atendimento_experimental_group_class_members")
+        .select("id", { count: "exact", head: true })
+        .eq("group_class_id", memberGroupClassId)
+        .eq("status", "assigned");
+      if (activeCountError) {
+        if (isMissingExperimentalGroupRelation(activeCountError)) {
+          return groupSchemaUnavailableResponse();
+        }
+        return Response.json({ ok: false, error: activeCountError.message }, { status: 500 });
+      }
+
+      if (Number(activeCount ?? 0) <= 0) {
+        const { error: updateClassError } = await admin
+          .from("atendimento_experimental_group_classes")
+          .update({
+            status: "cancelled",
+            updated_at: nowIso,
+          })
+          .eq("id", memberGroupClassId);
+        if (updateClassError) {
+          if (isMissingExperimentalGroupRelation(updateClassError)) {
+            return groupSchemaUnavailableResponse();
+          }
+          return Response.json({ ok: false, error: updateClassError.message }, { status: 500 });
+        }
       }
     }
 
@@ -199,7 +260,7 @@ export async function POST(req: Request) {
       eventType: "experimental_group_class_member_removed",
       title: "Registro removido de uma turma de aula experimental em grupo",
       details: {
-        group_class_id: parsed.data.group_class_id,
+        group_class_id: memberGroupClassId,
       },
       actorType: "attendant",
       actorEmail: auth.user.email,
