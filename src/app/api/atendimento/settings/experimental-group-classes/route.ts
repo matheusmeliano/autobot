@@ -59,6 +59,80 @@ function buildWeekdayOptions() {
   );
 }
 
+function canonicalizeExperimentalGroupPairSettings(
+  settings: ExperimentalGroupClassSettings,
+): ExperimentalGroupClassSettings {
+  const grouped = new Map<
+    string,
+    {
+      experimental: ExperimentalGroupClassSettings["slots"][number] | null;
+      recurring: ExperimentalGroupClassSettings["slots"][number] | null;
+    }
+  >();
+  for (const slot of settings.slots) {
+    const pairId = String(slot.pair_id ?? "").trim();
+    if (!pairId) continue;
+    const current = grouped.get(pairId) ?? { experimental: null, recurring: null };
+    if (slot.slot_type === "recorrente") {
+      current.recurring = slot;
+    } else {
+      current.experimental = slot;
+    }
+    grouped.set(pairId, current);
+  }
+
+  const normalizedSlots = Array.from(grouped.entries())
+    .sort((left, right) => left[0].localeCompare(right[0], "pt-BR", { numeric: true }))
+    .flatMap(([pairId, pair]) => {
+      const source = pair.experimental ?? pair.recurring;
+      if (!source) return [];
+      const sharedValues = {
+        enabled: Boolean(source.enabled),
+        weekday: source.weekday ?? null,
+        professor_time: source.professor_time ?? null,
+        professor_name: source.professor_name ?? null,
+        professor_phone: source.professor_phone ?? null,
+        pair_id: pairId,
+      };
+      return [
+        {
+          ...sharedValues,
+          slot_type: "experimental" as const,
+        },
+        {
+          ...sharedValues,
+          slot_type: "recorrente" as const,
+        },
+      ];
+    });
+
+  return normalizeExperimentalGroupClassSettings({
+    ...settings,
+    slots: normalizedSlots,
+  });
+}
+
+function isPairSlotAvailableForProfessor(params: {
+  availability: Awaited<ReturnType<typeof buildExperimentalGroupAvailability>> | null | undefined;
+  weekday: string | null | undefined;
+  professorTime: string | null | undefined;
+}) {
+  const weekday = String(params.weekday ?? "").trim().toLowerCase();
+  const professorTime = String(params.professorTime ?? "").trim();
+  const dates = Array.isArray(params.availability?.dates) ? params.availability!.dates : [];
+  if (!weekday || !professorTime || !dates.length) return false;
+  return dates.some((dateOption) => {
+    const slots = Array.isArray(params.availability?.slotsByDate?.[String(dateOption.id ?? "").trim()])
+      ? params.availability!.slotsByDate[String(dateOption.id ?? "").trim()]
+      : [];
+    const matchingWeekday = slots[0]?.weekday ?? "";
+    if (String(matchingWeekday).trim().toLowerCase() !== weekday) return false;
+    return slots.some(
+      (slot: any) => String(slot?.professorTime ?? "").trim() === professorTime,
+    );
+  });
+}
+
 function isMissingRelationError(error: unknown): boolean {
   const code = String((error as any)?.code ?? "").trim();
   const message = String((error as any)?.message ?? "");
@@ -244,7 +318,9 @@ export async function PATCH(req: Request) {
       return Response.json({ ok: false, error: "invalid_slot_pairs" }, { status: 400 });
     }
 
-    const settings = normalizeExperimentalGroupClassSettings(parsed.data);
+    const settings = canonicalizeExperimentalGroupPairSettings(
+      normalizeExperimentalGroupClassSettings(parsed.data),
+    );
     const activeCombinations = settings.slots
       .filter(
         (slot) =>
@@ -269,6 +345,44 @@ export async function PATCH(req: Request) {
       admin,
       fromIso: new Date().toISOString(),
     });
+    const availabilityByProfessor = await buildExperimentalGroupAvailabilityByProfessor(
+      admin,
+      futureGroupClasses,
+    );
+    const enabledExperimentalPairs = settings.slots.filter(
+      (slot) => slot.slot_type === "experimental" && slot.enabled,
+    );
+    for (const [index, slot] of enabledExperimentalPairs.entries()) {
+      if (!slot.professor_phone || !slot.professor_name) {
+        return Response.json(
+          { ok: false, error: `Selecione o professor da turma ${index + 1}.` },
+          { status: 400 },
+        );
+      }
+      if (!slot.weekday || !slot.professor_time) {
+        return Response.json(
+          { ok: false, error: `Configure dia e horario na turma ${index + 1}.` },
+          { status: 400 },
+        );
+      }
+      const availability =
+        availabilityByProfessor[String(slot.professor_phone ?? "").trim()] ?? null;
+      if (
+        !isPairSlotAvailableForProfessor({
+          availability,
+          weekday: slot.weekday,
+          professorTime: slot.professor_time,
+        })
+      ) {
+        return Response.json(
+          {
+            ok: false,
+            error: `A turma ${index + 1} precisa usar um dia e horario realmente disponiveis na agenda do professor.`,
+          },
+          { status: 400 },
+        );
+      }
+    }
     const currentPairUsage = buildExperimentalGroupPairUsage({
       settings: currentSettingsResult.settings,
       futureGroupClasses,
@@ -299,10 +413,6 @@ export async function PATCH(req: Request) {
 
     const updatedAt = await saveExperimentalGroupClassSettings({ admin, settings });
     const availability = await buildExperimentalGroupAvailability(admin, futureGroupClasses);
-    const availabilityByProfessor = await buildExperimentalGroupAvailabilityByProfessor(
-      admin,
-      futureGroupClasses,
-    );
     const pairUsage = buildExperimentalGroupPairUsage({
       settings,
       futureGroupClasses,
