@@ -4671,6 +4671,38 @@ export function AtendimentoClient() {
           } as AtendimentoLeadListItem;
         }),
       );
+      if (slot.slot_type === "experimental") {
+        setExperimentalGroupLead((current) =>
+          current && current.id === leadId
+            ? ({
+                ...current,
+                experimental_class_mode_preference: null,
+                experimental_class_group_interest: false,
+                experimental_class_group_interest_at: null,
+                experimental_class_group_class_id: null,
+                experimental_class_group_status: null,
+                experimental_class_status: null,
+                experimental_class_professor_date: null,
+                experimental_class_professor_time: null,
+                experimental_class_professor_start_at: null,
+                experimental_class_lead_date: null,
+                experimental_class_lead_time: null,
+                experimental_class_lead_start_at: null,
+                experimental_class_professor_name: null,
+                experimental_class_professor_phone: null,
+                experimental_class_booking_id: null,
+                experimental_class_link: null,
+                experimental_class_student_notification_sent_at: null,
+                experimental_class_attendant_notification_sent_at: null,
+                experimental_class_registered_attendant_notification_sent_at: null,
+              } as AtendimentoLeadListItem)
+            : current,
+        );
+        setExperimentalGroupSlots([]);
+        setExperimentalGroupSelectedPairId(null);
+        setExperimentalGroupSelectedDateId(null);
+        setExperimentalGroupSelectedSlotId(null);
+      }
       await Promise.all([
         loadPanelLeads(),
         loadSummary({ silent: true }),
