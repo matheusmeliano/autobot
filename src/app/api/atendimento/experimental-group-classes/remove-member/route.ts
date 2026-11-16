@@ -138,68 +138,62 @@ export async function POST(req: Request) {
     const requestedGroupClassId = String(parsed.data.group_class_id ?? "").trim() || null;
     const effectiveGroupClassId = leadAssignedGroupClassId || requestedGroupClassId;
 
-    let member:
-      | {
+    const activeMembersResult = await admin
+      .from("atendimento_experimental_group_class_members")
+      .select("id, conversation_id, status, group_class_id")
+      .eq("lead_id", parsed.data.lead_id)
+      .eq("status", "assigned");
+    if (activeMembersResult.error) {
+      if (isMissingExperimentalGroupRelation(activeMembersResult.error)) {
+        return groupSchemaUnavailableResponse();
+      }
+      return Response.json({ ok: false, error: activeMembersResult.error.message }, { status: 500 });
+    }
+
+    const activeMembers = Array.isArray(activeMembersResult.data)
+      ? (activeMembersResult.data as Array<{
           id: string;
           conversation_id: string | null;
           status: string | null;
           group_class_id?: string | null;
-        }
-      | null = null;
+        }>)
+      : [];
+    const matchedMembers = effectiveGroupClassId
+      ? activeMembers.filter(
+          (item) => String(item.group_class_id ?? "").trim() === effectiveGroupClassId,
+        )
+      : activeMembers;
+    const membersToRemove = matchedMembers.length > 0 ? matchedMembers : activeMembers;
+    const primaryMember = membersToRemove[0] ?? null;
 
-    let memberError: any = null;
-    if (effectiveGroupClassId) {
-      const memberResult = await admin
-        .from("atendimento_experimental_group_class_members")
-        .select("id, conversation_id, status, group_class_id")
-        .eq("group_class_id", effectiveGroupClassId)
-        .eq("lead_id", parsed.data.lead_id)
-        .maybeSingle();
-      member = (memberResult.data as any) ?? null;
-      memberError = memberResult.error;
-    }
-
-    if (memberError) {
-      if (isMissingExperimentalGroupRelation(memberError)) {
-        return groupSchemaUnavailableResponse();
-      }
-      return Response.json({ ok: false, error: memberError.message }, { status: 500 });
-    }
-
-    if (!member?.id) {
-      const fallbackMemberResult = await admin
-        .from("atendimento_experimental_group_class_members")
-        .select("id, conversation_id, status, group_class_id")
-        .eq("lead_id", parsed.data.lead_id)
-        .eq("status", "assigned")
-        .maybeSingle();
-      if (fallbackMemberResult.error) {
-        if (isMissingExperimentalGroupRelation(fallbackMemberResult.error)) {
-          return groupSchemaUnavailableResponse();
-        }
-        return Response.json({ ok: false, error: fallbackMemberResult.error.message }, { status: 500 });
-      }
-      member = (fallbackMemberResult.data as any) ?? null;
-    }
-
-    if (!member?.id) {
+    if (!primaryMember?.id) {
       const leadGroupStatus = String((lead as any)?.experimental_class_group_status ?? "").trim().toLowerCase();
       if (!leadGroupStatus || leadGroupStatus === "removed") {
         return Response.json({ ok: false, error: "member_not_found" }, { status: 404 });
       }
     }
 
-    const memberGroupClassId =
-      String((member as any)?.group_class_id ?? "").trim() || effectiveGroupClassId;
+    const affectedGroupClassIds = Array.from(
+      new Set(
+        membersToRemove
+          .map((item) => String(item.group_class_id ?? "").trim())
+          .filter(Boolean),
+      ),
+    );
 
-    if (member?.id) {
+    if (membersToRemove.length > 0) {
       const { error: updateMemberError } = await admin
         .from("atendimento_experimental_group_class_members")
         .update({
           status: "removed",
           updated_at: nowIso,
         })
-        .eq("id", String((member as any)?.id ?? ""));
+        .in(
+          "id",
+          membersToRemove
+            .map((item) => String(item.id ?? "").trim())
+            .filter(Boolean),
+        );
       if (updateMemberError) {
         if (isMissingExperimentalGroupRelation(updateMemberError)) {
           return groupSchemaUnavailableResponse();
@@ -208,11 +202,11 @@ export async function POST(req: Request) {
       }
     }
 
-    if (memberGroupClassId) {
+    for (const affectedGroupClassId of affectedGroupClassIds) {
       const { count: activeCount, error: activeCountError } = await admin
         .from("atendimento_experimental_group_class_members")
         .select("id", { count: "exact", head: true })
-        .eq("group_class_id", memberGroupClassId)
+        .eq("group_class_id", affectedGroupClassId)
         .eq("status", "assigned");
       if (activeCountError) {
         if (isMissingExperimentalGroupRelation(activeCountError)) {
@@ -228,7 +222,7 @@ export async function POST(req: Request) {
             status: "cancelled",
             updated_at: nowIso,
           })
-          .eq("id", memberGroupClassId);
+          .eq("id", affectedGroupClassId);
         if (updateClassError) {
           if (isMissingExperimentalGroupRelation(updateClassError)) {
             return groupSchemaUnavailableResponse();
@@ -290,11 +284,12 @@ export async function POST(req: Request) {
 
     await appendHistoryEvent({
       leadId: parsed.data.lead_id,
-      conversationId: String((member as any)?.conversation_id ?? "").trim() || null,
+      conversationId: String((primaryMember as any)?.conversation_id ?? "").trim() || null,
       eventType: "experimental_group_class_member_removed",
       title: "Registro removido de uma turma de aula experimental em grupo",
       details: {
-        group_class_id: memberGroupClassId,
+        group_class_id:
+          affectedGroupClassIds[0] ?? effectiveGroupClassId ?? leadAssignedGroupClassId ?? null,
       },
       actorType: "attendant",
       actorEmail: auth.user.email,

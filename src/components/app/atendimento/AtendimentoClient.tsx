@@ -4702,6 +4702,10 @@ export function AtendimentoClient() {
         setExperimentalGroupSelectedPairId(null);
         setExperimentalGroupSelectedDateId(null);
         setExperimentalGroupSelectedSlotId(null);
+        setExperimentalGroupCanOpenModal(false);
+        setExperimentalGroupLeadSlotType(null);
+        setExperimentalGroupLead(null);
+        setIsExperimentalGroupModalOpen(false);
       }
       await Promise.all([
         loadPanelLeads(),
