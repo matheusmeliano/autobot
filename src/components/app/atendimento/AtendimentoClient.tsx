@@ -10296,13 +10296,18 @@ export function AtendimentoClient() {
                   latestExperimentalStatus === "completed" ||
                   latestExperimentalAttendanceStatus === "attended" ||
                   Boolean(latestExperimentalCheckedAt);
+                const latestExperimentalIsConfirmedOrCompleted =
+                  latestExperimentalStatus === "confirmed" ||
+                  latestExperimentalStatus === "completed";
                 const showExperimentalCompletionButton =
+                  card.slotType === "experimental" &&
                   Boolean(latestExperimentalClass?.group_class_id) &&
+                  latestExperimentalIsConfirmedOrCompleted &&
                   (latestExperimentalAlreadyHappened || latestExperimentalCompleted);
                 const canCompleteExperimentalGroup =
                   showExperimentalCompletionButton &&
                   !latestExperimentalCompleted &&
-                  latestExperimentalStatus !== "cancelled";
+                  latestExperimentalStatus === "confirmed";
                 const completingThisPair = experimentalGroupCompletingPairId === pair.pairId;
 
                 return (
