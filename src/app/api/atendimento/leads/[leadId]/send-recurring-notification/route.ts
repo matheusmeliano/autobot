@@ -1,5 +1,6 @@
 import {
   appendHistoryEvent,
+  getRecurringGroupExperimentalNotificationGate,
   hasLeadConfirmedPaymentForRecurringNotifications,
   hasLeadConfirmedPaymentForRecurringNotificationsResolved,
   requireAtendimentoUser,
@@ -47,6 +48,20 @@ export async function POST(req: Request, { params }: { params: Promise<{ leadId:
       {
         ok: false,
         error: "Confirme o pagamento pelo painel antes de disparar notificações da aula recorrente.",
+      },
+      { status: 409 },
+    );
+  }
+  const recurringExperimentalGate = await getRecurringGroupExperimentalNotificationGate({
+    admin,
+    lead: lead as Record<string, unknown>,
+  });
+  if (recurringExperimentalGate.blocked) {
+    return Response.json(
+      {
+        ok: false,
+        error:
+          "A aula experimental em grupo desse par já aconteceu e ainda precisa ser confirmada no check verde antes de continuar as notificações recorrentes.",
       },
       { status: 409 },
     );

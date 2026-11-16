@@ -46,6 +46,10 @@ import {
   type RecurringOccupiedInterval,
   type RecurringWeekdayKey,
 } from "@/lib/atendimento/experimentalClass";
+import {
+  normalizeExperimentalGroupClassSettings,
+  resolveExperimentalGroupPairIdForClass,
+} from "@/lib/atendimento/experimentalGroupClass";
 import { buildAtendimentoPublicUrl, isAtendimentoEmail, makeConversationSessionSlug, summarizePreview } from "@/lib/atendimento/utils";
 import { isAtendimentoOnlyAccessScope, normalizeAccessScope } from "@/lib/auth/access";
 import { resolveLeadTimeZoneFromRecord, zonedDateTimeToUtcIso } from "@/lib/timezone";
@@ -54,6 +58,7 @@ const ATENDIMENTO_DAILY_SUMMARY_TIME_ZONE = "America/Cuiaba";
 const ATENDIMENTO_DAILY_SUMMARY_LINK = "https://www.autobot.business/app/atendimento";
 const ATENDIMENTO_DAILY_SUMMARY_TRIGGER_HOUR = 20;
 export const ATENDIMENTO_PRESENCE_SESSION_TTL_MS = 45_000;
+const EXPERIMENTAL_GROUP_CLASS_SETTINGS_KEY = "experimental_group_classes_settings";
 
 function buildDeterministicInitialBotMessageId(conversationId: string, contentText: string) {
   const hash = crypto
@@ -1970,6 +1975,161 @@ export async function sendExperimentalClassStartNotifications(now = new Date()) 
   };
 }
 
+type RecurringGroupExperimentalGate = {
+  released: boolean;
+  blocked: boolean;
+  pairId: string | null;
+  latestClass: {
+    id: string;
+    professor_start_at: string;
+    status: string | null;
+    attendance_status: string | null;
+    attendance_checked_at: string | null;
+  } | null;
+};
+
+function isExperimentalGroupClassAttendanceReleased(groupClass: {
+  status?: string | null;
+  attendance_status?: string | null;
+  attendance_checked_at?: string | null;
+}) {
+  const status = String(groupClass.status ?? "").trim().toLowerCase();
+  const attendanceStatus = String(groupClass.attendance_status ?? "").trim().toLowerCase();
+  const checkedAt = String(groupClass.attendance_checked_at ?? "").trim();
+  return status === "completed" || attendanceStatus === "attended" || Boolean(checkedAt);
+}
+
+function buildRecurringGroupExperimentalGate(params: {
+  pairId: string | null;
+  latestClass:
+    | {
+        id: string;
+        professor_start_at: string;
+        status: string | null;
+        attendance_status: string | null;
+        attendance_checked_at: string | null;
+      }
+    | null;
+  now: Date;
+}): RecurringGroupExperimentalGate {
+  const pairId = String(params.pairId ?? "").trim() || null;
+  const latestClass = params.latestClass ?? null;
+  if (!pairId || !latestClass) {
+    return {
+      released: true,
+      blocked: false,
+      pairId,
+      latestClass,
+    };
+  }
+  const classStartMs = new Date(latestClass.professor_start_at).getTime();
+  const classAlreadyHappened =
+    Number.isFinite(classStartMs) && classStartMs > 0 && classStartMs <= params.now.getTime();
+  const released =
+    !classAlreadyHappened || isExperimentalGroupClassAttendanceReleased(latestClass);
+  return {
+    released,
+    blocked: classAlreadyHappened && !released,
+    pairId,
+    latestClass,
+  };
+}
+
+async function loadRecurringGroupExperimentalLatestClassesByPair(params: {
+  admin: ReturnType<typeof createSupabaseAdminClient>;
+  pairIds: string[];
+  now: Date;
+}) {
+  const uniquePairIds = Array.from(
+    new Set(params.pairIds.map((pairId) => String(pairId ?? "").trim()).filter(Boolean)),
+  );
+  const latestByPair = new Map<
+    string,
+    {
+      id: string;
+      professor_start_at: string;
+      status: string | null;
+      attendance_status: string | null;
+      attendance_checked_at: string | null;
+    }
+  >();
+  if (!uniquePairIds.length) return latestByPair;
+  try {
+    const { data: settingsRow } = await params.admin
+      .from("app_settings")
+      .select("value")
+      .eq("key", EXPERIMENTAL_GROUP_CLASS_SETTINGS_KEY)
+      .maybeSingle();
+    const settings = normalizeExperimentalGroupClassSettings((settingsRow as any)?.value ?? null);
+    if (!settings.slots.length) return latestByPair;
+    const lookbackIso = new Date(
+      params.now.getTime() - 120 * 24 * 60 * 60 * 1000,
+    ).toISOString();
+    const { data: groupClasses, error: groupClassesError } = await params.admin
+      .from("atendimento_experimental_group_classes")
+      .select(
+        "id, professor_phone, professor_weekday, professor_time, professor_start_at, status, attendance_status, attendance_checked_at",
+      )
+      .gte("professor_start_at", lookbackIso)
+      .order("professor_start_at", { ascending: false })
+      .limit(400);
+    if (groupClassesError || !Array.isArray(groupClasses)) {
+      return latestByPair;
+    }
+    for (const row of groupClasses as any[]) {
+      const pairId = resolveExperimentalGroupPairIdForClass({
+        settings,
+        groupClass: {
+          professor_weekday: String(row?.professor_weekday ?? "").trim().toLowerCase() as any,
+          professor_time: String(row?.professor_time ?? "").trim(),
+          professor_phone: String(row?.professor_phone ?? "").trim() || null,
+        },
+      });
+      if (!pairId || !uniquePairIds.includes(pairId) || latestByPair.has(pairId)) continue;
+      latestByPair.set(pairId, {
+        id: String(row?.id ?? "").trim(),
+        professor_start_at: String(row?.professor_start_at ?? "").trim(),
+        status: String(row?.status ?? "").trim() || null,
+        attendance_status: String(row?.attendance_status ?? "").trim() || null,
+        attendance_checked_at: String(row?.attendance_checked_at ?? "").trim() || null,
+      });
+    }
+  } catch (_error) {
+    void _error;
+  }
+  return latestByPair;
+}
+
+export async function getRecurringGroupExperimentalNotificationGate(params: {
+  admin?: ReturnType<typeof createSupabaseAdminClient>;
+  lead?: Record<string, unknown> | null;
+  pairId?: string | null;
+  now?: Date;
+}): Promise<RecurringGroupExperimentalGate> {
+  const admin = params.admin ?? createSupabaseAdminClient();
+  const now = params.now ?? new Date();
+  const pairId =
+    String(params.pairId ?? (params.lead as any)?.recurring_class_group_pair_id ?? "").trim() ||
+    null;
+  if (!pairId) {
+    return buildRecurringGroupExperimentalGate({
+      pairId: null,
+      latestClass: null,
+      now,
+    });
+  }
+  const latestByPair = await loadRecurringGroupExperimentalLatestClassesByPair({
+    admin,
+    pairIds: [pairId],
+    now,
+  });
+  return buildRecurringGroupExperimentalGate({
+    pairId,
+    latestClass: latestByPair.get(pairId) ?? null,
+    now,
+  });
+}
+
 export async function sendRecurringClassStartNotifications(now = new Date()) {
   const admin = createSupabaseAdminClient();
   const nowIso = now.toISOString();
@@ -2015,8 +2175,22 @@ export async function sendRecurringClassStartNotifications(now = new Date()) {
   let missingStudentPhone = 0;
   let missingRecurringMeta = 0;
   let missingRequiredDestinations = 0;
+  let blockedByExperimentalCompletion = 0;
 
   const validWeekdayKeys = new Set<string>(["mon", "tue", "wed", "thu", "fri", "sat", "sun"]);
+  const recurringPairIds = Array.from(
+    new Set(
+      rows
+        .map((row) => String((row as any)?.recurring_class_group_pair_id ?? "").trim())
+        .filter(Boolean),
+    ),
+  );
+  const recurringExperimentalLatestByPair =
+    await loadRecurringGroupExperimentalLatestClassesByPair({
+      admin,
+      pairIds: recurringPairIds,
+      now,
+    });
 
   const recurringLeadIds = (rows as any[]).map((r: any) => String(r?.id ?? "")).filter(Boolean);
   const sentOccurrencesByLeadId = new Map<string, Set<string>>();
@@ -2072,6 +2246,17 @@ export async function sendRecurringClassStartNotifications(now = new Date()) {
     const leadId = String(row?.id ?? "").trim();
     const userId = String(row?.user_id ?? "").trim();
     if (!leadId) continue;
+    const recurringPairId = String(row?.recurring_class_group_pair_id ?? "").trim() || null;
+    const recurringExperimentalGate = buildRecurringGroupExperimentalGate({
+      pairId: recurringPairId,
+      latestClass:
+        recurringPairId ? (recurringExperimentalLatestByPair.get(recurringPairId) ?? null) : null,
+      now,
+    });
+    if (recurringExperimentalGate.blocked) {
+      blockedByExperimentalCompletion += 1;
+      continue;
+    }
 
     const weekdayRaw = String(row?.recurring_class_weekday ?? "").trim().toLowerCase();
     const professorTimeHHMM = /^\d{2}:\d{2}$/.test(String(row?.recurring_class_professor_time ?? ""))
@@ -2313,6 +2498,7 @@ export async function sendRecurringClassStartNotifications(now = new Date()) {
     attendantFailed,
     missingStudentPhone,
     missingRecurringMeta,
+    blockedByExperimentalCompletion,
     missingRequiredDestinations,
   };
 }

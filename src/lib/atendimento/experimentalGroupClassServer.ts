@@ -6,6 +6,7 @@ import {
   getDefaultExperimentalGroupClassSettings,
   listExperimentalGroupClassSlots,
   normalizeExperimentalGroupClassSettings,
+  resolveExperimentalGroupPairIdForClass,
   resolveConfiguredProfessorFromExperimentalGroupSettings,
   resolveExperimentalGroupProfessorFromLead,
   resolveRecurringGroupProfessorFromLead,
@@ -66,6 +67,20 @@ export type ExperimentalGroupPairUsageSummary = Record<
   }
 >;
 
+export type ExperimentalGroupPairActivitySummary = Record<
+  string,
+  {
+    latest_experimental_class: {
+      group_class_id: string;
+      status: string | null;
+      professor_start_at: string;
+      confirmed_at: string | null;
+      attendance_status: string | null;
+      attendance_checked_at: string | null;
+    } | null;
+  }
+>;
+
 function localDateInTimeZone(value: Date | string | number, timeZone: string): string {
   const parts = new Intl.DateTimeFormat("en-CA", {
     timeZone,
@@ -96,26 +111,6 @@ function formatTimeInTimeZone(iso: string, timeZone: string): string {
     minute: "2-digit",
     hour12: false,
   }).format(new Date(iso));
-}
-
-function findPairIdForExperimentalClass(params: {
-  settings: ExperimentalGroupClassSettings;
-  groupClass: ExperimentalGroupClassRecord;
-}): string {
-  const classWeekday = String(params.groupClass.professor_weekday ?? "").trim().toLowerCase();
-  const classTime = String(params.groupClass.professor_time ?? "").trim();
-  const classProfessorDigits = normalizePhoneDigits(params.groupClass.professor_phone);
-  const matchingSlot = params.settings.slots.find((slot) => {
-    if (slot.slot_type !== "experimental") return false;
-    if (!slot.weekday || !slot.professor_time) return false;
-    if (slot.weekday !== classWeekday || slot.professor_time !== classTime) return false;
-    const slotProfessorDigits = normalizePhoneDigits(slot.professor_phone);
-    if (slotProfessorDigits && classProfessorDigits) {
-      return slotProfessorDigits === classProfessorDigits;
-    }
-    return true;
-  });
-  return String(matchingSlot?.pair_id ?? "").trim();
 }
 
 export function buildExperimentalGroupPairUsage(params: {
@@ -157,7 +152,7 @@ export function buildExperimentalGroupPairUsage(params: {
   }
 
   for (const groupClass of params.futureGroupClasses ?? []) {
-    const pairId = findPairIdForExperimentalClass({ settings, groupClass });
+    const pairId = resolveExperimentalGroupPairIdForClass({ settings, groupClass });
     if (!pairId) continue;
     const usageEntry = usage[pairId] ?? {
       assigned_count: 0,
@@ -369,19 +364,36 @@ export async function saveExperimentalGroupClassSettings(params: {
   return nowIso;
 }
 
-export async function listFutureExperimentalGroupClasses(params: {
+export async function listExperimentalGroupClasses(params: {
   admin: ReturnType<typeof createSupabaseAdminClient>;
   fromIso?: string;
+  toIso?: string;
+  limit?: number;
+  ascending?: boolean;
 }): Promise<ExperimentalGroupClassRecord[]> {
-  const fromIso = String(params.fromIso ?? new Date().toISOString()).trim();
+  const fromIso = String(params.fromIso ?? "").trim();
+  const toIso = String(params.toIso ?? "").trim();
+  const limitRaw = Number(params.limit ?? 0);
+  const limit = Number.isFinite(limitRaw) && limitRaw > 0 ? Math.max(1, Math.floor(limitRaw)) : 0;
   try {
-    const { data: classes, error: classesError } = await params.admin
+    let query = params.admin
       .from("atendimento_experimental_group_classes")
       .select(
-        "id, professor_name, professor_phone, professor_timezone, professor_weekday, professor_date, professor_time, professor_start_at, capacity, status, confirmed_at, lesson_link",
-      )
-      .gte("professor_start_at", fromIso)
-      .order("professor_start_at", { ascending: true });
+        "id, professor_name, professor_phone, professor_timezone, professor_weekday, professor_date, professor_time, professor_start_at, capacity, status, confirmed_at, attendance_status, attendance_checked_at, lesson_link",
+      );
+    if (fromIso) {
+      query = query.gte("professor_start_at", fromIso);
+    }
+    if (toIso) {
+      query = query.lte("professor_start_at", toIso);
+    }
+    if (limit > 0) {
+      query = query.limit(limit);
+    }
+    query = query.order("professor_start_at", {
+      ascending: params.ascending ?? true,
+    });
+    const { data: classes, error: classesError } = await query;
     if (classesError) {
       if (isMissingRelationError(classesError)) return [];
       throw classesError;
@@ -459,6 +471,9 @@ export async function listFutureExperimentalGroupClasses(params: {
       capacity: Math.max(1, Math.min(4, Number((row as any)?.capacity ?? 4))),
       status: String((row as any)?.status ?? "").trim() || null,
       confirmed_at: String((row as any)?.confirmed_at ?? "").trim() || null,
+      attendance_status: String((row as any)?.attendance_status ?? "").trim() || null,
+      attendance_checked_at:
+        String((row as any)?.attendance_checked_at ?? "").trim() || null,
       lesson_link: String((row as any)?.lesson_link ?? "").trim() || null,
       members: membersByClassId.get(String((row as any)?.id ?? "").trim()) ?? [],
     }));
@@ -466,6 +481,52 @@ export async function listFutureExperimentalGroupClasses(params: {
     if (isMissingRelationError(error)) return [];
     throw error;
   }
+}
+
+export async function listFutureExperimentalGroupClasses(params: {
+  admin: ReturnType<typeof createSupabaseAdminClient>;
+  fromIso?: string;
+}): Promise<ExperimentalGroupClassRecord[]> {
+  return listExperimentalGroupClasses({
+    admin: params.admin,
+    fromIso: String(params.fromIso ?? new Date().toISOString()).trim(),
+    ascending: true,
+  });
+}
+
+export function buildExperimentalGroupPairActivitySummary(params: {
+  settings: ExperimentalGroupClassSettings;
+  groupClasses: ExperimentalGroupClassRecord[];
+}): ExperimentalGroupPairActivitySummary {
+  const settings = normalizeExperimentalGroupClassSettings(params.settings);
+  const summary: ExperimentalGroupPairActivitySummary = {};
+  const configuredPairIds = new Set(
+    settings.slots.map((slot) => String(slot.pair_id ?? "").trim()).filter(Boolean),
+  );
+  for (const pairId of configuredPairIds) {
+    summary[pairId] = {
+      latest_experimental_class: null,
+    };
+  }
+  const sortedClasses = [...(params.groupClasses ?? [])].sort(
+    (left, right) =>
+      new Date(right.professor_start_at).getTime() - new Date(left.professor_start_at).getTime(),
+  );
+  for (const groupClass of sortedClasses) {
+    const pairId = resolveExperimentalGroupPairIdForClass({ settings, groupClass });
+    if (!pairId || summary[pairId]?.latest_experimental_class) continue;
+    summary[pairId] = {
+      latest_experimental_class: {
+        group_class_id: groupClass.id,
+        status: groupClass.status,
+        professor_start_at: groupClass.professor_start_at,
+        confirmed_at: groupClass.confirmed_at,
+        attendance_status: groupClass.attendance_status,
+        attendance_checked_at: groupClass.attendance_checked_at,
+      },
+    };
+  }
+  return summary;
 }
 
 export async function listScheduledIndividualExperimentalProfessorStarts(params: {

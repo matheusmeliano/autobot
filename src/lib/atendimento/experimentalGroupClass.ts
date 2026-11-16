@@ -56,6 +56,8 @@ export type ExperimentalGroupClassRecord = {
   capacity: number;
   status: string | null;
   confirmed_at: string | null;
+  attendance_status: string | null;
+  attendance_checked_at: string | null;
   lesson_link: string | null;
   members: ExperimentalGroupClassMemberSummary[];
 };
@@ -381,6 +383,30 @@ export function resolveConfiguredProfessorFromExperimentalGroupSettings(
 
 export function experimentalGroupWeekdayLabel(weekday: ExperimentalGroupWeekdayKey): string {
   return WEEKDAY_LABELS_PT_BR[weekday] ?? weekday;
+}
+
+export function resolveExperimentalGroupPairIdForClass(params: {
+  settings: ExperimentalGroupClassSettings;
+  groupClass: Pick<
+    ExperimentalGroupClassRecord,
+    "professor_weekday" | "professor_time" | "professor_phone"
+  >;
+}): string {
+  const settings = normalizeExperimentalGroupClassSettings(params.settings);
+  const classWeekday = String(params.groupClass.professor_weekday ?? "").trim().toLowerCase();
+  const classTime = String(params.groupClass.professor_time ?? "").trim();
+  const classProfessorDigits = normalizePhoneDigits(params.groupClass.professor_phone);
+  const matchingSlot = settings.slots.find((slot) => {
+    if (slot.slot_type !== "experimental") return false;
+    if (!slot.weekday || !slot.professor_time) return false;
+    if (slot.weekday !== classWeekday || slot.professor_time !== classTime) return false;
+    const slotProfessorDigits = normalizePhoneDigits(slot.professor_phone);
+    if (slotProfessorDigits && classProfessorDigits) {
+      return slotProfessorDigits === classProfessorDigits;
+    }
+    return true;
+  });
+  return String(matchingSlot?.pair_id ?? "").trim();
 }
 
 export function isLeadPhoneEligibleForExperimentalGroup(phone: unknown): boolean {

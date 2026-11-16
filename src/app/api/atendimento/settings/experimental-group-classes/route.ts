@@ -5,8 +5,10 @@ import {
   requireAtendimentoUser,
 } from "@/lib/atendimento/server";
 import {
+  buildExperimentalGroupPairActivitySummary,
   buildExperimentalGroupPairUsage,
   listAssignedRecurringGroupMembers,
+  listExperimentalGroupClasses,
   listFutureExperimentalGroupClasses,
   loadExperimentalGroupClassSettings,
   saveExperimentalGroupClassSettings,
@@ -191,10 +193,20 @@ export async function GET() {
       admin,
       futureGroupClasses,
     );
+    const recentGroupClasses = await listExperimentalGroupClasses({
+      admin,
+      fromIso: new Date(Date.now() - 120 * 24 * 60 * 60 * 1000).toISOString(),
+      ascending: false,
+      limit: 200,
+    });
     const pairUsage = buildExperimentalGroupPairUsage({
       settings,
       futureGroupClasses,
       recurringMembers,
+    });
+    const pairActivity = buildExperimentalGroupPairActivitySummary({
+      settings,
+      groupClasses: recentGroupClasses,
     });
 
     return Response.json({
@@ -204,6 +216,7 @@ export async function GET() {
       weekday_options: buildWeekdayOptions(),
       preview_slots: [],
       pair_usage: pairUsage,
+      pair_activity: pairActivity,
       availability,
       availability_by_professor: availabilityByProfessor,
     });
@@ -295,6 +308,15 @@ export async function PATCH(req: Request) {
       futureGroupClasses,
       recurringMembers: await listAssignedRecurringGroupMembers({ admin }),
     });
+    const pairActivity = buildExperimentalGroupPairActivitySummary({
+      settings,
+      groupClasses: await listExperimentalGroupClasses({
+        admin,
+        fromIso: new Date(Date.now() - 120 * 24 * 60 * 60 * 1000).toISOString(),
+        ascending: false,
+        limit: 200,
+      }),
+    });
 
     return Response.json({
       ok: true,
@@ -303,6 +325,7 @@ export async function PATCH(req: Request) {
       weekday_options: buildWeekdayOptions(),
       preview_slots: [],
       pair_usage: pairUsage,
+      pair_activity: pairActivity,
       availability,
       availability_by_professor: availabilityByProfessor,
     });

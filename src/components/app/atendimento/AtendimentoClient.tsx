@@ -66,6 +66,20 @@ type ExperimentalGroupPairUsagePayload = Record<
   }
 >;
 
+type ExperimentalGroupPairActivityPayload = Record<
+  string,
+  {
+    latest_experimental_class?: {
+      group_class_id: string;
+      status?: string | null;
+      professor_start_at: string;
+      confirmed_at?: string | null;
+      attendance_status?: string | null;
+      attendance_checked_at?: string | null;
+    } | null;
+  }
+>;
+
 type ExperimentalGroupFormSlot = {
   enabled: boolean;
   weekday: string;
@@ -529,7 +543,7 @@ function leadHasNameForExperimentalGroup(
 function normalizeExperimentalGroupErrorMessage(value: unknown, fallback: string): string {
   const message = String(value ?? "").trim();
   if (
-    /(atendimento_experimental_group_classes|atendimento_experimental_group_class_members|recurring_class_(group_pair_id|group_status|weekday|weekday_label|professor_name|professor_phone|professor_time|lead_time|professor_timezone|lead_timezone|first_class_at|student_start_notification_sent_at|attendant_start_notification_sent_at))/i.test(
+    /(atendimento_experimental_group_classes|atendimento_experimental_group_class_members|attendance_(status|checked_at)|recurring_class_(group_pair_id|group_status|weekday|weekday_label|professor_name|professor_phone|professor_time|lead_time|professor_timezone|lead_timezone|first_class_at|student_start_notification_sent_at|attendant_start_notification_sent_at))/i.test(
       message,
     ) &&
     /(schema cache|could not find the table|could not find the '.*' column|relation .* does not exist|column .* does not exist|PGRST205|42P01|PGRST204|42703)/i.test(
@@ -1793,6 +1807,8 @@ export function AtendimentoClient() {
     useState<ExperimentalAvailabilityByProfessorPayload>({});
   const [experimentalGroupPairUsage, setExperimentalGroupPairUsage] =
     useState<ExperimentalGroupPairUsagePayload>({});
+  const [experimentalGroupPairActivity, setExperimentalGroupPairActivity] =
+    useState<ExperimentalGroupPairActivityPayload>({});
   const [experimentalGroupFormSlots, setExperimentalGroupFormSlots] = useState<
     ExperimentalGroupFormSlot[]
   >(createDefaultExperimentalGroupFormSlots);
@@ -1842,6 +1858,7 @@ export function AtendimentoClient() {
   >(null);
   const [experimentalGroupSettingsAssignProfPairId, setExperimentalGroupSettingsAssignProfPairId] =
     useState("");
+  const [experimentalGroupCompletingPairId, setExperimentalGroupCompletingPairId] = useState("");
   const [experimentalGroupSelectedDateId, setExperimentalGroupSelectedDateId] = useState<
     string | null
   >(null);
@@ -2258,6 +2275,14 @@ export function AtendimentoClient() {
         full_name: string | null;
         phone: string | null;
       }>;
+      latestExperimentalClass: {
+        group_class_id: string;
+        status: string | null;
+        professor_start_at: string;
+        confirmed_at: string | null;
+        attendance_status: string | null;
+        attendance_checked_at: string | null;
+      } | null;
       experimentalSlot: ExperimentalGroupFormSlot;
       recurringSlot: ExperimentalGroupFormSlot;
     }>
@@ -2323,10 +2348,37 @@ export function AtendimentoClient() {
               phone: string | null;
             }>)
           : [],
+        latestExperimentalClass:
+          experimentalGroupPairActivity[pair.pairId]?.latest_experimental_class
+            ? {
+                group_class_id: String(
+                  experimentalGroupPairActivity[pair.pairId]?.latest_experimental_class?.group_class_id ?? "",
+                ).trim(),
+                status:
+                  String(
+                    experimentalGroupPairActivity[pair.pairId]?.latest_experimental_class?.status ?? "",
+                  ).trim() || null,
+                professor_start_at: String(
+                  experimentalGroupPairActivity[pair.pairId]?.latest_experimental_class?.professor_start_at ?? "",
+                ).trim(),
+                confirmed_at:
+                  String(
+                    experimentalGroupPairActivity[pair.pairId]?.latest_experimental_class?.confirmed_at ?? "",
+                  ).trim() || null,
+                attendance_status:
+                  String(
+                    experimentalGroupPairActivity[pair.pairId]?.latest_experimental_class?.attendance_status ?? "",
+                  ).trim() || null,
+                attendance_checked_at:
+                  String(
+                    experimentalGroupPairActivity[pair.pairId]?.latest_experimental_class?.attendance_checked_at ?? "",
+                  ).trim() || null,
+              }
+            : null,
         experimentalSlot: pair.experimentalSlot as ExperimentalGroupFormSlot,
         recurringSlot: pair.recurringSlot as ExperimentalGroupFormSlot,
       }));
-  }, [experimentalGroupFormSlots, experimentalGroupPairUsage]);
+  }, [experimentalGroupFormSlots, experimentalGroupPairActivity, experimentalGroupPairUsage]);
 
   const experimentalGroupSlotsForSelectedTurma = useMemo<ExperimentalGroupSlotPayload[]>(() => {
     if (!experimentalGroupSelectedPairId) return experimentalGroupVisibleSlots;
@@ -4028,11 +4080,16 @@ export function AtendimentoClient() {
       json?.availability_by_professor ?? null,
     );
     const pairUsageRaw = (json?.pair_usage ?? null) as ExperimentalGroupPairUsagePayload | null;
+    const pairActivityRaw =
+      (json?.pair_activity ?? null) as ExperimentalGroupPairActivityPayload | null;
     setExperimentalGroupSettings(settings);
     setExperimentalGroupAvailability(availability);
     setExperimentalGroupAvailabilityByProfessor(availabilityByProfessor);
     setExperimentalGroupPairUsage(
       pairUsageRaw && typeof pairUsageRaw === "object" ? pairUsageRaw : {},
+    );
+    setExperimentalGroupPairActivity(
+      pairActivityRaw && typeof pairActivityRaw === "object" ? pairActivityRaw : {},
     );
     setExperimentalGroupWeekdayOptions(
       Array.isArray(json?.weekday_options) ? (json.weekday_options as Array<{ value: string; label: string }>) : [],
@@ -4075,14 +4132,24 @@ export function AtendimentoClient() {
       const json = await res.json().catch(() => null);
       if (!json?.ok) {
         if (!silent) {
-          modalToast.error(String(json?.error ?? "Falha ao carregar configurações de turma."));
+          modalToast.error(
+            normalizeExperimentalGroupErrorMessage(
+              json?.error,
+              "Falha ao carregar configurações de turma.",
+            ),
+          );
         }
         return;
       }
       syncExperimentalGroupSettingsFromPayload(json);
     } catch (error: any) {
       if (!silent) {
-        modalToast.error(String(error?.message ?? "Falha ao carregar configurações de turma."));
+        modalToast.error(
+          normalizeExperimentalGroupErrorMessage(
+            error?.message,
+            "Falha ao carregar configurações de turma.",
+          ),
+        );
       }
     } finally {
       setExperimentalGroupSettingsLoading(false);
@@ -4092,6 +4159,58 @@ export function AtendimentoClient() {
   async function handleOpenExperimentalGroupSettings() {
     setExperimentalGroupSettingsOpen(true);
     await loadExperimentalGroupSettings(false);
+  }
+
+  async function handleCompleteExperimentalGroupPair(pairId: string, groupClassId: string) {
+    if (experimentalGroupCompletingPairId) return;
+    const normalizedPairId = String(pairId ?? "").trim();
+    const normalizedGroupClassId = String(groupClassId ?? "").trim();
+    if (!normalizedPairId || !normalizedGroupClassId) return;
+    if (
+      !window.confirm(
+        "Confirmar que a aula experimental em grupo foi realizada com sucesso e liberar as notificações recorrentes deste par?",
+      )
+    ) {
+      return;
+    }
+    setExperimentalGroupCompletingPairId(normalizedPairId);
+    try {
+      const res = await fetch("/api/atendimento/experimental-group-classes/complete", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          group_class_id: normalizedGroupClassId,
+        }),
+      });
+      if (handleForbiddenResponse(res)) return;
+      const json = await res.json().catch(() => null);
+      if (!res.ok || !json?.ok) {
+        modalToast.error(
+          normalizeExperimentalGroupErrorMessage(
+            json?.error,
+            "Falha ao confirmar a realização da aula experimental em grupo.",
+          ),
+        );
+        return;
+      }
+      await Promise.all([
+        loadExperimentalGroupSettings(true),
+        loadPanelLeads(),
+        loadSummary({ silent: true }),
+      ]);
+      modalToast.success(
+        "Aula experimental em grupo confirmada. As notificações recorrentes podem continuar.",
+      );
+    } catch (error: any) {
+      modalToast.error(
+        normalizeExperimentalGroupErrorMessage(
+          error?.message,
+          "Falha ao confirmar a realização da aula experimental em grupo.",
+        ),
+      );
+    } finally {
+      setExperimentalGroupCompletingPairId("");
+    }
   }
 
   async function handleSaveExperimentalGroupSettings() {
@@ -4130,14 +4249,24 @@ export function AtendimentoClient() {
       if (handleForbiddenResponse(res)) return;
       const json = await res.json().catch(() => null);
       if (!json?.ok) {
-        modalToast.error(String(json?.error ?? "Falha ao salvar configuração das turmas."));
+        modalToast.error(
+          normalizeExperimentalGroupErrorMessage(
+            json?.error,
+            "Falha ao salvar configuração das turmas.",
+          ),
+        );
         return;
       }
       syncExperimentalGroupSettingsFromPayload(json);
       modalToast.success("Configuração das aulas experimentais em grupo salva.");
       void loadPanelLeads();
     } catch (error: any) {
-      modalToast.error(String(error?.message ?? "Falha ao salvar configuração das turmas."));
+      modalToast.error(
+        normalizeExperimentalGroupErrorMessage(
+          error?.message,
+          "Falha ao salvar configuração das turmas.",
+        ),
+      );
     } finally {
       setExperimentalGroupSettingsSaving(false);
     }
@@ -10142,6 +10271,35 @@ export function AtendimentoClient() {
                   pairAvailability,
                   selectedDateId,
                 );
+                const latestExperimentalClass = pair.latestExperimentalClass;
+                const latestExperimentalStatus = String(
+                  latestExperimentalClass?.status ?? "",
+                ).trim().toLowerCase();
+                const latestExperimentalAttendanceStatus = String(
+                  latestExperimentalClass?.attendance_status ?? "",
+                ).trim().toLowerCase();
+                const latestExperimentalCheckedAt = String(
+                  latestExperimentalClass?.attendance_checked_at ?? "",
+                ).trim();
+                const latestExperimentalStartMs = new Date(
+                  String(latestExperimentalClass?.professor_start_at ?? ""),
+                ).getTime();
+                const latestExperimentalAlreadyHappened =
+                  Number.isFinite(latestExperimentalStartMs) &&
+                  latestExperimentalStartMs > 0 &&
+                  latestExperimentalStartMs <= Date.now();
+                const latestExperimentalCompleted =
+                  latestExperimentalStatus === "completed" ||
+                  latestExperimentalAttendanceStatus === "attended" ||
+                  Boolean(latestExperimentalCheckedAt);
+                const showExperimentalCompletionButton =
+                  Boolean(latestExperimentalClass?.group_class_id) &&
+                  (latestExperimentalAlreadyHappened || latestExperimentalCompleted);
+                const canCompleteExperimentalGroup =
+                  showExperimentalCompletionButton &&
+                  !latestExperimentalCompleted &&
+                  latestExperimentalStatus !== "cancelled";
+                const completingThisPair = experimentalGroupCompletingPairId === pair.pairId;
 
                 return (
                   <div
@@ -10169,6 +10327,38 @@ export function AtendimentoClient() {
                           </div>
                         </div>
                         <div className="flex items-center justify-end gap-2 self-start justify-self-end">
+                          {showExperimentalCompletionButton ? (
+                            <button
+                              type="button"
+                              aria-label={`Confirmar realização da aula experimental da turma ${pair.pairNumber}`}
+                              title={
+                                latestExperimentalCompleted
+                                  ? `Aula experimental confirmada em ${formatAtendimentoDateTime(latestExperimentalCheckedAt)}`
+                                  : "Confirmar que a aula experimental em grupo foi realizada com sucesso"
+                              }
+                              onClick={() =>
+                                canCompleteExperimentalGroup && latestExperimentalClass?.group_class_id
+                                  ? void handleCompleteExperimentalGroupPair(
+                                      pair.pairId,
+                                      latestExperimentalClass.group_class_id,
+                                    )
+                                  : undefined
+                              }
+                              disabled={!canCompleteExperimentalGroup || completingThisPair}
+                              className={[
+                                "inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border transition disabled:cursor-not-allowed",
+                                latestExperimentalCompleted
+                                  ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-700"
+                                  : "border-emerald-500/30 bg-emerald-500/10 text-emerald-800 hover:bg-emerald-500/15 disabled:opacity-55",
+                              ].join(" ")}
+                            >
+                              {completingThisPair ? (
+                                <Loader2 className="h-4 w-4 shrink-0 animate-spin" />
+                              ) : (
+                                <Check className="h-4 w-4 shrink-0 text-emerald-700" />
+                              )}
+                            </button>
+                          ) : null}
                           <button
                             type="button"
                             role="switch"
