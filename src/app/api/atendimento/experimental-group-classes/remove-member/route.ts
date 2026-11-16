@@ -61,7 +61,7 @@ export async function POST(req: Request) {
     const nowIso = new Date().toISOString();
 
     if (parsed.data.slot_type === "recorrente" || (!parsed.data.group_class_id && parsed.data.pair_id)) {
-      const { error: clearRecurringGroupError } = await admin
+      const { data: clearedRecurringLead, error: clearRecurringGroupError } = await admin
         .from("atendimento_leads")
         .update({
           recurring_class_group_pair_id: null,
@@ -79,12 +79,24 @@ export async function POST(req: Request) {
           recurring_class_attendant_start_notification_sent_at: null,
           updated_at: nowIso,
         })
-        .eq("id", parsed.data.lead_id);
+        .eq("id", parsed.data.lead_id)
+        .select("id, recurring_class_group_pair_id, recurring_class_group_status")
+        .maybeSingle();
       if (clearRecurringGroupError) {
         if (isMissingExperimentalGroupRelation(clearRecurringGroupError)) {
           return groupSchemaUnavailableResponse();
         }
         return Response.json({ ok: false, error: clearRecurringGroupError.message }, { status: 500 });
+      }
+      if (
+        !clearedRecurringLead?.id ||
+        String((clearedRecurringLead as any)?.recurring_class_group_pair_id ?? "").trim() ||
+        String((clearedRecurringLead as any)?.recurring_class_group_status ?? "").trim()
+      ) {
+        return Response.json(
+          { ok: false, error: "A turma recorrente não foi removida corretamente do registro." },
+          { status: 409 },
+        );
       }
 
       await appendHistoryEvent({
@@ -226,7 +238,7 @@ export async function POST(req: Request) {
       }
     }
 
-    await admin
+    const { data: clearedExperimentalLead, error: clearExperimentalLeadError } = await admin
       .from("atendimento_leads")
       .update({
         status: "aguardando_aula_experimental",
@@ -252,7 +264,29 @@ export async function POST(req: Request) {
         experimental_class_registered_attendant_notification_sent_at: null,
         updated_at: nowIso,
       })
-      .eq("id", parsed.data.lead_id);
+      .eq("id", parsed.data.lead_id)
+      .select(
+        "id, experimental_class_mode_preference, experimental_class_group_interest, experimental_class_group_class_id, experimental_class_group_status",
+      )
+      .maybeSingle();
+    if (clearExperimentalLeadError) {
+      if (isMissingExperimentalGroupRelation(clearExperimentalLeadError)) {
+        return groupSchemaUnavailableResponse();
+      }
+      return Response.json({ ok: false, error: clearExperimentalLeadError.message }, { status: 500 });
+    }
+    if (
+      !clearedExperimentalLead?.id ||
+      String((clearedExperimentalLead as any)?.experimental_class_group_class_id ?? "").trim() ||
+      String((clearedExperimentalLead as any)?.experimental_class_group_status ?? "").trim() ||
+      Boolean((clearedExperimentalLead as any)?.experimental_class_group_interest) ||
+      String((clearedExperimentalLead as any)?.experimental_class_mode_preference ?? "").trim()
+    ) {
+      return Response.json(
+        { ok: false, error: "O registro ainda ficou marcado como vinculado a uma turma em grupo." },
+        { status: 409 },
+      );
+    }
 
     await appendHistoryEvent({
       leadId: parsed.data.lead_id,

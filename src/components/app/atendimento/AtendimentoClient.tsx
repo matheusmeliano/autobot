@@ -4626,6 +4626,51 @@ export function AtendimentoClient() {
         );
         return;
       }
+      setPanelLeads((current) =>
+        current.map((item) => {
+          if (item.id !== leadId) return item;
+          if (slot.slot_type === "recorrente") {
+            return {
+              ...item,
+              recurring_class_group_pair_id: null,
+              recurring_class_group_status: null,
+              recurring_class_weekday: null,
+              recurring_class_weekday_label: null,
+              recurring_class_professor_name: null,
+              recurring_class_professor_phone: null,
+              recurring_class_professor_time: null,
+              recurring_class_lead_time: null,
+              recurring_class_professor_timezone: null,
+              recurring_class_lead_timezone: null,
+              recurring_class_first_class_at: null,
+              recurring_class_student_start_notification_sent_at: null,
+              recurring_class_attendant_start_notification_sent_at: null,
+            } as AtendimentoLeadListItem;
+          }
+          return {
+            ...item,
+            experimental_class_mode_preference: null,
+            experimental_class_group_interest: false,
+            experimental_class_group_interest_at: null,
+            experimental_class_group_class_id: null,
+            experimental_class_group_status: null,
+            experimental_class_status: null,
+            experimental_class_professor_date: null,
+            experimental_class_professor_time: null,
+            experimental_class_professor_start_at: null,
+            experimental_class_lead_date: null,
+            experimental_class_lead_time: null,
+            experimental_class_lead_start_at: null,
+            experimental_class_professor_name: null,
+            experimental_class_professor_phone: null,
+            experimental_class_booking_id: null,
+            experimental_class_link: null,
+            experimental_class_student_notification_sent_at: null,
+            experimental_class_attendant_notification_sent_at: null,
+            experimental_class_registered_attendant_notification_sent_at: null,
+          } as AtendimentoLeadListItem;
+        }),
+      );
       await Promise.all([
         loadPanelLeads(),
         loadSummary({ silent: true }),
