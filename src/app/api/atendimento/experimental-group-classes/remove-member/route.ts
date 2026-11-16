@@ -274,6 +274,7 @@ export async function POST(req: Request) {
         experimental_class_professor_phone: null,
         experimental_class_booking_id: null,
         experimental_class_link: null,
+        latest_experimental_class_cancelled_at: nowIso,
         experimental_class_student_notification_sent_at: null,
         experimental_class_attendant_notification_sent_at: null,
         experimental_class_registered_attendant_notification_sent_at: null,
