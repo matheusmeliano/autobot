@@ -1917,6 +1917,7 @@ export function AtendimentoClient() {
   const [experimentalGroupSettingsAssignProfPairId, setExperimentalGroupSettingsAssignProfPairId] =
     useState("");
   const [experimentalGroupCompletingPairId, setExperimentalGroupCompletingPairId] = useState("");
+  const [experimentalGroupConfirmingPairId, setExperimentalGroupConfirmingPairId] = useState("");
   const [experimentalGroupLessonLinkDraftByPairId, setExperimentalGroupLessonLinkDraftByPairId] =
     useState<Record<string, string>>({});
   const [experimentalGroupLessonLinkSavingPairId, setExperimentalGroupLessonLinkSavingPairId] =
@@ -4395,6 +4396,57 @@ export function AtendimentoClient() {
     }
   }
 
+  async function handleConfirmExperimentalGroupPair(pairId: string, groupClassId: string) {
+    const normalizedPairId = String(pairId ?? "").trim();
+    const normalizedGroupClassId = String(groupClassId ?? "").trim();
+    if (!normalizedPairId || !normalizedGroupClassId || experimentalGroupConfirmingPairId) return;
+
+    const lessonLink =
+      String(experimentalGroupLessonLinkDraftByPairId[normalizedPairId] ?? "").trim() ||
+      String(
+        experimentalGroupPairActivity[normalizedPairId]?.latest_experimental_class?.lesson_link ?? "",
+      ).trim() ||
+      null;
+    if (!lessonLink) {
+      modalToast.warning("Adicione o link da aula na turma antes de confirmar.");
+      return;
+    }
+
+    setExperimentalGroupConfirmingPairId(normalizedPairId);
+    try {
+      const res = await fetch("/api/atendimento/experimental-group-classes/confirm", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          group_class_id: normalizedGroupClassId,
+          lesson_link: lessonLink,
+        }),
+      });
+      if (handleForbiddenResponse(res)) return;
+      const json = await res.json().catch(() => null);
+      if (!res.ok || !json?.ok) {
+        modalToast.error(
+          normalizeExperimentalGroupErrorMessage(json?.error, "Falha ao confirmar a turma."),
+        );
+        return;
+      }
+      await Promise.all([
+        loadExperimentalGroupSettings(true),
+        loadPanelLeads(),
+        loadSummary({ silent: true }),
+      ]);
+      modalToast.success(
+        "Turma confirmada. As notificações recorrentes seguem bloqueadas até você marcar a aula experimental como realizada.",
+      );
+    } catch (error: any) {
+      modalToast.error(
+        normalizeExperimentalGroupErrorMessage(error?.message, "Falha ao confirmar a turma."),
+      );
+    } finally {
+      setExperimentalGroupConfirmingPairId("");
+    }
+  }
+
   async function handleSaveExperimentalGroupSettings() {
     if (experimentalGroupSettingsSaving) return;
     const enabledSlots = experimentalGroupFormSlots.filter(
@@ -4756,7 +4808,18 @@ export function AtendimentoClient() {
       const lessonLinkForConfirmation =
         resolveExperimentalGroupLessonLinkForSlot(slot, groupClassId) || null;
       if (!lessonLinkForConfirmation) {
-        modalToast.error("Adicione o link da aula experimental antes de confirmar a turma.");
+        await Promise.all([
+          loadExperimentalGroupSettings(true),
+          loadPanelLeads(),
+          loadSummary({ silent: true }),
+          loadExperimentalGroupLeadData(experimentalGroupLead),
+        ]);
+        setExperimentalGroupSelectedPairId(String(slot.pair_id ?? "").trim() || null);
+        setIsExperimentalGroupModalOpen(false);
+        setExperimentalGroupSettingsOpen(true);
+        modalToast.success(
+          "Registro vinculado à turma. Agora adicione o link e confirme a turma no modal Aulas em Grupo.",
+        );
         return;
       }
 
@@ -10607,6 +10670,13 @@ export function AtendimentoClient() {
                   !latestExperimentalCompleted &&
                   latestExperimentalStatus === "confirmed";
                 const completingThisPair = experimentalGroupCompletingPairId === pair.pairId;
+                const confirmingThisPair = experimentalGroupConfirmingPairId === pair.pairId;
+                const canConfirmExperimentalGroupFromSettings =
+                  card.slotType === "experimental" &&
+                  pair.hasAssignedMembers &&
+                  Boolean(latestExperimentalClass?.group_class_id) &&
+                  !latestExperimentalCompleted &&
+                  latestExperimentalStatus !== "confirmed";
 
                 return (
                   <div
@@ -11014,6 +11084,38 @@ export function AtendimentoClient() {
                           <div className="text-[12px] text-[var(--app-text-55)]">
                             Esse link vale para todos os registros experimentais vinculados a esta turma.
                           </div>
+                          {canConfirmExperimentalGroupFromSettings ? (
+                            <div className="flex justify-end">
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  latestExperimentalClass?.group_class_id
+                                    ? void handleConfirmExperimentalGroupPair(
+                                        pair.pairId,
+                                        latestExperimentalClass.group_class_id,
+                                      )
+                                    : undefined
+                                }
+                                disabled={
+                                  confirmingThisPair ||
+                                  experimentalGroupLessonLinkSavingPairId === pair.pairId ||
+                                  !String(
+                                    experimentalGroupLessonLinkDraftByPairId[pair.pairId] ??
+                                      latestExperimentalClass?.lesson_link ??
+                                      "",
+                                  ).trim()
+                                }
+                                className="inline-flex min-h-[42px] items-center justify-center gap-2 rounded-xl bg-[#ea580c] px-4 text-[13px] font-semibold !text-white disabled:cursor-not-allowed disabled:opacity-60"
+                              >
+                                {confirmingThisPair ? (
+                                  <Loader2 className="h-4 w-4 shrink-0 animate-spin" />
+                                ) : (
+                                  <Check className="h-4 w-4 shrink-0" />
+                                )}
+                                Confirmar turma
+                              </button>
+                            </div>
+                          ) : null}
                         </div>
                       ) : null}
                     </div>
@@ -11312,17 +11414,16 @@ export function AtendimentoClient() {
                     const isCurrentLeadAssigned = Boolean(
                       selectedExperimentalGroupSlot.is_current_lead_assigned,
                     );
-                    const needsLessonLinkForExperimental =
-                      !isCurrentLeadAssigned &&
-                      experimentalGroupLeadSlotType === "experimental" &&
-                      selectedExperimentalGroupSlot.slot_type === "experimental" &&
-                      !resolveExperimentalGroupLessonLinkForSlot(selectedExperimentalGroupSlot);
                     const actionDisabled = isCurrentLeadAssigned
                       ? experimentalGroupActionLoading
                       : experimentalGroupActionLoading ||
                         selectedExperimentalGroupSlot.is_full ||
-                        !experimentalGroupCanOpenModal ||
-                        needsLessonLinkForExperimental;
+                        !experimentalGroupCanOpenModal;
+                    const willOnlyAssignExperimental =
+                      !isCurrentLeadAssigned &&
+                      experimentalGroupLeadSlotType === "experimental" &&
+                      selectedExperimentalGroupSlot.slot_type === "experimental" &&
+                      !resolveExperimentalGroupLessonLinkForSlot(selectedExperimentalGroupSlot);
                     return (
                   <button
                     type="button"
@@ -11344,7 +11445,11 @@ export function AtendimentoClient() {
                     ) : (
                       <Check className="h-4 w-4" />
                     )}
-                    {isCurrentLeadAssigned ? "Sair da turma" : "Confirmar turma"}
+                    {isCurrentLeadAssigned
+                      ? "Sair da turma"
+                      : willOnlyAssignExperimental
+                        ? "Entrar na turma"
+                        : "Confirmar turma"}
                   </button>
                     );
                   })()}
