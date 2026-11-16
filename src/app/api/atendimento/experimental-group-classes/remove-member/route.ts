@@ -34,6 +34,19 @@ function isMissingExperimentalGroupRelation(error: unknown): boolean {
   );
 }
 
+function isMissingExperimentalBookingRelation(error: unknown): boolean {
+  const code = String((error as any)?.code ?? "").trim();
+  const message = String((error as any)?.message ?? "");
+  return (
+    code === "42P01" ||
+    code === "PGRST205" ||
+    /relation .*atendimento_experimental_class_bookings.*does not exist/i.test(message) ||
+    /could not find the table .*atendimento_experimental_class_bookings.* in the schema cache/i.test(
+      message,
+    )
+  );
+}
+
 function groupSchemaUnavailableResponse() {
   return Response.json(
     {
@@ -121,7 +134,7 @@ export async function POST(req: Request) {
     const { data: lead, error: leadError } = await admin
       .from("atendimento_leads")
       .select(
-        "id, experimental_class_group_class_id, experimental_class_group_status, experimental_class_professor_start_at, experimental_class_professor_date, experimental_class_professor_time, experimental_class_professor_phone",
+        "id, conversation_id, experimental_class_booking_id, experimental_class_group_class_id, experimental_class_group_status, experimental_class_professor_start_at, experimental_class_professor_date, experimental_class_professor_time, experimental_class_lead_start_at, experimental_class_lead_date, experimental_class_lead_time, experimental_class_professor_name, experimental_class_professor_phone, experimental_class_link",
       )
       .eq("id", parsed.data.lead_id)
       .maybeSingle();
@@ -232,6 +245,14 @@ export async function POST(req: Request) {
       }
     }
 
+    const { error: deleteBookingError } = await admin
+      .from("atendimento_experimental_class_bookings")
+      .delete()
+      .eq("lead_id", parsed.data.lead_id);
+    if (deleteBookingError && !isMissingExperimentalBookingRelation(deleteBookingError)) {
+      return Response.json({ ok: false, error: deleteBookingError.message }, { status: 500 });
+    }
+
     const { data: clearedExperimentalLead, error: clearExperimentalLeadError } = await admin
       .from("atendimento_leads")
       .update({
@@ -281,6 +302,35 @@ export async function POST(req: Request) {
         { status: 409 },
       );
     }
+
+    await appendHistoryEvent({
+      leadId: parsed.data.lead_id,
+      conversationId:
+        String((primaryMember as any)?.conversation_id ?? "").trim() ||
+        String((lead as any)?.conversation_id ?? "").trim() ||
+        null,
+      eventType: "experimental_class_cancelled",
+      title: "Aula experimental cancelada ao sair da turma em grupo",
+      details: {
+        cancelled_action: "group_member_removed",
+        professor_name_before: String((lead as any)?.experimental_class_professor_name ?? "").trim() || null,
+        professor_phone_before: String((lead as any)?.experimental_class_professor_phone ?? "").trim() || null,
+        professor_date_before: String((lead as any)?.experimental_class_professor_date ?? "").trim() || null,
+        professor_time_before: String((lead as any)?.experimental_class_professor_time ?? "").trim() || null,
+        professor_start_at_before:
+          String((lead as any)?.experimental_class_professor_start_at ?? "").trim() || null,
+        lead_date_before: String((lead as any)?.experimental_class_lead_date ?? "").trim() || null,
+        lead_time_before: String((lead as any)?.experimental_class_lead_time ?? "").trim() || null,
+        lead_start_at_before:
+          String((lead as any)?.experimental_class_lead_start_at ?? "").trim() || null,
+        lesson_link_before: String((lead as any)?.experimental_class_link ?? "").trim() || null,
+        booking_id_before: String((lead as any)?.experimental_class_booking_id ?? "").trim() || null,
+        group_class_id:
+          affectedGroupClassIds[0] ?? effectiveGroupClassId ?? leadAssignedGroupClassId ?? null,
+      },
+      actorType: "attendant",
+      actorEmail: auth.user.email,
+    });
 
     await appendHistoryEvent({
       leadId: parsed.data.lead_id,
