@@ -396,11 +396,13 @@ export async function POST(req: Request) {
           targetSlot.lead_timezone ||
           targetSlot.professor_timezone,
       });
-      await admin
+      const currentRecurringStatus = String((lead as any)?.recurring_class_status ?? "").trim();
+      const { data: updatedRecurringLead, error: updateRecurringLeadError } = await admin
         .from("atendimento_leads")
         .update({
           recurring_class_group_pair_id: String(targetSlot.pair_id ?? "").trim() || null,
           recurring_class_group_status: "assigned",
+          recurring_class_status: currentRecurringStatus || "confirmado",
           recurring_class_professor_name: targetSlot.professor_name,
           recurring_class_professor_phone: targetSlot.professor_phone,
           recurring_class_weekday: targetSlot.professor_weekday,
@@ -414,7 +416,44 @@ export async function POST(req: Request) {
           recurring_class_attendant_start_notification_sent_at: null,
           updated_at: nowIso,
         })
-        .eq("id", leadId);
+        .eq("id", leadId)
+        .select(
+          "id, recurring_class_group_pair_id, recurring_class_group_status, recurring_class_status, recurring_class_weekday, recurring_class_professor_time",
+        )
+        .maybeSingle();
+      if (updateRecurringLeadError) {
+        return Response.json(
+          {
+            ok: false,
+            error: updateRecurringLeadError.message,
+          },
+          { status: 500 },
+        );
+      }
+      if (!updatedRecurringLead?.id) {
+        return Response.json(
+          {
+            ok: false,
+            error: "Não foi possível atualizar o aluno para a turma recorrente selecionada.",
+          },
+          { status: 404 },
+        );
+      }
+      if (
+        String((updatedRecurringLead as any)?.recurring_class_group_pair_id ?? "").trim() !==
+          String(targetSlot.pair_id ?? "").trim() ||
+        String((updatedRecurringLead as any)?.recurring_class_group_status ?? "")
+          .trim()
+          .toLowerCase() !== "assigned"
+      ) {
+        return Response.json(
+          {
+            ok: false,
+            error: "A turma recorrente não pôde ser vinculada ao aluno.",
+          },
+          { status: 409 },
+        );
+      }
 
       await appendHistoryEvent({
         leadId,

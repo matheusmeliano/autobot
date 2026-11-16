@@ -4378,11 +4378,24 @@ export function AtendimentoClient() {
           }
         }
 
-        await Promise.all([
+        const [, , refreshedGroupData] = await Promise.all([
           loadPanelLeads(),
           loadSummary({ silent: true }),
           loadExperimentalGroupLeadData(experimentalGroupLead),
         ]);
+        const recurringAssignmentPersisted = Boolean(
+          refreshedGroupData?.slots?.some(
+            (candidate) =>
+              String(candidate.pair_id ?? "").trim() === String(slot.pair_id ?? "").trim() &&
+              candidate.is_current_lead_assigned,
+          ),
+        );
+        if (!recurringAssignmentPersisted) {
+          modalToast.error(
+            "A turma recorrente não foi vinculada ao aluno. Recarregue a página e tente novamente.",
+          );
+          return;
+        }
         modalToast.success("Turma recorrente confirmada.");
         return;
       }
