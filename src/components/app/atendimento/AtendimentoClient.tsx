@@ -2593,12 +2593,13 @@ export function AtendimentoClient() {
         lead: experimentalGroupLead,
         leadSlotType: experimentalGroupLeadSlotType,
       }) ?? null;
+    const fallbackSlot = assignedSlot ?? pairSlots[0] ?? null;
 
     const selectedSlotStillValid = pairSlots.some(
       (slot) => String(slot.id) === String(experimentalGroupSelectedSlotId ?? ""),
     );
     if (!selectedSlotStillValid) {
-      setExperimentalGroupSelectedSlotId(assignedSlot ? String(assignedSlot.id) : null);
+      setExperimentalGroupSelectedSlotId(fallbackSlot ? String(fallbackSlot.id) : null);
     }
 
     const selectedDateStillValid = pairSlots.some((slot) => {
@@ -2607,11 +2608,11 @@ export function AtendimentoClient() {
       return dateId === experimentalGroupSelectedDateId;
     });
     if (!selectedDateStillValid) {
-      const assignedDate =
-        assignedSlot?.lead_date ??
-        assignedSlot?.professor_date ??
+      const fallbackDate =
+        fallbackSlot?.lead_date ??
+        fallbackSlot?.professor_date ??
         "";
-      setExperimentalGroupSelectedDateId(String(assignedDate ?? "").trim() || null);
+      setExperimentalGroupSelectedDateId(String(fallbackDate ?? "").trim() || null);
     }
   }, [
     experimentalGroupLead,
@@ -11197,8 +11198,17 @@ export function AtendimentoClient() {
                                   key={dateOption.id}
                                   type="button"
                                   onClick={() => {
+                                    const firstSlotForDate =
+                                      experimentalGroupSlotsForSelectedTurma.find((slot) => {
+                                        const slotDateId =
+                                          String(slot.lead_date ?? "").trim() ||
+                                          String(slot.professor_date ?? "").trim();
+                                        return slotDateId === dateOption.id;
+                                      }) ?? null;
                                     setExperimentalGroupSelectedDateId(dateOption.id);
-                                    setExperimentalGroupSelectedSlotId(null);
+                                    setExperimentalGroupSelectedSlotId(
+                                      firstSlotForDate ? String(firstSlotForDate.id) : null,
+                                    );
                                   }}
                                   className={
                                     "flex min-h-[76px] flex-col items-center justify-center gap-1 rounded-2xl border px-2 py-2 text-center transition duration-150 " +
