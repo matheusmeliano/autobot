@@ -4668,6 +4668,10 @@ export function AtendimentoClient() {
             experimental_class_student_notification_sent_at: null,
             experimental_class_attendant_notification_sent_at: null,
             experimental_class_registered_attendant_notification_sent_at: null,
+            experimental_class_booking: null,
+            future_experimental_class_booking: null,
+            latest_experimental_class_booking: null,
+            latest_experimental_class_cancelled_at: new Date().toISOString(),
           } as AtendimentoLeadListItem;
         }),
       );
@@ -4695,6 +4699,10 @@ export function AtendimentoClient() {
                 experimental_class_student_notification_sent_at: null,
                 experimental_class_attendant_notification_sent_at: null,
                 experimental_class_registered_attendant_notification_sent_at: null,
+                experimental_class_booking: null,
+                future_experimental_class_booking: null,
+                latest_experimental_class_booking: null,
+                latest_experimental_class_cancelled_at: new Date().toISOString(),
               } as AtendimentoLeadListItem)
             : current,
         );

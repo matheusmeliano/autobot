@@ -1038,6 +1038,17 @@ async function isLeadBlockedByPreviousCancelledBooking(params: {
     const fullRaw = String((leadRowFull as any)?.latest_experimental_class_cancelled_at ?? "").trim();
     if (fullRaw && fullRaw !== "null") return true;
   } catch (_e) {}
+  try {
+    const { data: historyCancelledRow } = await params.admin
+      .from("atendimento_history_events")
+      .select("id")
+      .eq("lead_id", params.leadId)
+      .eq("event_type", "experimental_class_cancelled")
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if ((historyCancelledRow as any)?.id) return true;
+  } catch (_e) {}
   return false;
 }
 
@@ -5839,6 +5850,66 @@ export async function POST(req: Request) {
               const chosenNow = findExperimentalClassTimeOption(inboundContent, pres.slots);
               if (chosenNow) {
                 const professorDate = alreadyHasProfessorDate;
+                const blockedByCancel = await isLeadBlockedByPreviousCancelledBooking({
+                  admin,
+                  lead,
+                  leadId,
+                });
+                if (blockedByCancel) {
+                  try {
+                    await insertWhatsAppBotTextMessage({
+                      admin,
+                      conversationId,
+                      contentText: CANCELLED_BOOKING_AUTO_REPLY_MSG,
+                    });
+                  } catch (_e) {}
+                  try {
+                    await sendAtendimentoWhatsAppText({
+                      phone: normalizedPhoneOnly,
+                      message: CANCELLED_BOOKING_AUTO_REPLY_MSG,
+                    });
+                  } catch (_e) {}
+                  try {
+                    await admin
+                      .from("atendimento_conversations")
+                      .update({ updated_at: nowIso })
+                      .eq("id", conversationId);
+                  } catch (_e) {}
+                  try {
+                    await admin
+                      .from("atendimento_leads")
+                      .update({
+                        unread_count: Number(lead.unread_count ?? 0) + 1,
+                        is_new_for_attendant: true,
+                        last_interaction_at: nowIso,
+                        updated_at: nowIso,
+                      })
+                      .eq("id", leadId);
+                  } catch (_e) {}
+                  void syncConversationPreview({
+                    conversationId,
+                    contentText: CANCELLED_BOOKING_AUTO_REPLY_MSG,
+                    createdAt: nowIso,
+                  });
+                  void appendHistoryEvent({
+                    leadId,
+                    conversationId,
+                    eventType: "whatsapp_message_sent_cancelled_booking_auto_reply",
+                    title: "Mensagem automática de cancelamento enviada ao lead",
+                    details: {
+                      content_text: CANCELLED_BOOKING_AUTO_REPLY_MSG,
+                      source: "whatsapp_zapi",
+                    },
+                    actorType: "bot",
+                  });
+                  return Response.json({
+                    ok: true,
+                    ignored: false,
+                    replied: true,
+                    reply: CANCELLED_BOOKING_AUTO_REPLY_MSG,
+                    reason: "cancelled_booking_auto_reply_sent",
+                  });
+                }
 
                 void appendHistoryEvent({
                   leadId,
@@ -6292,6 +6363,67 @@ export async function POST(req: Request) {
               handled: true,
               flow: "whatsapp_time_retry",
               blocked: false,
+            });
+          }
+
+          const blockedByCancel = await isLeadBlockedByPreviousCancelledBooking({
+            admin,
+            lead,
+            leadId,
+          });
+          if (blockedByCancel) {
+            try {
+              await insertWhatsAppBotTextMessage({
+                admin,
+                conversationId,
+                contentText: CANCELLED_BOOKING_AUTO_REPLY_MSG,
+              });
+            } catch (_e) {}
+            try {
+              await sendAtendimentoWhatsAppText({
+                phone: normalizedPhoneOnly,
+                message: CANCELLED_BOOKING_AUTO_REPLY_MSG,
+              });
+            } catch (_e) {}
+            try {
+              await admin
+                .from("atendimento_conversations")
+                .update({ updated_at: nowIso })
+                .eq("id", conversationId);
+            } catch (_e) {}
+            try {
+              await admin
+                .from("atendimento_leads")
+                .update({
+                  unread_count: Number(lead.unread_count ?? 0) + 1,
+                  is_new_for_attendant: true,
+                  last_interaction_at: nowIso,
+                  updated_at: nowIso,
+                })
+                .eq("id", leadId);
+            } catch (_e) {}
+            void syncConversationPreview({
+              conversationId,
+              contentText: CANCELLED_BOOKING_AUTO_REPLY_MSG,
+              createdAt: nowIso,
+            });
+            void appendHistoryEvent({
+              leadId,
+              conversationId,
+              eventType: "whatsapp_message_sent_cancelled_booking_auto_reply",
+              title: "Mensagem automática de cancelamento enviada ao lead",
+              details: {
+                content_text: CANCELLED_BOOKING_AUTO_REPLY_MSG,
+                source: "whatsapp_zapi",
+              },
+              actorType: "bot",
+            });
+            return Response.json({
+              ok: true,
+              ignored: false,
+              replied: true,
+              reply: CANCELLED_BOOKING_AUTO_REPLY_MSG,
+              reason: "cancelled_booking_auto_reply_sent",
             });
           }
 
