@@ -595,32 +595,42 @@ export async function POST(req: Request) {
     }
 
     const groupClassId = String(assignmentResult.group_class_id ?? "").trim();
-    await admin
+    const leadUpdatePayload = {
+      experimental_class_mode_preference: "group",
+      experimental_class_group_interest: true,
+      experimental_class_group_interest_at:
+        String((lead as any)?.experimental_class_group_interest_at ?? "").trim() || nowIso,
+      experimental_class_group_class_id: groupClassId || null,
+      experimental_class_group_status: "assigned",
+      experimental_class_status: "scheduled",
+      experimental_class_professor_date: targetSlot.professor_date || null,
+      experimental_class_professor_time: targetSlot.professor_time || null,
+      experimental_class_professor_start_at: targetSlot.professor_start_at || null,
+      experimental_class_lead_date: targetSlot.lead_date || null,
+      experimental_class_lead_time: targetSlot.lead_time || targetSlot.professor_time || null,
+      experimental_class_lead_start_at: targetSlot.professor_start_at || null,
+      experimental_class_professor_name: targetSlot.professor_name,
+      experimental_class_professor_phone: targetSlot.professor_phone,
+      experimental_class_booking_id: null,
+      experimental_class_link: null,
+      updated_at: nowIso,
+    };
+    const { error: updateLeadError } = await admin
       .from("atendimento_leads")
-      .update({
-        experimental_class_mode_preference: "group",
-        experimental_class_group_interest: true,
-        experimental_class_group_interest_at:
-          String((lead as any)?.experimental_class_group_interest_at ?? "").trim() || nowIso,
-        experimental_class_group_class_id: groupClassId || null,
-        experimental_class_group_status: "assigned",
-        experimental_class_status: "scheduled",
-        experimental_class_professor_date: targetSlot.professor_date || null,
-        experimental_class_professor_time: targetSlot.professor_time || null,
-        experimental_class_professor_start_at: targetSlot.professor_start_at || null,
-        experimental_class_lead_date: targetSlot.lead_date || null,
-        experimental_class_lead_time: targetSlot.lead_time || targetSlot.professor_time || null,
-        experimental_class_lead_start_at: targetSlot.professor_start_at || null,
-        experimental_class_professor_name: targetSlot.professor_name,
-        experimental_class_professor_phone: targetSlot.professor_phone,
-        experimental_class_booking_id: null,
-        experimental_class_link: null,
-        experimental_class_student_notification_sent_at: null,
-        experimental_class_attendant_notification_sent_at: null,
-        experimental_class_registered_attendant_notification_sent_at: null,
-        updated_at: nowIso,
-      })
+      .update(leadUpdatePayload)
       .eq("id", leadId);
+    if (updateLeadError) {
+      await admin
+        .from("atendimento_experimental_group_class_members")
+        .update({
+          status: "removed",
+          updated_at: nowIso,
+        })
+        .eq("lead_id", leadId)
+        .eq("group_class_id", groupClassId)
+        .eq("status", "assigned");
+      return Response.json({ ok: false, error: updateLeadError.message }, { status: 500 });
+    }
 
     await appendHistoryEvent({
       leadId,
