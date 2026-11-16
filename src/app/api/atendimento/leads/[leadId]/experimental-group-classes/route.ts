@@ -1,6 +1,10 @@
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { requireAtendimentoUser } from "@/lib/atendimento/server";
 import {
+  experimentalGroupWeekdayLabel,
+  resolveExperimentalGroupPairIdForClass,
+} from "@/lib/atendimento/experimentalGroupClass";
+import {
   buildExperimentalGroupClassSlotsForLead,
   buildRecurringGroupClassSlotsForLead,
   loadExperimentalGroupClassSettings,
@@ -97,7 +101,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ leadId:
           lookAheadDays: 56,
           excludeLeadIdFromIndividualBookings: true,
         });
-    const slots =
+    let slots =
       leadHasExperimentalAssignment && leadAssignedExperimentalGroupId
         ? rawSlots.map((slot) => {
             const slotGroupClassId = String(slot.group_class_id ?? "").trim() || null;
@@ -116,7 +120,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ leadId:
           })
         : rawSlots;
 
-    const currentAssignedSlot =
+    let currentAssignedSlot =
       slots.find((slot) => slot.is_current_lead_assigned) ??
       (leadHasExperimentalAssignment && leadAssignedExperimentalGroupId
         ? slots.find(
@@ -125,6 +129,82 @@ export async function GET(_req: Request, { params }: { params: Promise<{ leadId:
               String(slot.group_class_id ?? "").trim() === leadAssignedExperimentalGroupId,
           ) ?? null
         : null);
+
+    if (!currentAssignedSlot && leadHasExperimentalAssignment && leadAssignedExperimentalGroupId) {
+      const { data: assignedGroupClass, error: assignedGroupClassError } = await admin
+        .from("atendimento_experimental_group_classes")
+        .select(
+          "id, professor_name, professor_phone, professor_timezone, professor_weekday, professor_date, professor_time, professor_start_at, capacity, status, confirmed_at, attendance_status, attendance_checked_at, lesson_link",
+        )
+        .eq("id", leadAssignedExperimentalGroupId)
+        .maybeSingle();
+
+      if (!assignedGroupClassError && assignedGroupClass?.id) {
+        const { count: assignedMembersCount } = await admin
+          .from("atendimento_experimental_group_class_members")
+          .select("id", { count: "exact", head: true })
+          .eq("group_class_id", leadAssignedExperimentalGroupId)
+          .eq("status", "assigned");
+
+        const capacity = Math.max(1, Math.min(4, Number((assignedGroupClass as any)?.capacity ?? 4)));
+        const occupiedSeats = Math.max(1, Number(assignedMembersCount ?? 0));
+        const professorTimeZone =
+          String((assignedGroupClass as any)?.professor_timezone ?? "").trim() || "America/Cuiaba";
+        const professorWeekday =
+          String((assignedGroupClass as any)?.professor_weekday ?? "").trim().toLowerCase() || "mon";
+        const professorDate = String((assignedGroupClass as any)?.professor_date ?? "").trim();
+        const professorTime = String((assignedGroupClass as any)?.professor_time ?? "").trim();
+        const pairId =
+          resolveExperimentalGroupPairIdForClass({
+            settings,
+            groupClass: assignedGroupClass as any,
+          }) || `assigned-${leadAssignedExperimentalGroupId}`;
+        const assignedSlot = {
+          id: String((assignedGroupClass as any)?.id ?? "").trim() || leadAssignedExperimentalGroupId,
+          group_class_id: leadAssignedExperimentalGroupId,
+          pair_id: pairId,
+          slot_type: "experimental" as const,
+          professor_name: String((assignedGroupClass as any)?.professor_name ?? "").trim() || null,
+          professor_phone: String((assignedGroupClass as any)?.professor_phone ?? "").trim() || null,
+          professor_timezone: professorTimeZone,
+          professor_weekday: professorWeekday as any,
+          professor_weekday_label: experimentalGroupWeekdayLabel(professorWeekday as any),
+          professor_date: professorDate,
+          professor_time: professorTime,
+          professor_start_at: String((assignedGroupClass as any)?.professor_start_at ?? "").trim(),
+          lead_timezone: professorTimeZone,
+          lead_date:
+            String((lead as any)?.experimental_class_lead_date ?? "").trim() ||
+            professorDate,
+          lead_time:
+            String((lead as any)?.experimental_class_lead_time ?? "").trim() ||
+            professorTime,
+          capacity,
+          occupied_seats: occupiedSeats,
+          available_seats: Math.max(capacity - occupiedSeats, 0),
+          status:
+            String((assignedGroupClass as any)?.status ?? "").trim().toLowerCase() ||
+            leadAssignedExperimentalStatus ||
+            "assigned",
+          lesson_link: String((assignedGroupClass as any)?.lesson_link ?? "").trim() || null,
+          confirmed_at: String((assignedGroupClass as any)?.confirmed_at ?? "").trim() || null,
+          members: [],
+          is_full: false,
+          is_current_lead_assigned: true,
+        };
+        slots = [
+          assignedSlot,
+          ...slots.filter(
+            (slot) =>
+              !(
+                slot.slot_type === "experimental" &&
+                String(slot.group_class_id ?? "").trim() === leadAssignedExperimentalGroupId
+              ),
+          ),
+        ];
+        currentAssignedSlot = assignedSlot;
+      }
+    }
 
     const reasons: string[] = [];
     if (!settings.enabled) reasons.push("feature_disabled");
