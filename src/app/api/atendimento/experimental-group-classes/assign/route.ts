@@ -115,6 +115,19 @@ async function assignLeadToExperimentalGroupDirect(params: {
   const admin = params.admin;
   const slot = params.targetSlot;
 
+  const { data: lead, error: leadError } = await admin
+    .from("atendimento_leads")
+    .select("id, experimental_class_group_class_id, experimental_class_group_status")
+    .eq("id", params.leadId)
+    .maybeSingle();
+
+  if (leadError) {
+    if (isMissingExperimentalGroupRelation(leadError)) {
+      return { ok: false as const, error: "experimental_group_schema_unavailable" };
+    }
+    return { ok: false as const, error: leadError.message };
+  }
+
   const { data: upsertedGroupClass, error: upsertGroupClassError } = await admin
     .from("atendimento_experimental_group_classes")
     .upsert(
@@ -165,14 +178,24 @@ async function assignLeadToExperimentalGroupDirect(params: {
     }
   }
 
-  const { data: existingOtherGroupMember, error: existingOtherGroupError } = await admin
+  const currentLeadAssignedGroupClassId =
+    String((lead as any)?.experimental_class_group_class_id ?? "").trim() || null;
+  const currentLeadAssignedGroupStatus = String(
+    (lead as any)?.experimental_class_group_status ?? "",
+  )
+    .trim()
+    .toLowerCase();
+  const leadHasCurrentExperimentalGroupAssignment = Boolean(
+    currentLeadAssignedGroupClassId && currentLeadAssignedGroupStatus !== "removed",
+  );
+
+  const { data: existingOtherGroupMembers, error: existingOtherGroupError } = await admin
     .from("atendimento_experimental_group_class_members")
-    .select("group_class_id")
+    .select("id, group_class_id")
     .eq("lead_id", params.leadId)
     .eq("status", "assigned")
     .neq("group_class_id", groupClassId)
-    .limit(1)
-    .maybeSingle();
+    .order("updated_at", { ascending: false });
 
   if (existingOtherGroupError) {
     if (isMissingExperimentalGroupRelation(existingOtherGroupError)) {
@@ -180,8 +203,37 @@ async function assignLeadToExperimentalGroupDirect(params: {
     }
     return { ok: false as const, error: existingOtherGroupError.message };
   }
-  if (existingOtherGroupMember?.group_class_id) {
-    return { ok: false as const, error: "lead_already_assigned_to_other_group" };
+
+  const assignedOtherMembers = Array.isArray(existingOtherGroupMembers)
+    ? existingOtherGroupMembers.filter((row) => String((row as any)?.group_class_id ?? "").trim())
+    : [];
+
+  if (assignedOtherMembers.length > 0) {
+    if (
+      leadHasCurrentExperimentalGroupAssignment &&
+      currentLeadAssignedGroupClassId !== groupClassId
+    ) {
+      return { ok: false as const, error: "lead_already_assigned_to_other_group" };
+    }
+
+    const staleMemberIds = assignedOtherMembers
+      .map((row) => String((row as any)?.id ?? "").trim())
+      .filter(Boolean);
+    if (staleMemberIds.length > 0) {
+      const { error: clearStaleMembersError } = await admin
+        .from("atendimento_experimental_group_class_members")
+        .update({
+          status: "removed",
+          updated_at: nowIso,
+        })
+        .in("id", staleMemberIds);
+      if (clearStaleMembersError) {
+        if (isMissingExperimentalGroupRelation(clearStaleMembersError)) {
+          return { ok: false as const, error: "experimental_group_schema_unavailable" };
+        }
+        return { ok: false as const, error: clearStaleMembersError.message };
+      }
+    }
   }
 
   const { data: existingMember, error: existingMemberError } = await admin
