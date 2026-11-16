@@ -4352,6 +4352,41 @@ export function AtendimentoClient() {
     if (!experimentalGroupLead || experimentalGroupActionLoading) return;
     setExperimentalGroupActionLoading(true);
     try {
+      if (slot.slot_type === "recorrente") {
+        if (!slot.is_current_lead_assigned) {
+          const assignRes = await fetch("/api/atendimento/experimental-group-classes/assign", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              lead_id: experimentalGroupLead.id,
+              group_class_id: slot.group_class_id,
+              professor_start_at: slot.professor_start_at,
+              pair_id: slot.pair_id,
+              slot_type: slot.slot_type,
+            }),
+          });
+          if (handleForbiddenResponse(assignRes)) return;
+          const assignJson = await assignRes.json().catch(() => null);
+          if (!assignJson?.ok) {
+            modalToast.error(
+              normalizeExperimentalGroupErrorMessage(
+                assignJson?.error,
+                "Falha ao atribuir aluno à turma recorrente.",
+              ),
+            );
+            return;
+          }
+        }
+
+        await Promise.all([
+          loadPanelLeads(),
+          loadSummary({ silent: true }),
+          loadExperimentalGroupLeadData(experimentalGroupLead),
+        ]);
+        modalToast.success("Turma recorrente confirmada.");
+        return;
+      }
+
       let groupClassId = String(slot.group_class_id ?? "").trim();
 
       if (!slot.is_current_lead_assigned) {
