@@ -3,11 +3,7 @@ import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import {
   appendHistoryEvent,
   requireAtendimentoUser,
-  sendAtendimentoWhatsAppText,
 } from "@/lib/atendimento/server";
-import {
-  buildExperimentalGroupClassConfirmationMessage,
-} from "@/lib/atendimento/experimentalGroupClass";
 import { resolveLeadTimeZoneFromRecord } from "@/lib/timezone";
 
 export const runtime = "nodejs";
@@ -81,7 +77,6 @@ export async function POST(req: Request) {
     if (!effectiveLessonLink) {
       return Response.json({ ok: false, error: "missing_lesson_link" }, { status: 409 });
     }
-
     const { data: members, error: membersError } = await admin
       .from("atendimento_experimental_group_class_members")
       .select("*")
@@ -139,57 +134,15 @@ export async function POST(req: Request) {
       return Response.json({ ok: false, error: updateClassError.message }, { status: 500 });
     }
 
-    let sentCount = 0;
-    const errors: Array<{ lead_id: string; error: string }> = [];
-
     for (const member of memberRows) {
       const leadId = String((member as any)?.lead_id ?? "").trim();
       const lead = leadsById.get(leadId);
       if (!lead) continue;
-      const leadPhone = String((lead as any)?.phone ?? "").trim();
       const conversationId = String((member as any)?.conversation_id ?? "").trim() || null;
       const leadTimeZone = resolveLeadTimeZoneFromRecord({
         lead,
         fallbackTimeZone: String((groupClass as any)?.professor_timezone ?? "").trim() || null,
       });
-      const message = buildExperimentalGroupClassConfirmationMessage({
-        leadName: String((lead as any)?.full_name ?? "").trim() || null,
-        professorName: String((groupClass as any)?.professor_name ?? "").trim() || null,
-        professorStartAt: String((groupClass as any)?.professor_start_at ?? "").trim(),
-        leadTimeZone,
-        professorTimeZone:
-          String((groupClass as any)?.professor_timezone ?? "").trim() || null,
-        lessonLink: effectiveLessonLink,
-      });
-
-      if (
-        !String((member as any)?.student_notification_sent_at ?? "").trim() &&
-        leadPhone
-      ) {
-        try {
-          await sendAtendimentoWhatsAppText({
-            phone: leadPhone,
-            message,
-            allowNoInbound: true,
-          });
-          const { error: updateMemberError } = await admin
-            .from("atendimento_experimental_group_class_members")
-            .update({
-              student_notification_sent_at: nowIso,
-              updated_at: nowIso,
-            })
-            .eq("id", String((member as any)?.id ?? ""));
-          if (updateMemberError && isMissingExperimentalGroupRelation(updateMemberError)) {
-            return groupSchemaUnavailableResponse();
-          }
-          sentCount += 1;
-        } catch (error: any) {
-          errors.push({
-            lead_id: leadId,
-            error: String(error?.message ?? error ?? "Falha ao enviar WhatsApp"),
-          });
-        }
-      }
 
       const professorStartAt = String((groupClass as any)?.professor_start_at ?? "").trim();
       const leadDate = new Intl.DateTimeFormat("en-CA", {
@@ -256,7 +209,8 @@ export async function POST(req: Request) {
           lead_time: leadTime || null,
           lead_timezone: leadTimeZone,
           lesson_link: effectiveLessonLink,
-          student_notification_sent: !errors.some((entry) => entry.lead_id === leadId),
+          student_notification_sent: false,
+          recurring_release_pending: true,
         },
         actorType: "attendant",
         actorEmail: auth.user.email,
@@ -265,8 +219,8 @@ export async function POST(req: Request) {
 
     return Response.json({
       ok: true,
-      sent_count: sentCount,
-      errors,
+      lesson_link_saved: Boolean(effectiveLessonLink),
+      recurring_release_pending: true,
     });
   } catch (error: any) {
     return Response.json(

@@ -76,6 +76,7 @@ type ExperimentalGroupPairActivityPayload = Record<
       confirmed_at?: string | null;
       attendance_status?: string | null;
       attendance_checked_at?: string | null;
+      lesson_link?: string | null;
     } | null;
   }
 >;
@@ -1906,7 +1907,6 @@ export function AtendimentoClient() {
     useState<AtendimentoLeadListItem | null>(null);
   const [experimentalGroupLoading, setExperimentalGroupLoading] = useState(false);
   const [experimentalGroupActionLoading, setExperimentalGroupActionLoading] = useState(false);
-  const [experimentalGroupLessonLinkDraft, setExperimentalGroupLessonLinkDraft] = useState("");
   const [experimentalGroupSlots, setExperimentalGroupSlots] = useState<
     ExperimentalGroupSlotPayload[]
   >([]);
@@ -1917,6 +1917,10 @@ export function AtendimentoClient() {
   const [experimentalGroupSettingsAssignProfPairId, setExperimentalGroupSettingsAssignProfPairId] =
     useState("");
   const [experimentalGroupCompletingPairId, setExperimentalGroupCompletingPairId] = useState("");
+  const [experimentalGroupLessonLinkDraftByPairId, setExperimentalGroupLessonLinkDraftByPairId] =
+    useState<Record<string, string>>({});
+  const [experimentalGroupLessonLinkSavingPairId, setExperimentalGroupLessonLinkSavingPairId] =
+    useState("");
   const [experimentalGroupSelectedDateId, setExperimentalGroupSelectedDateId] = useState<
     string | null
   >(null);
@@ -2229,19 +2233,6 @@ export function AtendimentoClient() {
     );
   }, [experimentalGroupSelectedSlotId, experimentalGroupSlots]);
 
-  useEffect(() => {
-    if (
-      experimentalGroupLeadSlotType === "experimental" &&
-      selectedExperimentalGroupSlot?.slot_type === "experimental"
-    ) {
-      setExperimentalGroupLessonLinkDraft(
-        String(selectedExperimentalGroupSlot.lesson_link ?? "").trim(),
-      );
-      return;
-    }
-    setExperimentalGroupLessonLinkDraft("");
-  }, [experimentalGroupLeadSlotType, selectedExperimentalGroupSlot]);
-
   const experimentalGroupVisibleSlots = useMemo<ExperimentalGroupSlotPayload[]>(() => {
     return experimentalGroupSlots.filter(
       (slot) => slot.available_seats > 0 || slot.is_current_lead_assigned,
@@ -2353,6 +2344,7 @@ export function AtendimentoClient() {
         confirmed_at: string | null;
         attendance_status: string | null;
         attendance_checked_at: string | null;
+        lesson_link: string | null;
       } | null;
       experimentalSlot: ExperimentalGroupFormSlot;
       recurringSlot: ExperimentalGroupFormSlot;
@@ -2443,6 +2435,10 @@ export function AtendimentoClient() {
                 attendance_checked_at:
                   String(
                     experimentalGroupPairActivity[pair.pairId]?.latest_experimental_class?.attendance_checked_at ?? "",
+                  ).trim() || null,
+                lesson_link:
+                  String(
+                    experimentalGroupPairActivity[pair.pairId]?.latest_experimental_class?.lesson_link ?? "",
                   ).trim() || null,
               }
             : null,
@@ -2861,6 +2857,12 @@ export function AtendimentoClient() {
 
   async function handleSaveLessonLinkExperimental(lead: AtendimentoLeadListItem) {
     if (expSavingLessonLink) return;
+    if (isLeadMarkedForExperimentalGroup(lead)) {
+      modalToast.warning(
+        "Para turma experimental em grupo, adicione o link no modal da turma em grupo.",
+      );
+      return;
+    }
     const saved = experimentalLessonLinkForLead(lead);
     const draft = experimentalLessonLinkDraft.trim();
     if (experimentalLockedProf) {
@@ -4169,6 +4171,15 @@ export function AtendimentoClient() {
     setExperimentalGroupPairActivity(
       pairActivityRaw && typeof pairActivityRaw === "object" ? pairActivityRaw : {},
     );
+    const lessonLinkDraftsByPairId = Object.fromEntries(
+      Object.entries(pairActivityRaw && typeof pairActivityRaw === "object" ? pairActivityRaw : {}).map(
+        ([pairId, value]) => [
+          pairId,
+          String((value as any)?.latest_experimental_class?.lesson_link ?? "").trim(),
+        ],
+      ),
+    ) as Record<string, string>;
+    setExperimentalGroupLessonLinkDraftByPairId(lessonLinkDraftsByPairId);
     setExperimentalGroupWeekdayOptions(
       Array.isArray(json?.weekday_options) ? (json.weekday_options as Array<{ value: string; label: string }>) : [],
     );
@@ -4288,6 +4299,67 @@ export function AtendimentoClient() {
       );
     } finally {
       setExperimentalGroupCompletingPairId("");
+    }
+  }
+
+  async function handleSaveExperimentalGroupLessonLink(pairId: string, groupClassId: string) {
+    const normalizedPairId = String(pairId ?? "").trim();
+    const normalizedGroupClassId = String(groupClassId ?? "").trim();
+    if (!normalizedPairId || !normalizedGroupClassId) return;
+    if (experimentalGroupLessonLinkSavingPairId) return;
+
+    const saved =
+      String(
+        experimentalGroupPairActivity[normalizedPairId]?.latest_experimental_class?.lesson_link ?? "",
+      ).trim() || "";
+    const draft =
+      String(experimentalGroupLessonLinkDraftByPairId[normalizedPairId] ?? "").trim() || "";
+
+    if (!draft && !saved) {
+      modalToast.warning("Informe o link da aula da turma antes de salvar.");
+      return;
+    }
+    if (draft === saved) {
+      modalToast.info("Nenhuma alteração no link da turma.");
+      return;
+    }
+
+    setExperimentalGroupLessonLinkSavingPairId(normalizedPairId);
+    try {
+      const res = await fetch("/api/atendimento/experimental-group-classes/lesson-link", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          group_class_id: normalizedGroupClassId,
+          lesson_link: draft || null,
+        }),
+      });
+      if (handleForbiddenResponse(res)) return;
+      const json = await res.json().catch(() => null);
+      if (!res.ok || !json?.ok) {
+        modalToast.error(
+          normalizeExperimentalGroupErrorMessage(
+            json?.error,
+            "Falha ao salvar o link da turma experimental.",
+          ),
+        );
+        return;
+      }
+      await Promise.all([
+        loadExperimentalGroupSettings(true),
+        loadPanelLeads(),
+        loadSummary({ silent: true }),
+      ]);
+      modalToast.success(draft ? "Link da turma salvo." : "Link da turma removido.");
+    } catch (error: any) {
+      modalToast.error(
+        normalizeExperimentalGroupErrorMessage(
+          error?.message,
+          "Falha ao salvar o link da turma experimental.",
+        ),
+      );
+    } finally {
+      setExperimentalGroupLessonLinkSavingPairId("");
     }
   }
 
@@ -4649,10 +4721,7 @@ export function AtendimentoClient() {
         return;
       }
 
-      const lessonLinkForConfirmation =
-        String(experimentalGroupLessonLinkDraft ?? "").trim() ||
-        String(slot.lesson_link ?? "").trim() ||
-        null;
+      const lessonLinkForConfirmation = String(slot.lesson_link ?? "").trim() || null;
       if (!lessonLinkForConfirmation) {
         modalToast.error("Adicione o link da aula experimental antes de confirmar a turma.");
         return;
@@ -4687,7 +4756,7 @@ export function AtendimentoClient() {
         loadExperimentalGroupLeadData(experimentalGroupLead),
       ]);
       modalToast.success(
-        `Turma confirmada. ${Number(confirmJson?.sent_count ?? 0)} mensagem(ns) enviada(s).`,
+        "Turma confirmada. As notificações recorrentes seguem bloqueadas até você marcar a aula experimental como realizada.",
       );
     } catch (error: any) {
       modalToast.error(
@@ -8189,6 +8258,7 @@ export function AtendimentoClient() {
                         if (expTone === "success") {
                           const expAssigned = experimentalAssignedProfessorForLead(sl);
                           const expIsGroupAssigned = isLeadAssignedToExperimentalGroup(sl);
+                          const expUsesGroupFlow = isLeadMarkedForExperimentalGroup(sl);
                           const expSavedLink = experimentalLessonLinkForLead(sl);
                           const expHasPhone = Boolean(String(sl?.phone ?? "").trim());
                           const expBestBooking =
@@ -8554,7 +8624,7 @@ export function AtendimentoClient() {
                                 </div>
                               )}
 
-                              {!expIsGroupAssigned ? (
+                              {!expUsesGroupFlow ? (
                               <div className="mt-5">
                                 <div className="flex flex-col items-stretch gap-3 min-[600px]:flex-row min-[600px]:items-end">
                                   <div className="min-w-0 flex-1">
@@ -9757,6 +9827,7 @@ export function AtendimentoClient() {
                       if (expTone === "success") {
                         const expAssigned = experimentalAssignedProfessorForLead(sl);
                         const expIsGroupAssigned = isLeadAssignedToExperimentalGroup(sl);
+                        const expUsesGroupFlow = isLeadMarkedForExperimentalGroup(sl);
                         const expSavedLink = experimentalLessonLinkForLead(sl);
                         const expHasPhone = Boolean(String(sl?.phone ?? "").trim());
                         const expBestBooking =
@@ -10146,7 +10217,7 @@ export function AtendimentoClient() {
                               </div>
                             )}
 
-                            {!expIsGroupAssigned ? (
+                            {!expUsesGroupFlow ? (
                             <div className="mt-5">
                               <div className="flex flex-col items-stretch gap-3 min-[600px]:flex-row min-[600px]:items-end">
                                 <div className="min-w-0 flex-1">
@@ -10855,6 +10926,63 @@ export function AtendimentoClient() {
                           </div>
                         )}
                       </div>
+
+                      {pair.hasAssignedMembers &&
+                      latestExperimentalClass?.group_class_id &&
+                      card.slotType === "experimental" ? (
+                        <div className="space-y-2">
+                          <label className="text-xs font-semibold text-[var(--app-text-70)]">
+                            Link da aula
+                          </label>
+                          <div className="flex flex-col items-stretch gap-3 min-[600px]:flex-row min-[600px]:items-end">
+                            <div className="min-w-0 flex-1">
+                              <input
+                                type="url"
+                                inputMode="url"
+                                placeholder="https://meet.google.com/..."
+                                value={String(
+                                  experimentalGroupLessonLinkDraftByPairId[pair.pairId] ?? "",
+                                )}
+                                onChange={(e) =>
+                                  setExperimentalGroupLessonLinkDraftByPairId((prev) => ({
+                                    ...prev,
+                                    [pair.pairId]: e.target.value,
+                                  }))
+                                }
+                                className="w-full min-w-0 rounded-xl border border-[var(--app-border)] bg-[var(--app-solid-surface-2)] px-4 py-3 text-[13px] font-semibold text-[var(--app-text-85)] placeholder:text-[var(--app-text-45)] transition focus:border-[var(--app-border-strong)] focus:outline-none disabled:cursor-not-allowed disabled:opacity-60"
+                                disabled={experimentalGroupLessonLinkSavingPairId === pair.pairId}
+                              />
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() =>
+                                void handleSaveExperimentalGroupLessonLink(
+                                  pair.pairId,
+                                  latestExperimentalClass.group_class_id,
+                                )
+                              }
+                              disabled={
+                                experimentalGroupLessonLinkSavingPairId === pair.pairId ||
+                                String(
+                                  experimentalGroupLessonLinkDraftByPairId[pair.pairId] ?? "",
+                                ).trim() ===
+                                  String(latestExperimentalClass.lesson_link ?? "").trim()
+                              }
+                              className="inline-flex h-[46px] w-full items-center justify-center gap-2 rounded-xl border border-[var(--app-border)] bg-[var(--app-solid-surface-2)] px-4 text-[13px] font-semibold text-[var(--app-text-85)] transition hover:bg-[var(--app-hover)] min-[600px]:w-auto disabled:cursor-not-allowed disabled:opacity-55"
+                            >
+                              {experimentalGroupLessonLinkSavingPairId === pair.pairId ? (
+                                <Loader2 className="h-4 w-4 shrink-0 animate-spin" />
+                              ) : (
+                                <Save className="h-4 w-4 shrink-0" />
+                              )}
+                              Salvar
+                            </button>
+                          </div>
+                          <div className="text-[12px] text-[var(--app-text-55)]">
+                            Esse link vale para todos os registros experimentais vinculados a esta turma.
+                          </div>
+                        </div>
+                      ) : null}
                     </div>
                   </div>
                 );
@@ -11124,31 +11252,6 @@ export function AtendimentoClient() {
                           )}
                         </div>
 
-                        {experimentalGroupLeadSlotType === "experimental" ? (
-                          <div className="space-y-2">
-                            <label className="text-xs font-semibold text-[var(--app-text-70)]">
-                              Link da aula
-                            </label>
-                            <div className="flex flex-col items-stretch gap-3 min-[600px]:flex-row min-[600px]:items-end">
-                              <div className="min-w-0 flex-1">
-                                <input
-                                  type="url"
-                                  inputMode="url"
-                                  placeholder="https://meet.google.com/..."
-                                  value={experimentalGroupLessonLinkDraft}
-                                  onChange={(e) =>
-                                    setExperimentalGroupLessonLinkDraft(e.target.value)
-                                  }
-                                  className="w-full min-w-0 rounded-xl border border-[var(--app-border)] bg-[var(--app-solid-surface-2)] px-4 py-3 text-[13px] font-semibold text-[var(--app-text-85)] placeholder:text-[var(--app-text-45)] transition focus:border-[var(--app-border-strong)] focus:outline-none disabled:cursor-not-allowed disabled:opacity-60"
-                                  disabled={experimentalGroupActionLoading}
-                                />
-                              </div>
-                            </div>
-                            <div className="text-[12px] text-[var(--app-text-55)]">
-                              Esse link sera enviado na notificacao da turma experimental.
-                            </div>
-                          </div>
-                        ) : null}
                       </>
                     ) : (
                       <div className="rounded-2xl border border-dashed border-[var(--app-border)] bg-[var(--app-solid-surface-2)] px-4 py-5 text-center text-[13px] text-[var(--app-text-55)]">
@@ -11171,7 +11274,6 @@ export function AtendimentoClient() {
                       !isCurrentLeadAssigned &&
                       experimentalGroupLeadSlotType === "experimental" &&
                       selectedExperimentalGroupSlot.slot_type === "experimental" &&
-                      !String(experimentalGroupLessonLinkDraft ?? "").trim() &&
                       !String(selectedExperimentalGroupSlot.lesson_link ?? "").trim();
                     const actionDisabled = isCurrentLeadAssigned
                       ? experimentalGroupActionLoading

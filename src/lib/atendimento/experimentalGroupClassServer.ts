@@ -77,6 +77,7 @@ export type ExperimentalGroupPairActivitySummary = Record<
       confirmed_at: string | null;
       attendance_status: string | null;
       attendance_checked_at: string | null;
+      lesson_link: string | null;
     } | null;
   }
 >;
@@ -523,6 +524,7 @@ export function buildExperimentalGroupPairActivitySummary(params: {
         confirmed_at: groupClass.confirmed_at,
         attendance_status: groupClass.attendance_status,
         attendance_checked_at: groupClass.attendance_checked_at,
+        lesson_link: groupClass.lesson_link,
       },
     };
   }
