@@ -2523,6 +2523,37 @@ export function AtendimentoClient() {
     });
   }, [experimentalGroupSelectedDateId, experimentalGroupSlotsForSelectedTurma]);
 
+  function resolveExperimentalGroupLessonLinkForSlot(
+    slot: ExperimentalGroupSlotPayload | null | undefined,
+    resolvedGroupClassId?: string | null,
+  ) {
+    const slotLessonLink = String(slot?.lesson_link ?? "").trim();
+    if (slotLessonLink) return slotLessonLink;
+
+    const pairId = String(slot?.pair_id ?? "").trim();
+    if (!pairId) return "";
+
+    const latestExperimentalClass =
+      experimentalGroupPairActivity[pairId]?.latest_experimental_class ?? null;
+    const latestLessonLink = String(latestExperimentalClass?.lesson_link ?? "").trim();
+    if (!latestLessonLink) return "";
+
+    const latestGroupClassId = String(latestExperimentalClass?.group_class_id ?? "").trim();
+    const slotGroupClassId = String(slot?.group_class_id ?? "").trim();
+    const effectiveGroupClassId = String(resolvedGroupClassId ?? "").trim();
+
+    if (
+      !latestGroupClassId ||
+      latestGroupClassId === effectiveGroupClassId ||
+      latestGroupClassId === slotGroupClassId ||
+      (!effectiveGroupClassId && !slotGroupClassId)
+    ) {
+      return latestLessonLink;
+    }
+
+    return latestLessonLink;
+  }
+
   const experimentalGroupDisplayProfessor = useMemo<{ name: string; phone: string } | null>(() => {
     const sourceSlots =
       selectedExperimentalGroupSlot
@@ -4721,7 +4752,8 @@ export function AtendimentoClient() {
         return;
       }
 
-      const lessonLinkForConfirmation = String(slot.lesson_link ?? "").trim() || null;
+      const lessonLinkForConfirmation =
+        resolveExperimentalGroupLessonLinkForSlot(slot, groupClassId) || null;
       if (!lessonLinkForConfirmation) {
         modalToast.error("Adicione o link da aula experimental antes de confirmar a turma.");
         return;
@@ -11274,7 +11306,7 @@ export function AtendimentoClient() {
                       !isCurrentLeadAssigned &&
                       experimentalGroupLeadSlotType === "experimental" &&
                       selectedExperimentalGroupSlot.slot_type === "experimental" &&
-                      !String(selectedExperimentalGroupSlot.lesson_link ?? "").trim();
+                      !resolveExperimentalGroupLessonLinkForSlot(selectedExperimentalGroupSlot);
                     const actionDisabled = isCurrentLeadAssigned
                       ? experimentalGroupActionLoading
                       : experimentalGroupActionLoading ||
