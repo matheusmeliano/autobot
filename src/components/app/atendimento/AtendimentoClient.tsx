@@ -638,6 +638,59 @@ function isLeadMarkedForExperimentalGroup(lead: AtendimentoLeadListItem | null |
   return String((lead as any)?.experimental_class_mode_preference ?? "").trim().toLowerCase() === "group";
 }
 
+function resolveAssignedExperimentalGroupSlot(params: {
+  slots: ExperimentalGroupSlotPayload[];
+  lead: AtendimentoLeadListItem | null | undefined;
+  leadSlotType: "experimental" | "recorrente" | null;
+}): ExperimentalGroupSlotPayload | null {
+  const lead = params.lead;
+  const desiredSlotType = params.leadSlotType;
+  const assignedSlots = params.slots.filter((slot) => slot.is_current_lead_assigned);
+  if (!assignedSlots.length) return null;
+
+  if (desiredSlotType === "experimental") {
+    const assignedGroupId = String((lead as any)?.experimental_class_group_class_id ?? "").trim();
+    const assignedProfessorStartAt = String(
+      (lead as any)?.experimental_class_professor_start_at ?? "",
+    ).trim();
+    const assignedProfessorDate = String((lead as any)?.experimental_class_professor_date ?? "").trim();
+    const assignedProfessorTime = String((lead as any)?.experimental_class_professor_time ?? "").trim();
+    const assignedProfessorPhone = String((lead as any)?.experimental_class_professor_phone ?? "").trim();
+    return (
+      assignedSlots.find(
+        (slot) =>
+          slot.slot_type === "experimental" &&
+          ((assignedGroupId && String(slot.group_class_id ?? "").trim() === assignedGroupId) ||
+            (assignedProfessorStartAt &&
+              String(slot.professor_start_at ?? "").trim() === assignedProfessorStartAt) ||
+            ((assignedProfessorDate &&
+              String(slot.professor_date ?? "").trim() === assignedProfessorDate &&
+              assignedProfessorTime &&
+              String(slot.professor_time ?? "").trim() === assignedProfessorTime &&
+              (!assignedProfessorPhone ||
+                String(slot.professor_phone ?? "").trim() === assignedProfessorPhone)))),
+      ) ??
+      assignedSlots.find((slot) => slot.slot_type === "experimental") ??
+      null
+    );
+  }
+
+  if (desiredSlotType === "recorrente") {
+    const assignedPairId = String((lead as any)?.recurring_class_group_pair_id ?? "").trim();
+    return (
+      assignedSlots.find(
+        (slot) =>
+          slot.slot_type === "recorrente" &&
+          (!assignedPairId || String(slot.pair_id ?? "").trim() === assignedPairId),
+      ) ??
+      assignedSlots.find((slot) => slot.slot_type === "recorrente") ??
+      null
+    );
+  }
+
+  return assignedSlots[0] ?? null;
+}
+
 function hasLeadConfirmedPaymentForRecurringNotificationsClient(
   lead: AtendimentoLeadListItem | null | undefined,
 ): boolean {
@@ -2493,12 +2546,17 @@ export function AtendimentoClient() {
       (slot) => String(slot.pair_id ?? "").trim() === experimentalGroupSelectedPairId,
     );
     if (!pairSlots.length) return;
+    const assignedSlot =
+      resolveAssignedExperimentalGroupSlot({
+        slots: pairSlots,
+        lead: experimentalGroupLead,
+        leadSlotType: experimentalGroupLeadSlotType,
+      }) ?? null;
 
     const selectedSlotStillValid = pairSlots.some(
       (slot) => String(slot.id) === String(experimentalGroupSelectedSlotId ?? ""),
     );
     if (!selectedSlotStillValid) {
-      const assignedSlot = pairSlots.find((slot) => slot.is_current_lead_assigned) ?? null;
       setExperimentalGroupSelectedSlotId(assignedSlot ? String(assignedSlot.id) : null);
     }
 
@@ -2509,12 +2567,14 @@ export function AtendimentoClient() {
     });
     if (!selectedDateStillValid) {
       const assignedDate =
-        pairSlots.find((slot) => slot.is_current_lead_assigned)?.lead_date ??
-        pairSlots.find((slot) => slot.is_current_lead_assigned)?.professor_date ??
+        assignedSlot?.lead_date ??
+        assignedSlot?.professor_date ??
         "";
       setExperimentalGroupSelectedDateId(String(assignedDate ?? "").trim() || null);
     }
   }, [
+    experimentalGroupLead,
+    experimentalGroupLeadSlotType,
     experimentalGroupSelectedDateId,
     experimentalGroupSelectedPairId,
     experimentalGroupSelectedSlotId,
@@ -4400,10 +4460,19 @@ export function AtendimentoClient() {
           ? "recorrente"
           : "experimental",
       );
+      const resolvedLeadSlotType =
+        String(json?.lead_slot_type ?? "").trim().toLowerCase() === "recorrente"
+          ? "recorrente"
+          : "experimental";
       const slots = Array.isArray(json?.slots) ? (json.slots as ExperimentalGroupSlotPayload[]) : [];
       setExperimentalGroupCanOpenModal(Boolean(json?.can_open_modal));
       setExperimentalGroupSlots(slots);
-      const firstAssigned = slots.find((slot) => slot.is_current_lead_assigned) ?? null;
+      const firstAssigned =
+        resolveAssignedExperimentalGroupSlot({
+          slots,
+          lead,
+          leadSlotType: resolvedLeadSlotType,
+        }) ?? null;
       const firstAssignedDate =
         firstAssigned?.is_current_lead_assigned
           ? String(firstAssigned.lead_date ?? firstAssigned.professor_date ?? "").trim() || null
@@ -4602,14 +4671,20 @@ export function AtendimentoClient() {
   async function handleRemoveLeadFromExperimentalGroup(slot: ExperimentalGroupSlotPayload, leadId: string) {
     if (experimentalGroupActionLoading || !experimentalGroupLead) return;
     setExperimentalGroupActionLoading(true);
+    const resolvedSlot =
+      resolveAssignedExperimentalGroupSlot({
+        slots: experimentalGroupSlots,
+        lead: experimentalGroupLead,
+        leadSlotType: experimentalGroupLeadSlotType,
+      }) ?? slot;
     try {
       const res = await fetch("/api/atendimento/experimental-group-classes/remove-member", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          group_class_id: slot.group_class_id,
-          pair_id: slot.pair_id,
-          slot_type: slot.slot_type,
+          group_class_id: resolvedSlot.group_class_id,
+          pair_id: resolvedSlot.pair_id,
+          slot_type: resolvedSlot.slot_type,
           lead_id: leadId,
         }),
       });
@@ -4619,7 +4694,7 @@ export function AtendimentoClient() {
         modalToast.error(
           normalizeExperimentalGroupErrorMessage(
             json?.error,
-            slot.slot_type === "recorrente"
+            resolvedSlot.slot_type === "recorrente"
               ? "Falha ao remover aluno da turma recorrente."
               : "Falha ao remover registro da turma.",
           ),
@@ -4629,7 +4704,7 @@ export function AtendimentoClient() {
       setPanelLeads((current) =>
         current.map((item) => {
           if (item.id !== leadId) return item;
-          if (slot.slot_type === "recorrente") {
+          if (resolvedSlot.slot_type === "recorrente") {
             return {
               ...item,
               recurring_class_group_pair_id: null,
@@ -4675,7 +4750,7 @@ export function AtendimentoClient() {
           } as AtendimentoLeadListItem;
         }),
       );
-      if (slot.slot_type === "experimental") {
+      if (resolvedSlot.slot_type === "experimental") {
         setExperimentalGroupLead((current) =>
           current && current.id === leadId
             ? ({
@@ -4721,7 +4796,7 @@ export function AtendimentoClient() {
         loadExperimentalGroupLeadData(experimentalGroupLead),
       ]);
       modalToast.success(
-        slot.slot_type === "recorrente"
+        resolvedSlot.slot_type === "recorrente"
           ? "Aluno removido da turma recorrente. O dia e horário voltaram para o individual."
           : "Registro removido da turma. O agendamento voltou para o individual.",
       );
@@ -4729,7 +4804,7 @@ export function AtendimentoClient() {
       modalToast.error(
         normalizeExperimentalGroupErrorMessage(
           error?.message,
-          slot.slot_type === "recorrente"
+          resolvedSlot.slot_type === "recorrente"
             ? "Falha ao remover aluno da turma recorrente."
             : "Falha ao remover registro da turma.",
         ),

@@ -134,7 +134,7 @@ export async function POST(req: Request) {
     const { data: lead, error: leadError } = await admin
       .from("atendimento_leads")
       .select(
-        "id, conversation_id, experimental_class_booking_id, experimental_class_group_class_id, experimental_class_group_status, experimental_class_professor_start_at, experimental_class_professor_date, experimental_class_professor_time, experimental_class_lead_start_at, experimental_class_lead_date, experimental_class_lead_time, experimental_class_professor_name, experimental_class_professor_phone, experimental_class_link",
+        "id, experimental_class_booking_id, experimental_class_group_class_id, experimental_class_group_status, experimental_class_professor_start_at, experimental_class_professor_date, experimental_class_professor_time, experimental_class_lead_start_at, experimental_class_lead_date, experimental_class_lead_time, experimental_class_professor_name, experimental_class_professor_phone, experimental_class_link",
       )
       .eq("id", parsed.data.lead_id)
       .maybeSingle();
@@ -306,9 +306,7 @@ export async function POST(req: Request) {
     await appendHistoryEvent({
       leadId: parsed.data.lead_id,
       conversationId:
-        String((primaryMember as any)?.conversation_id ?? "").trim() ||
-        String((lead as any)?.conversation_id ?? "").trim() ||
-        null,
+        String((primaryMember as any)?.conversation_id ?? "").trim() || null,
       eventType: "experimental_class_cancelled",
       title: "Aula experimental cancelada ao sair da turma em grupo",
       details: {
