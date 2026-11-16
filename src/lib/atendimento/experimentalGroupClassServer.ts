@@ -36,6 +36,19 @@ function isMissingRelationError(error: unknown): boolean {
   );
 }
 
+function isExperimentalGroupClassAttendanceColumnsUnavailable(error: unknown): boolean {
+  const code = String((error as any)?.code ?? "").trim();
+  const message = String((error as any)?.message ?? "");
+  return (
+    code === "42703" ||
+    code === "PGRST204" ||
+    /column .*(attendance_status|attendance_checked_at).* does not exist/i.test(message) ||
+    /could not find the '(attendance_status|attendance_checked_at)' column .*schema cache/i.test(
+      message,
+    )
+  );
+}
+
 type RecurringGroupAssignedLeadRecord = {
   id: string;
   full_name: string | null;
@@ -377,24 +390,34 @@ export async function listExperimentalGroupClasses(params: {
   const limitRaw = Number(params.limit ?? 0);
   const limit = Number.isFinite(limitRaw) && limitRaw > 0 ? Math.max(1, Math.floor(limitRaw)) : 0;
   try {
-    let query = params.admin
-      .from("atendimento_experimental_group_classes")
-      .select(
-        "id, professor_name, professor_phone, professor_timezone, professor_weekday, professor_date, professor_time, professor_start_at, capacity, status, confirmed_at, attendance_status, attendance_checked_at, lesson_link",
+    const buildQuery = (selectClause: string) => {
+      let query = params.admin
+        .from("atendimento_experimental_group_classes")
+        .select(selectClause);
+      if (fromIso) {
+        query = query.gte("professor_start_at", fromIso);
+      }
+      if (toIso) {
+        query = query.lte("professor_start_at", toIso);
+      }
+      if (limit > 0) {
+        query = query.limit(limit);
+      }
+      return query.order("professor_start_at", {
+        ascending: params.ascending ?? true,
+      });
+    };
+
+    let { data: classes, error: classesError } = await buildQuery(
+      "id, professor_name, professor_phone, professor_timezone, professor_weekday, professor_date, professor_time, professor_start_at, capacity, status, confirmed_at, attendance_status, attendance_checked_at, lesson_link",
+    );
+    if (classesError && isExperimentalGroupClassAttendanceColumnsUnavailable(classesError)) {
+      const fallback = await buildQuery(
+        "id, professor_name, professor_phone, professor_timezone, professor_weekday, professor_date, professor_time, professor_start_at, capacity, status, confirmed_at, lesson_link",
       );
-    if (fromIso) {
-      query = query.gte("professor_start_at", fromIso);
+      classes = fallback.data;
+      classesError = fallback.error;
     }
-    if (toIso) {
-      query = query.lte("professor_start_at", toIso);
-    }
-    if (limit > 0) {
-      query = query.limit(limit);
-    }
-    query = query.order("professor_start_at", {
-      ascending: params.ascending ?? true,
-    });
-    const { data: classes, error: classesError } = await query;
     if (classesError) {
       if (isMissingRelationError(classesError)) return [];
       throw classesError;

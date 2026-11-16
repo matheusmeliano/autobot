@@ -429,6 +429,21 @@ function isExperimentalClassBookingsNotificationSentColumnsUnavailable(error: un
   );
 }
 
+function isExperimentalGroupClassAttendanceColumnsUnavailable(error: unknown) {
+  const code = String((error as any)?.code ?? "").trim();
+  const message = String((error as any)?.message ?? "");
+  return (
+    code === "42703" ||
+    code === "PGRST204" ||
+    code === "PGRST205" ||
+    code === "42P01" ||
+    /column .*(attendance_status|attendance_checked_at).* does not exist/i.test(message) ||
+    /could not find the '(attendance_status|attendance_checked_at)' column of 'atendimento_experimental_group_classes' in the schema cache/i.test(
+      message,
+    )
+  );
+}
+
 async function countAtendimentoDailyExperimentalClassBookings(params: {
   rangeStartIso: string;
   rangeEndIso: string;
@@ -2065,7 +2080,7 @@ async function loadRecurringGroupExperimentalLatestClassesByPair(params: {
     const lookbackIso = new Date(
       params.now.getTime() - 120 * 24 * 60 * 60 * 1000,
     ).toISOString();
-    const { data: groupClasses, error: groupClassesError } = await params.admin
+    let { data: groupClasses, error: groupClassesError } = await params.admin
       .from("atendimento_experimental_group_classes")
       .select(
         "id, professor_phone, professor_weekday, professor_time, professor_start_at, status, attendance_status, attendance_checked_at",
@@ -2073,6 +2088,16 @@ async function loadRecurringGroupExperimentalLatestClassesByPair(params: {
       .gte("professor_start_at", lookbackIso)
       .order("professor_start_at", { ascending: false })
       .limit(400);
+    if (groupClassesError && isExperimentalGroupClassAttendanceColumnsUnavailable(groupClassesError)) {
+      const fallback = await params.admin
+        .from("atendimento_experimental_group_classes")
+        .select("id, professor_phone, professor_weekday, professor_time, professor_start_at, status")
+        .gte("professor_start_at", lookbackIso)
+        .order("professor_start_at", { ascending: false })
+        .limit(400);
+      groupClasses = (fallback.data as any[] | null) ?? null;
+      groupClassesError = fallback.error;
+    }
     if (groupClassesError || !Array.isArray(groupClasses)) {
       return latestByPair;
     }
