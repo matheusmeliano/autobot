@@ -2588,6 +2588,31 @@ export function AtendimentoClient() {
   ]);
 
   useEffect(() => {
+    if (!experimentalGroupTurmaOptions.length) {
+      if (experimentalGroupSelectedPairId) {
+        setExperimentalGroupSelectedPairId(null);
+        setExperimentalGroupSelectedDateId(null);
+        setExperimentalGroupSelectedSlotId(null);
+      }
+      return;
+    }
+
+    const selectedPairStillExists = experimentalGroupTurmaOptions.some(
+      (turma) => turma.pairId === experimentalGroupSelectedPairId,
+    );
+    if (selectedPairStillExists) return;
+
+    const fallbackTurma =
+      experimentalGroupTurmaOptions.find((turma) => turma.hasCurrentLeadAssigned) ??
+      experimentalGroupTurmaOptions[0] ??
+      null;
+    const fallbackPairId = String(fallbackTurma?.pairId ?? "").trim() || null;
+    setExperimentalGroupSelectedPairId(fallbackPairId);
+    setExperimentalGroupSelectedDateId(null);
+    setExperimentalGroupSelectedSlotId(null);
+  }, [experimentalGroupSelectedPairId, experimentalGroupTurmaOptions]);
+
+  useEffect(() => {
     if (!experimentalGroupSelectedPairId) return;
     const pairSlots = experimentalGroupVisibleSlots.filter(
       (slot) => String(slot.pair_id ?? "").trim() === experimentalGroupSelectedPairId,
