@@ -66,7 +66,22 @@ export async function GET(_req: Request, { params }: { params: Promise<{ leadId:
     const isStudentLead = isLeadRecurringStudent(lead as any);
     const hasPhone = isLeadPhoneEligibleForExperimentalGroup((lead as any)?.phone ?? null);
     const hasStateAndCity = leadHasStateAndCity(lead as any);
-    const slots = isStudentLead
+    const leadAssignedExperimentalGroupId =
+      String((lead as any)?.experimental_class_group_class_id ?? "").trim() || null;
+    const leadAssignedExperimentalStatus = String(
+      (lead as any)?.experimental_class_group_status ?? "",
+    )
+      .trim()
+      .toLowerCase();
+    const leadHasExperimentalAssignment =
+      !isStudentLead &&
+      Boolean(
+        leadAssignedExperimentalGroupId &&
+          leadAssignedExperimentalStatus &&
+          leadAssignedExperimentalStatus !== "removed",
+      );
+
+    const rawSlots = isStudentLead
       ? await buildRecurringGroupClassSlotsForLead({
           admin,
           lead: lead as Record<string, unknown>,
@@ -82,9 +97,34 @@ export async function GET(_req: Request, { params }: { params: Promise<{ leadId:
           lookAheadDays: 56,
           excludeLeadIdFromIndividualBookings: true,
         });
+    const slots =
+      leadHasExperimentalAssignment && leadAssignedExperimentalGroupId
+        ? rawSlots.map((slot) => {
+            const slotGroupClassId = String(slot.group_class_id ?? "").trim() || null;
+            if (slot.slot_type !== "experimental") return slot;
+            if (slotGroupClassId !== leadAssignedExperimentalGroupId) return slot;
+            const capacity = Math.max(1, Number(slot.capacity ?? 1));
+            const occupiedSeats = Math.max(1, Number(slot.occupied_seats ?? 0));
+            return {
+              ...slot,
+              occupied_seats: occupiedSeats,
+              available_seats: Math.max(capacity - occupiedSeats, 0),
+              is_current_lead_assigned: true,
+              is_full: false,
+              status: slot.status === "draft" ? leadAssignedExperimentalStatus : slot.status,
+            };
+          })
+        : rawSlots;
 
     const currentAssignedSlot =
-      slots.find((slot) => slot.is_current_lead_assigned) ?? null;
+      slots.find((slot) => slot.is_current_lead_assigned) ??
+      (leadHasExperimentalAssignment && leadAssignedExperimentalGroupId
+        ? slots.find(
+            (slot) =>
+              slot.slot_type === "experimental" &&
+              String(slot.group_class_id ?? "").trim() === leadAssignedExperimentalGroupId,
+          ) ?? null
+        : null);
 
     const reasons: string[] = [];
     if (!settings.enabled) reasons.push("feature_disabled");
