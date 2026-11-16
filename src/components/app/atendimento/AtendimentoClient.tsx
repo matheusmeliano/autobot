@@ -2251,6 +2251,8 @@ export function AtendimentoClient() {
       turmaNumber: number;
       professorName: string | null;
       professorPhone: string | null;
+      previewDate: string | null;
+      previewTime: string | null;
       occupiedSeats: number;
       capacity: number;
       availableSeats: number;
@@ -2264,6 +2266,9 @@ export function AtendimentoClient() {
         pairId: string;
         professorName: string | null;
         professorPhone: string | null;
+          previewDate: string | null;
+          previewTime: string | null;
+          previewStartAt: string | null;
         occupiedSeats: number;
         capacity: number;
         availableSeats: number;
@@ -2279,6 +2284,15 @@ export function AtendimentoClient() {
         pairId,
         professorName: slot.professor_name ?? null,
         professorPhone: slot.professor_phone ?? null,
+          previewDate:
+            String(slot.lead_date ?? "").trim() ||
+            String(slot.professor_date ?? "").trim() ||
+            null,
+          previewTime:
+            String(slot.lead_time ?? "").trim() ||
+            String(slot.professor_time ?? "").trim() ||
+            null,
+          previewStartAt: String(slot.professor_start_at ?? "").trim() || null,
         occupiedSeats: slot.occupied_seats,
         capacity: slot.capacity,
         availableSeats: slot.available_seats,
@@ -2293,6 +2307,22 @@ export function AtendimentoClient() {
         current.availableSeats,
         Number(slot.available_seats ?? 0),
       );
+      const candidateStartAt = String(slot.professor_start_at ?? "").trim() || null;
+      const shouldReplacePreview =
+        Boolean(slot.is_current_lead_assigned) ||
+        !current.previewStartAt ||
+        Boolean(candidateStartAt && candidateStartAt < current.previewStartAt);
+      if (shouldReplacePreview) {
+        current.previewDate =
+          String(slot.lead_date ?? "").trim() ||
+          String(slot.professor_date ?? "").trim() ||
+          null;
+        current.previewTime =
+          String(slot.lead_time ?? "").trim() ||
+          String(slot.professor_time ?? "").trim() ||
+          null;
+        current.previewStartAt = candidateStartAt;
+      }
       current.hasCurrentLeadAssigned =
         current.hasCurrentLeadAssigned || Boolean(slot.is_current_lead_assigned);
       current.slotCount += 1;
@@ -2317,6 +2347,8 @@ export function AtendimentoClient() {
         turmaNumber: index + 1,
         professorName: entry.professorName,
         professorPhone: entry.professorPhone,
+        previewDate: entry.previewDate,
+        previewTime: entry.previewTime,
         occupiedSeats: entry.occupiedSeats,
         capacity: entry.capacity,
         availableSeats: entry.availableSeats,
@@ -11357,6 +11389,16 @@ export function AtendimentoClient() {
                       <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                         {experimentalGroupTurmaOptions.map((turma) => {
                           const isSelected = experimentalGroupSelectedPairId === turma.pairId;
+                          const previewDate = String(turma.previewDate ?? "").trim();
+                          const previewTime = String(turma.previewTime ?? "").trim();
+                          const scheduleSummary =
+                            previewDate && previewTime
+                              ? `Aula em: ${formatAtendimentoDate(previewDate)}, ${previewTime}h`
+                              : previewDate
+                                ? `Aula em: ${formatAtendimentoDate(previewDate)}`
+                                : previewTime
+                                  ? `Horário: ${previewTime}h`
+                                  : "Dia e horário definidos na turma";
                           return (
                             <button
                               key={turma.pairId}
@@ -11391,6 +11433,14 @@ export function AtendimentoClient() {
                                   >
                                     {turma.professorName || "Professor definido na turma"}
                                   </div>
+                                  <div
+                                    className={
+                                      "mt-2 text-[12px] font-medium " +
+                                      (isSelected ? "!text-white/90" : "text-[var(--app-text-60)]")
+                                    }
+                                  >
+                                    {scheduleSummary}
+                                  </div>
                                 </div>
                                 {turma.hasCurrentLeadAssigned ? (
                                   <div className="inline-flex shrink-0 items-center gap-1 rounded-full border border-white/20 bg-white/15 px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.12em] !text-white">
@@ -11414,148 +11464,7 @@ export function AtendimentoClient() {
                     </div>
 
                     {experimentalGroupSelectedPairId ? (
-                      <>
-                        <div className="space-y-2">
-                          <label className="text-xs font-semibold text-[var(--app-text-70)]">
-                            Professor da turma
-                          </label>
-                          <div
-                            className="inline-flex min-h-[44px] w-full items-center justify-between gap-3 rounded-2xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] px-4 text-left text-[13px] font-semibold text-[var(--app-text-85)]"
-                            title={
-                              experimentalGroupDisplayProfessor?.name
-                                ? `Professor vinculado: ${experimentalGroupDisplayProfessor.name}`
-                                : "O professor será definido pela turma selecionada."
-                            }
-                          >
-                            <span className="flex min-w-0 items-center gap-2">
-                              <CheckCircle2 className="h-4 w-4 shrink-0 text-[var(--app-text-65)]" />
-                              <span className="min-w-0 truncate">
-                                {experimentalGroupDisplayProfessor?.name || "Professor definido pela turma"}
-                              </span>
-                            </span>
-                          </div>
-                          <div className="text-[12px] text-[var(--app-text-55)]">
-                            {experimentalGroupDisplayProfessor?.name
-                              ? `${experimentalGroupDisplayProfessor.name} (${experimentalGroupDisplayProfessor.phone})`
-                              : "As informações do professor seguem o que foi configurado na turma selecionada."}
-                          </div>
-                        </div>
-
-                        <div className="space-y-2">
-                          <div className="flex items-center gap-3">
-                            <label className="text-xs font-semibold text-[var(--app-text-70)]">
-                              Dias disponíveis
-                              <span className="ml-2 font-normal text-[var(--app-text-45)]">
-                                ({experimentalGroupDateOptions.length})
-                              </span>
-                            </label>
-                          </div>
-
-                          <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 md:grid-cols-5">
-                            {experimentalGroupDateOptions.map((dateOption) => {
-                              const isSelected = experimentalGroupSelectedDateId === dateOption.id;
-                              return (
-                                <button
-                                  key={dateOption.id}
-                                  type="button"
-                                  onClick={() => {
-                                    const firstSlotForDate =
-                                      experimentalGroupSlotsForSelectedTurma.find((slot) => {
-                                        const slotDateId =
-                                          String(slot.lead_date ?? "").trim() ||
-                                          String(slot.professor_date ?? "").trim();
-                                        return slotDateId === dateOption.id;
-                                      }) ?? null;
-                                    setExperimentalGroupSelectedDateId(dateOption.id);
-                                    setExperimentalGroupSelectedSlotId(
-                                      firstSlotForDate ? String(firstSlotForDate.id) : null,
-                                    );
-                                  }}
-                                  className={
-                                    "flex min-h-[76px] flex-col items-center justify-center gap-1 rounded-2xl border px-2 py-2 text-center transition duration-150 " +
-                                    (isSelected
-                                      ? "!border-transparent !bg-[#ea580c] !text-white shadow-md"
-                                      : "border-[var(--app-border)] bg-[var(--app-solid-surface)] text-[var(--app-text-85)] hover:border-[#ea580c]/35 hover:bg-[var(--app-hover)] hover:text-[var(--app-text-90)]")
-                                  }
-                                >
-                                  <div
-                                    className={
-                                      "text-[11px] uppercase tracking-wide font-semibold " +
-                                      (isSelected ? "!text-white/95" : "text-[var(--app-text-50)]")
-                                    }
-                                  >
-                                    {dateOption.weekdayShort}
-                                  </div>
-                                  <div
-                                    className={
-                                      "text-[20px] font-semibold leading-none " +
-                                      (isSelected ? "!text-white" : "text-[var(--app-text-92)]")
-                                    }
-                                  >
-                                    {dateOption.dayLabel}
-                                  </div>
-                                  <div
-                                    className={
-                                      "text-[10px] font-semibold " +
-                                      (isSelected ? "!text-white/90" : "text-[var(--app-text-55)]")
-                                    }
-                                  >
-                                    {dateOption.slotCount}{" "}
-                                    {dateOption.slotCount === 1 ? "horário" : "horários"}
-                                  </div>
-                                </button>
-                              );
-                            })}
-                          </div>
-                        </div>
-
-                        <div className="space-y-2">
-                          <label className="text-xs font-semibold text-[var(--app-text-70)]">
-                            Horários disponíveis
-                            {experimentalGroupSelectedDateId ? (
-                              <span className="ml-2 font-normal text-[var(--app-text-45)]">
-                                (dia selecionado)
-                              </span>
-                            ) : (
-                              <span className="ml-2 font-normal text-[var(--app-text-45)]">
-                                (selecione um dia primeiro)
-                              </span>
-                            )}
-                          </label>
-
-                          {!experimentalGroupSelectedDateId ? (
-                            <div className="rounded-2xl border border-dashed border-[var(--app-border)] bg-[var(--app-solid-surface-2)] px-4 py-4 text-center text-[13px] text-[var(--app-text-55)]">
-                              Clique em um dia acima para ver os horários disponíveis.
-                            </div>
-                          ) : !experimentalGroupSelectedDateSlots.length ? (
-                            <div className="rounded-2xl border border-dashed border-[var(--app-border)] bg-[var(--app-solid-surface-2)] px-4 py-4 text-center text-[13px] text-[var(--app-text-55)]">
-                              Não há horários livres para este dia. Selecione outro dia disponível.
-                            </div>
-                          ) : (
-                            <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 md:grid-cols-5">
-                              {experimentalGroupSelectedDateSlots.map((slot) => {
-                                const isSelected = selectedExperimentalGroupSlot?.id === slot.id;
-                                return (
-                                  <button
-                                    key={slot.id}
-                                    type="button"
-                                    onClick={() => setExperimentalGroupSelectedSlotId(slot.id)}
-                                    className={
-                                      "flex h-12 items-center justify-center rounded-2xl border px-2 text-[15px] font-semibold transition duration-150 " +
-                                      (isSelected
-                                        ? "!border-transparent !bg-[#ea580c] !text-white shadow-md"
-                                        : "border-[var(--app-border)] bg-[var(--app-solid-surface)] text-[var(--app-text-85)] hover:border-[#ea580c]/35 hover:bg-[var(--app-hover)] hover:text-[var(--app-text-90)]")
-                                    }
-                                  >
-                                    {slot.lead_time || slot.professor_time || "Horário"}
-                                  </button>
-                                );
-                              })}
-                            </div>
-                          )}
-                        </div>
-
-                      </>
+                      null
                     ) : (
                       <div className="rounded-2xl border border-dashed border-[var(--app-border)] bg-[var(--app-solid-surface-2)] px-4 py-5 text-center text-[13px] text-[var(--app-text-55)]">
                         Selecione uma turma disponível primeiro.
