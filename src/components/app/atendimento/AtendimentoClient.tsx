@@ -11110,9 +11110,6 @@ export function AtendimentoClient() {
                               Salvar
                             </button>
                           </div>
-                          <div className="text-[12px] text-[var(--app-text-55)]">
-                            Esse link vale para todos os registros experimentais vinculados a esta turma.
-                          </div>
                           {canConfirmExperimentalGroupFromSettings ? (
                             <div className="flex justify-end">
                               <button
