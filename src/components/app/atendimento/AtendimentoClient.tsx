@@ -57,6 +57,7 @@ type ExperimentalGroupPairUsagePayload = Record<
   {
     assigned_count?: number;
     has_assigned_members?: boolean;
+    has_experimental_members?: boolean;
     members?: Array<{
       id: string;
       lead_id: string;
@@ -2332,6 +2333,7 @@ export function AtendimentoClient() {
       recurringIndex: number;
       assignedCount: number;
       hasAssignedMembers: boolean;
+      hasExperimentalMembers: boolean;
       members: Array<{
         id: string;
         lead_id: string;
@@ -2403,6 +2405,9 @@ export function AtendimentoClient() {
         ),
         hasAssignedMembers: Boolean(
           experimentalGroupPairUsage[pair.pairId]?.has_assigned_members,
+        ),
+        hasExperimentalMembers: Boolean(
+          experimentalGroupPairUsage[pair.pairId]?.has_experimental_members,
         ),
         members: Array.isArray(experimentalGroupPairUsage[pair.pairId]?.members)
           ? (experimentalGroupPairUsage[pair.pairId]?.members as Array<{
@@ -4816,9 +4821,8 @@ export function AtendimentoClient() {
         ]);
         setExperimentalGroupSelectedPairId(String(slot.pair_id ?? "").trim() || null);
         setIsExperimentalGroupModalOpen(false);
-        setExperimentalGroupSettingsOpen(true);
         modalToast.success(
-          "Registro vinculado à turma. Agora adicione o link e confirme a turma no modal Aulas em Grupo.",
+          "Registro vinculado à turma com sucesso. Não esqueça de adicionar o link da aula na turma experimental.",
         );
         return;
       }
@@ -11030,7 +11034,7 @@ export function AtendimentoClient() {
                         )}
                       </div>
 
-                      {pair.hasAssignedMembers &&
+                      {pair.hasExperimentalMembers &&
                       latestExperimentalClass?.group_class_id &&
                       card.slotType === "experimental" ? (
                         <div className="space-y-2">
