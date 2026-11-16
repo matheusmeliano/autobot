@@ -17,9 +17,17 @@ function isMissingExperimentalGroupRelation(error: unknown): boolean {
   return (
     code === "42P01" ||
     code === "PGRST205" ||
+    code === "42703" ||
+    code === "PGRST204" ||
     /relation .*atendimento_experimental_group_(classes|class_members).*does not exist/i.test(
       message,
     ) ||
+    /(recurring_class_(group_pair_id|group_status|weekday|weekday_label|professor_name|professor_phone|professor_time|lead_time|professor_timezone|lead_timezone|first_class_at|student_start_notification_sent_at|attendant_start_notification_sent_at))/i.test(
+      message,
+    ) &&
+      /(column .* does not exist|could not find the '.*' column .* in the schema cache|schema cache)/i.test(
+        message,
+      ) ||
     /could not find the table .*atendimento_experimental_group_(classes|class_members).* in the schema cache/i.test(
       message,
     )
@@ -53,7 +61,7 @@ export async function POST(req: Request) {
     const nowIso = new Date().toISOString();
 
     if (parsed.data.slot_type === "recorrente" || (!parsed.data.group_class_id && parsed.data.pair_id)) {
-      await admin
+      const { error: clearRecurringGroupError } = await admin
         .from("atendimento_leads")
         .update({
           recurring_class_group_pair_id: null,
@@ -72,6 +80,12 @@ export async function POST(req: Request) {
           updated_at: nowIso,
         })
         .eq("id", parsed.data.lead_id);
+      if (clearRecurringGroupError) {
+        if (isMissingExperimentalGroupRelation(clearRecurringGroupError)) {
+          return groupSchemaUnavailableResponse();
+        }
+        return Response.json({ ok: false, error: clearRecurringGroupError.message }, { status: 500 });
+      }
 
       await appendHistoryEvent({
         leadId: parsed.data.lead_id,

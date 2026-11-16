@@ -529,10 +529,10 @@ function leadHasNameForExperimentalGroup(
 function normalizeExperimentalGroupErrorMessage(value: unknown, fallback: string): string {
   const message = String(value ?? "").trim();
   if (
-    /(atendimento_experimental_group_classes|atendimento_experimental_group_class_members)/i.test(
+    /(atendimento_experimental_group_classes|atendimento_experimental_group_class_members|recurring_class_(group_pair_id|group_status|weekday|weekday_label|professor_name|professor_phone|professor_time|lead_time|professor_timezone|lead_timezone|first_class_at|student_start_notification_sent_at|attendant_start_notification_sent_at))/i.test(
       message,
     ) &&
-    /(schema cache|could not find the table|relation .* does not exist|PGRST205|42P01)/i.test(
+    /(schema cache|could not find the table|could not find the '.*' column|relation .* does not exist|column .* does not exist|PGRST205|42P01|PGRST204|42703)/i.test(
       message,
     )
   ) {

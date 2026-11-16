@@ -68,9 +68,17 @@ function isMissingExperimentalGroupRelation(error: unknown): boolean {
   return (
     code === "42P01" ||
     code === "PGRST205" ||
+    code === "42703" ||
+    code === "PGRST204" ||
     /relation .*atendimento_experimental_group_(classes|class_members).*does not exist/i.test(
       message,
     ) ||
+    /(recurring_class_(group_pair_id|group_status|weekday|weekday_label|professor_name|professor_phone|professor_time|lead_time|professor_timezone|lead_timezone|first_class_at|student_start_notification_sent_at|attendant_start_notification_sent_at))/i.test(
+      message,
+    ) &&
+      /(column .* does not exist|could not find the '.*' column .* in the schema cache|schema cache)/i.test(
+        message,
+      ) ||
     /could not find the table .*atendimento_experimental_group_(classes|class_members).* in the schema cache/i.test(
       message,
     )
