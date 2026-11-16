@@ -362,6 +362,17 @@ function experimentalLessonLinkForLead(lead: AtendimentoLeadListItem | null | un
   return String((lead as any)?.experimental_class_link ?? "").trim();
 }
 
+function experimentalGroupScheduleReadyForLead(
+  lead: AtendimentoLeadListItem | null | undefined,
+): boolean {
+  if (!lead || !isLeadAssignedToExperimentalGroup(lead)) return false;
+  const professorDate = String((lead as any)?.experimental_class_professor_date ?? "").slice(0, 10).trim();
+  const professorTime = String((lead as any)?.experimental_class_professor_time ?? "").trim();
+  const leadDate = String((lead as any)?.experimental_class_lead_date ?? "").trim();
+  const leadTime = String((lead as any)?.experimental_class_lead_time ?? "").trim();
+  return Boolean((professorDate && professorTime) || (leadDate && leadTime));
+}
+
 function experimentalBookingIdForLead(lead: AtendimentoLeadListItem | null | undefined): string {
   if (!lead) return "";
   const idFromLead = String((lead as any)?.experimental_class_booking_id ?? "").trim();
@@ -413,8 +424,9 @@ function buildInitials(name: string | null | undefined): string {
  * Regras — precedência de cima para baixo (a primeira que bater ganha):
  *   1) AZUL   #2563eb  = MATRÍCULA EM PROCESSO: tem recurring_registration_step > 0
  *                        E NÃO está com matrícula concluída/aluno efetivo.
- *   2) VERDE  #16a34a  = professor atribuído + link da aula definido + NÃO matriculado
- *                        (SÓ vence se a matrícula NÃO estiver em processo).
+ *   2) VERDE  #16a34a  = professor atribuído + link da aula definido
+ *                        OU turma experimental já atribuída com dia/horário herdados
+ *                        + NÃO matriculado (SÓ vence se a matrícula NÃO estiver em processo).
  *   3) AMARELO #eab308 = Card Status "Dados básicos coletados / Nenhum passo pendente
  *                        nessa etapa" (step null e NÃO matriculado).
  *   4) LARANJA #ea580c = padrão (fallback; qualquer outro cenário).
@@ -473,6 +485,8 @@ function getAvatarColorClassesForLead(
   const temLink = Boolean(link);
   const professorELinkOk =
     temProfessor && temLink && !matriculaConcluida && !recurringTrulyStarted;
+  const turmaExperimentalAgendadaOk =
+    experimentalGroupScheduleReadyForLead(lead) && !matriculaConcluida && !recurringTrulyStarted;
 
   // REGRA 1: AZUL (MATRÍCULA EM PROCESSO OU JÁ CONCLUÍDA / ALUNO RECORRENTE).
   // VENCE DE TODAS as outras cores. Se passou pelo cadastro inicial OU já está
@@ -485,8 +499,8 @@ function getAvatarColorClassesForLead(
     return `${sizeBase} !bg-[#2563eb] !text-white transition-none hover:!bg-[#2563eb]`;
   }
 
-  // REGRA 2: VERDE (prof + link + NÃO em recorrente NÃO matriculado)
-  if (professorELinkOk) {
+  // REGRA 2: VERDE (prof + link OU turma experimental já atribuída com horário herdado)
+  if (professorELinkOk || turmaExperimentalAgendadaOk) {
     if (isSelected || size === "big") {
       return `${sizeBase} !bg-[#16a34a] !text-white ring-[3px] ring-[#15803d] shadow-[0_2px_6px_rgba(22,163,74,0.42)] transition-none hover:!bg-[#16a34a] hover:!ring-[#15803d]`;
     }
@@ -6088,7 +6102,7 @@ export function AtendimentoClient() {
         cor: "bg-[#16a34a]",
         titulo: "Verde",
         descricao:
-          "Sistema pronto para fazer o disparo agendado ou manual do link da aula e, após a aula, enviar o link da matrícula.",
+          "Registro com aula pronta para acontecer: professor e link definidos ou turma experimental já atribuída com dia e horário herdados.",
         ring: "ring-[3px] ring-[#15803d]",
       },
       {
