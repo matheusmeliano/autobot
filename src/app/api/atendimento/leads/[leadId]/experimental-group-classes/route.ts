@@ -79,7 +79,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ leadId:
           lead: lead as Record<string, unknown>,
           settings,
           now: new Date(),
-          lookAheadDays: 42,
+          lookAheadDays: 56,
           excludeLeadIdFromIndividualBookings: true,
         });
 

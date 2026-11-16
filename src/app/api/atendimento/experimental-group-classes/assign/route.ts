@@ -350,7 +350,7 @@ export async function POST(req: Request) {
           lead: lead as Record<string, unknown>,
           settings,
           now: new Date(),
-          lookAheadDays: 42,
+          lookAheadDays: 56,
           excludeLeadIdFromIndividualBookings: true,
         });
 

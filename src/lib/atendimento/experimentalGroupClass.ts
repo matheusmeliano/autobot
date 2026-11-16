@@ -454,6 +454,26 @@ function professorStartAtConflictsWithRecurring(params: {
   });
 }
 
+function linkedRecurringSlotReservesSameSchedule(params: {
+  settings: ExperimentalGroupClassSettings;
+  configuredSlot: ExperimentalGroupConfiguredSlot;
+}): boolean {
+  const pairId = String(params.configuredSlot.pair_id ?? "").trim();
+  if (!pairId || !params.configuredSlot.weekday || !params.configuredSlot.professor_time) {
+    return false;
+  }
+  return params.settings.slots.some((slot) => {
+    if (!slot.enabled || slot.slot_type !== "recorrente") return false;
+    if (String(slot.pair_id ?? "").trim() !== pairId) return false;
+    return (
+      String(slot.weekday ?? "").trim().toLowerCase() ===
+        String(params.configuredSlot.weekday ?? "").trim().toLowerCase() &&
+      String(slot.professor_time ?? "").trim() ===
+        String(params.configuredSlot.professor_time ?? "").trim()
+    );
+  });
+}
+
 export function buildExperimentalGroupClassConfirmationMessage(params: {
   leadName?: string | null;
   professorName?: string | null;
@@ -588,10 +608,15 @@ export function listExperimentalGroupClassSlots(params: {
         continue;
       }
 
-      const blockedByRecurring = professorStartAtConflictsWithRecurring({
-        professorStartAt,
-        occupiedIntervals: params.occupiedIntervals ?? [],
-      });
+      const blockedByRecurring =
+        !linkedRecurringSlotReservesSameSchedule({
+          settings,
+          configuredSlot,
+        }) &&
+        professorStartAtConflictsWithRecurring({
+          professorStartAt,
+          occupiedIntervals: params.occupiedIntervals ?? [],
+        });
       const blockedByIndividual =
         individualStarts.has(professorStartAt) && !existingClass;
       const slotProfessorName =
