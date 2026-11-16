@@ -1,5 +1,6 @@
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { requireAtendimentoUser } from "@/lib/atendimento/server";
+import { normalizePhoneDigits } from "@/lib/phone";
 import {
   experimentalGroupWeekdayLabel,
   resolveExperimentalGroupPairIdForClass,
@@ -77,13 +78,60 @@ export async function GET(_req: Request, { params }: { params: Promise<{ leadId:
     )
       .trim()
       .toLowerCase();
+    const leadAssignedProfessorStartAt =
+      String((lead as any)?.experimental_class_professor_start_at ?? "").trim() || null;
+    const leadAssignedProfessorDate =
+      String((lead as any)?.experimental_class_professor_date ?? "").trim() || null;
+    const leadAssignedProfessorTime =
+      String((lead as any)?.experimental_class_professor_time ?? "").trim() || null;
+    const leadAssignedProfessorPhoneDigits = normalizePhoneDigits(
+      (lead as any)?.experimental_class_professor_phone ?? null,
+    );
     const leadHasExperimentalAssignment =
       !isStudentLead &&
       Boolean(
-        leadAssignedExperimentalGroupId &&
-          leadAssignedExperimentalStatus &&
-          leadAssignedExperimentalStatus !== "removed",
+        leadAssignedExperimentalStatus &&
+          leadAssignedExperimentalStatus !== "removed" &&
+          (leadAssignedExperimentalGroupId ||
+            leadAssignedProfessorStartAt ||
+            (leadAssignedProfessorDate && leadAssignedProfessorTime)),
       );
+    const matchesLeadExperimentalAssignment = (slot: {
+      slot_type: string;
+      group_class_id: string | null;
+      professor_start_at: string;
+      professor_date: string;
+      professor_time: string;
+      professor_phone: string | null;
+    }) => {
+      if (slot.slot_type !== "experimental") return false;
+      const slotGroupClassId = String(slot.group_class_id ?? "").trim() || null;
+      if (leadAssignedExperimentalGroupId && slotGroupClassId === leadAssignedExperimentalGroupId) {
+        return true;
+      }
+      const slotProfessorStartAt = String(slot.professor_start_at ?? "").trim() || null;
+      if (leadAssignedProfessorStartAt && slotProfessorStartAt === leadAssignedProfessorStartAt) {
+        return true;
+      }
+      const slotProfessorDate = String(slot.professor_date ?? "").trim() || null;
+      const slotProfessorTime = String(slot.professor_time ?? "").trim() || null;
+      if (
+        leadAssignedProfessorDate &&
+        leadAssignedProfessorTime &&
+        slotProfessorDate === leadAssignedProfessorDate &&
+        slotProfessorTime === leadAssignedProfessorTime
+      ) {
+        const slotProfessorPhoneDigits = normalizePhoneDigits(slot.professor_phone);
+        if (
+          !leadAssignedProfessorPhoneDigits ||
+          !slotProfessorPhoneDigits ||
+          slotProfessorPhoneDigits === leadAssignedProfessorPhoneDigits
+        ) {
+          return true;
+        }
+      }
+      return false;
+    };
 
     const rawSlots = isStudentLead
       ? await buildRecurringGroupClassSlotsForLead({
@@ -102,11 +150,9 @@ export async function GET(_req: Request, { params }: { params: Promise<{ leadId:
           excludeLeadIdFromIndividualBookings: true,
         });
     let slots =
-      leadHasExperimentalAssignment && leadAssignedExperimentalGroupId
+      leadHasExperimentalAssignment
         ? rawSlots.map((slot) => {
-            const slotGroupClassId = String(slot.group_class_id ?? "").trim() || null;
-            if (slot.slot_type !== "experimental") return slot;
-            if (slotGroupClassId !== leadAssignedExperimentalGroupId) return slot;
+            if (!matchesLeadExperimentalAssignment(slot)) return slot;
             const capacity = Math.max(1, Number(slot.capacity ?? 1));
             const occupiedSeats = Math.max(1, Number(slot.occupied_seats ?? 0));
             return {
@@ -122,12 +168,8 @@ export async function GET(_req: Request, { params }: { params: Promise<{ leadId:
 
     let currentAssignedSlot =
       slots.find((slot) => slot.is_current_lead_assigned) ??
-      (leadHasExperimentalAssignment && leadAssignedExperimentalGroupId
-        ? slots.find(
-            (slot) =>
-              slot.slot_type === "experimental" &&
-              String(slot.group_class_id ?? "").trim() === leadAssignedExperimentalGroupId,
-          ) ?? null
+      (leadHasExperimentalAssignment
+        ? slots.find((slot) => matchesLeadExperimentalAssignment(slot)) ?? null
         : null);
 
     if (!currentAssignedSlot && leadHasExperimentalAssignment && leadAssignedExperimentalGroupId) {
