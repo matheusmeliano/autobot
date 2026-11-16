@@ -584,6 +584,31 @@ export function listExperimentalGroupClassSlots(params: {
   );
 
   const leadId = String((params.lead as any)?.id ?? "").trim();
+  const leadAssignedGroupClassId =
+    String((params.lead as any)?.experimental_class_group_class_id ?? "").trim() || null;
+  const leadAssignedGroupStatus = String(
+    (params.lead as any)?.experimental_class_group_status ?? "",
+  )
+    .trim()
+    .toLowerCase();
+  const leadAssignedProfessorStartAt =
+    String((params.lead as any)?.experimental_class_professor_start_at ?? "").trim() || null;
+  const leadAssignedProfessorDate =
+    String((params.lead as any)?.experimental_class_professor_date ?? "").trim() || null;
+  const leadAssignedProfessorTime =
+    String((params.lead as any)?.experimental_class_professor_time ?? "").trim() || null;
+  const leadAssignedProfessorPhoneDigits = normalizePhoneDigits(
+    (params.lead as any)?.experimental_class_professor_phone ?? null,
+  );
+  const leadHasAssignedExperimentalClass =
+    Boolean(
+      leadId &&
+        leadAssignedGroupStatus &&
+        leadAssignedGroupStatus !== "removed" &&
+        (leadAssignedGroupClassId ||
+          leadAssignedProfessorStartAt ||
+          (leadAssignedProfessorDate && leadAssignedProfessorTime)),
+    );
   const seenDates = new Set<string>();
   const slots: ExperimentalGroupSlotSummary[] = [];
 
@@ -620,11 +645,37 @@ export function listExperimentalGroupClassSlots(params: {
       const pairId = String(configuredSlot.pair_id ?? "").trim();
       const pairUsageEntry = pairId ? params.pairUsage?.[pairId] ?? null : null;
       const pairRecurringLeadIds = new Set(pairUsageEntry?.recurring_lead_ids ?? []);
-      const pairAnyLeadIds = new Set([
-        ...(pairUsageEntry?.experimental_lead_ids ?? []),
-        ...(pairUsageEntry?.recurring_lead_ids ?? []),
-      ]);
-      const isCurrentLeadAssigned = pairAnyLeadIds.has(leadId);
+      const matchesCurrentLeadAssignment = (() => {
+        if (!leadHasAssignedExperimentalClass) return false;
+        const existingClassId = String(existingClass?.id ?? "").trim() || null;
+        if (leadAssignedGroupClassId && existingClassId === leadAssignedGroupClassId) {
+          return true;
+        }
+        if (leadAssignedProfessorStartAt && professorStartAt === leadAssignedProfessorStartAt) {
+          return true;
+        }
+        if (
+          leadAssignedProfessorDate &&
+          leadAssignedProfessorTime &&
+          professorDate === leadAssignedProfessorDate &&
+          configuredSlot.professor_time === leadAssignedProfessorTime
+        ) {
+          const slotProfessorDigits = normalizePhoneDigits(
+            existingClass?.professor_phone ?? configuredSlot.professor_phone ?? null,
+          );
+          if (
+            !leadAssignedProfessorPhoneDigits ||
+            !slotProfessorDigits ||
+            slotProfessorDigits === leadAssignedProfessorPhoneDigits
+          ) {
+            return true;
+          }
+        }
+        return false;
+      })();
+      const isCurrentLeadAssigned =
+        matchesCurrentLeadAssignment ||
+        activeMembers.some((member) => String(member.lead_id ?? "").trim() === leadId);
       const occupiedSeats = Math.max(
         activeMembers.length,
         Number(pairUsageEntry?.assigned_count ?? activeMembers.length),

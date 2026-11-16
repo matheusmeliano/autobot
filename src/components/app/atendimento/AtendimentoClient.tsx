@@ -2322,10 +2322,13 @@ export function AtendimentoClient() {
         Number(slot.available_seats ?? 0),
       );
       const candidateStartAt = String(slot.professor_start_at ?? "").trim() || null;
-      const shouldReplacePreview =
-        Boolean(slot.is_current_lead_assigned) ||
-        !current.previewStartAt ||
-        Boolean(candidateStartAt && candidateStartAt < current.previewStartAt);
+      const shouldReplacePreview = Boolean(slot.is_current_lead_assigned)
+        ? !current.hasCurrentLeadAssigned ||
+          !current.previewStartAt ||
+          Boolean(candidateStartAt && candidateStartAt < current.previewStartAt)
+        : !current.hasCurrentLeadAssigned &&
+          (!current.previewStartAt ||
+            Boolean(candidateStartAt && candidateStartAt < current.previewStartAt));
       if (shouldReplacePreview) {
         current.previewDate =
           String(slot.lead_date ?? "").trim() ||
@@ -4604,6 +4607,47 @@ export function AtendimentoClient() {
     }
   }
 
+  function serializeExperimentalGroupFormSlots(slots: ExperimentalGroupFormSlot[]): string {
+    return JSON.stringify(
+      slots.map((slot) => ({
+        enabled: Boolean(slot.enabled),
+        weekday: String(slot.weekday ?? "").trim(),
+        professor_time: String(slot.professor_time ?? "").trim(),
+        professor_name: String(slot.professorName ?? "").trim(),
+        professor_phone: String(slot.professorPhone ?? "").trim(),
+        slot_type: slot.slotType,
+        pair_id: String(slot.pairId ?? "").trim(),
+      })),
+    );
+  }
+
+  function hasPendingExperimentalGroupSettingsChanges(
+    slots: ExperimentalGroupFormSlot[] = experimentalGroupFormSlots,
+  ): boolean {
+    return (
+      serializeExperimentalGroupFormSlots(slots) !==
+      experimentalGroupSettingsLastSavedSnapshotRef.current
+    );
+  }
+
+  async function handleRequestCloseExperimentalGroupSettings() {
+    if (typeof experimentalGroupSettingsAutosaveTimeoutRef.current === "number") {
+      window.clearTimeout(experimentalGroupSettingsAutosaveTimeoutRef.current);
+      experimentalGroupSettingsAutosaveTimeoutRef.current = null;
+    }
+    if (
+      !experimentalGroupSettingsSaving &&
+      hasPendingExperimentalGroupSettingsChanges(experimentalGroupFormSlots)
+    ) {
+      const saved = await handleSaveExperimentalGroupSettings({
+        silent: false,
+        slots: experimentalGroupFormSlots,
+      });
+      if (!saved) return;
+    }
+    setExperimentalGroupSettingsOpen(false);
+  }
+
   useEffect(() => {
     return () => {
       const timers = experimentalGroupLessonLinkAutosaveTimeoutsRef.current;
@@ -4621,17 +4665,7 @@ export function AtendimentoClient() {
 
   useEffect(() => {
     if (!experimentalGroupSettingsOpen || experimentalGroupSettingsLoading) return;
-    const currentSnapshot = JSON.stringify(
-      experimentalGroupFormSlots.map((slot) => ({
-        enabled: Boolean(slot.enabled),
-        weekday: String(slot.weekday ?? "").trim(),
-        professor_time: String(slot.professor_time ?? "").trim(),
-        professor_name: String(slot.professorName ?? "").trim(),
-        professor_phone: String(slot.professorPhone ?? "").trim(),
-        slot_type: slot.slotType,
-        pair_id: String(slot.pairId ?? "").trim(),
-      })),
-    );
+    const currentSnapshot = serializeExperimentalGroupFormSlots(experimentalGroupFormSlots);
     if (currentSnapshot === experimentalGroupSettingsLastSavedSnapshotRef.current) {
       return;
     }
@@ -4709,8 +4743,8 @@ export function AtendimentoClient() {
   async function handleSaveExperimentalGroupSettings(options?: {
     silent?: boolean;
     slots?: ExperimentalGroupFormSlot[];
-  }) {
-    if (experimentalGroupSettingsSaving) return;
+  }): Promise<boolean> {
+    if (experimentalGroupSettingsSaving) return false;
     const slots = Array.isArray(options?.slots) ? options!.slots : experimentalGroupFormSlots;
     const enabledSlots = slots.filter(
       (slot) => slot.slotType === "experimental" && slot.enabled,
@@ -4721,14 +4755,14 @@ export function AtendimentoClient() {
       if (!options?.silent) {
         modalToast.warning("Configure dia e horario em cada turma ativada.");
       }
-      return;
+      return false;
     }
     const activeCombinations = enabledSlots.map((slot) => `${slot.weekday}-${slot.professor_time}`);
     if (new Set(activeCombinations).size !== activeCombinations.length) {
       if (!options?.silent) {
         modalToast.warning("Nao repita a mesma combinacao de dia e horario entre as turmas.");
       }
-      return;
+      return false;
     }
     setExperimentalGroupSettingsSaving(true);
     try {
@@ -4747,7 +4781,7 @@ export function AtendimentoClient() {
           })),
         }),
       });
-      if (handleForbiddenResponse(res)) return;
+      if (handleForbiddenResponse(res)) return false;
       const json = await res.json().catch(() => null);
       if (!json?.ok) {
         modalToast.error(
@@ -4756,13 +4790,14 @@ export function AtendimentoClient() {
             "Falha ao salvar configuração das turmas.",
           ),
         );
-        return;
+        return false;
       }
       syncExperimentalGroupSettingsFromPayload(json);
       if (!options?.silent) {
         modalToast.success("Configuração das aulas experimentais em grupo salva.");
       }
       void loadPanelLeads();
+      return true;
     } catch (error: any) {
       modalToast.error(
         normalizeExperimentalGroupErrorMessage(
@@ -4770,6 +4805,7 @@ export function AtendimentoClient() {
           "Falha ao salvar configuração das turmas.",
         ),
       );
+      return false;
     } finally {
       setExperimentalGroupSettingsSaving(false);
     }
@@ -10845,7 +10881,9 @@ export function AtendimentoClient() {
 
       <AppModal
         open={experimentalGroupSettingsOpen}
-        onClose={() => setExperimentalGroupSettingsOpen(false)}
+        onClose={() => {
+          void handleRequestCloseExperimentalGroupSettings();
+        }}
         size="md"
         position="center"
         zIndexClass="z-[420]"
@@ -10877,7 +10915,9 @@ export function AtendimentoClient() {
               <button
                 type="button"
                 aria-label="Fechar"
-                onClick={() => setExperimentalGroupSettingsOpen(false)}
+                onClick={() => {
+                  void handleRequestCloseExperimentalGroupSettings();
+                }}
                 className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-[var(--app-border)] bg-[var(--app-solid-surface)] text-[var(--app-text-70)] hover:bg-[var(--app-hover)] disabled:cursor-not-allowed disabled:opacity-60"
               >
                 <X className="h-4 w-4" />
