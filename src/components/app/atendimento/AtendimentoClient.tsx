@@ -1923,6 +1923,8 @@ export function AtendimentoClient() {
     useState<Record<string, string>>({});
   const [experimentalGroupLessonLinkSavingPairId, setExperimentalGroupLessonLinkSavingPairId] =
     useState("");
+  const experimentalGroupLessonLinkAutosaveTimeoutsRef = useRef<Map<string, number>>(new Map());
+  const experimentalGroupAutoConfirmLockRef = useRef<Map<string, string>>(new Map());
   const [experimentalGroupSelectedDateId, setExperimentalGroupSelectedDateId] = useState<
     string | null
   >(null);
@@ -4365,7 +4367,46 @@ export function AtendimentoClient() {
     }
   }
 
-  async function handleSaveExperimentalGroupLessonLink(pairId: string, groupClassId: string) {
+  function clearExperimentalGroupLessonLinkAutosave(pairId: string) {
+    const normalizedPairId = String(pairId ?? "").trim();
+    if (!normalizedPairId) return;
+    const timers = experimentalGroupLessonLinkAutosaveTimeoutsRef.current;
+    const timeoutId = timers.get(normalizedPairId);
+    if (typeof timeoutId === "number") {
+      window.clearTimeout(timeoutId);
+    }
+    timers.delete(normalizedPairId);
+  }
+
+  function scheduleExperimentalGroupLessonLinkAutosave(pairId: string, groupClassId: string) {
+    const normalizedPairId = String(pairId ?? "").trim();
+    const normalizedGroupClassId = String(groupClassId ?? "").trim();
+    if (!normalizedPairId || !normalizedGroupClassId) return;
+    clearExperimentalGroupLessonLinkAutosave(normalizedPairId);
+    const timeoutId = window.setTimeout(() => {
+      experimentalGroupLessonLinkAutosaveTimeoutsRef.current.delete(normalizedPairId);
+      void handleSaveExperimentalGroupLessonLink(normalizedPairId, normalizedGroupClassId, {
+        silent: true,
+      });
+    }, 700);
+    experimentalGroupLessonLinkAutosaveTimeoutsRef.current.set(normalizedPairId, timeoutId);
+  }
+
+  function flushExperimentalGroupLessonLinkAutosave(pairId: string, groupClassId: string) {
+    const normalizedPairId = String(pairId ?? "").trim();
+    const normalizedGroupClassId = String(groupClassId ?? "").trim();
+    if (!normalizedPairId || !normalizedGroupClassId) return;
+    clearExperimentalGroupLessonLinkAutosave(normalizedPairId);
+    void handleSaveExperimentalGroupLessonLink(normalizedPairId, normalizedGroupClassId, {
+      silent: true,
+    });
+  }
+
+  async function handleSaveExperimentalGroupLessonLink(
+    pairId: string,
+    groupClassId: string,
+    options?: { silent?: boolean },
+  ) {
     const normalizedPairId = String(pairId ?? "").trim();
     const normalizedGroupClassId = String(groupClassId ?? "").trim();
     if (!normalizedPairId || !normalizedGroupClassId) return;
@@ -4379,11 +4420,15 @@ export function AtendimentoClient() {
       String(experimentalGroupLessonLinkDraftByPairId[normalizedPairId] ?? "").trim() || "";
 
     if (!draft && !saved) {
-      modalToast.warning("Informe o link da aula da turma antes de salvar.");
+      if (!options?.silent) {
+        modalToast.warning("Informe o link da aula da turma antes de salvar.");
+      }
       return;
     }
     if (draft === saved) {
-      modalToast.info("Nenhuma alteração no link da turma.");
+      if (!options?.silent) {
+        modalToast.info("Nenhuma alteração no link da turma.");
+      }
       return;
     }
 
@@ -4413,7 +4458,9 @@ export function AtendimentoClient() {
         loadPanelLeads(),
         loadSummary({ silent: true }),
       ]);
-      modalToast.success(draft ? "Link da turma salvo." : "Link da turma removido.");
+      if (!options?.silent) {
+        modalToast.success(draft ? "Link da turma salvo." : "Link da turma removido.");
+      }
     } catch (error: any) {
       modalToast.error(
         normalizeExperimentalGroupErrorMessage(
@@ -4426,7 +4473,11 @@ export function AtendimentoClient() {
     }
   }
 
-  async function handleConfirmExperimentalGroupPair(pairId: string, groupClassId: string) {
+  async function handleConfirmExperimentalGroupPair(
+    pairId: string,
+    groupClassId: string,
+    options?: { silent?: boolean; autoLockKey?: string | null },
+  ) {
     const normalizedPairId = String(pairId ?? "").trim();
     const normalizedGroupClassId = String(groupClassId ?? "").trim();
     if (!normalizedPairId || !normalizedGroupClassId || experimentalGroupConfirmingPairId) return;
@@ -4438,7 +4489,12 @@ export function AtendimentoClient() {
       ).trim() ||
       null;
     if (!lessonLink) {
-      modalToast.warning("Adicione o link da aula na turma antes de confirmar.");
+      if (options?.autoLockKey) {
+        experimentalGroupAutoConfirmLockRef.current.delete(normalizedPairId);
+      }
+      if (!options?.silent) {
+        modalToast.warning("Adicione o link da aula na turma antes de confirmar.");
+      }
       return;
     }
 
@@ -4455,6 +4511,9 @@ export function AtendimentoClient() {
       if (handleForbiddenResponse(res)) return;
       const json = await res.json().catch(() => null);
       if (!res.ok || !json?.ok) {
+        if (options?.autoLockKey) {
+          experimentalGroupAutoConfirmLockRef.current.delete(normalizedPairId);
+        }
         modalToast.error(
           normalizeExperimentalGroupErrorMessage(json?.error, "Falha ao confirmar a turma."),
         );
@@ -4465,10 +4524,15 @@ export function AtendimentoClient() {
         loadPanelLeads(),
         loadSummary({ silent: true }),
       ]);
-      modalToast.success(
-        "Turma confirmada. As notificações recorrentes seguem bloqueadas até você marcar a aula experimental como realizada.",
-      );
+      if (!options?.silent) {
+        modalToast.success(
+          "Turma confirmada. As notificações recorrentes seguem bloqueadas até você marcar a aula experimental como realizada.",
+        );
+      }
     } catch (error: any) {
+      if (options?.autoLockKey) {
+        experimentalGroupAutoConfirmLockRef.current.delete(normalizedPairId);
+      }
       modalToast.error(
         normalizeExperimentalGroupErrorMessage(error?.message, "Falha ao confirmar a turma."),
       );
@@ -4476,6 +4540,66 @@ export function AtendimentoClient() {
       setExperimentalGroupConfirmingPairId("");
     }
   }
+
+  useEffect(() => {
+    return () => {
+      const timers = experimentalGroupLessonLinkAutosaveTimeoutsRef.current;
+      for (const timeoutId of timers.values()) {
+        window.clearTimeout(timeoutId);
+      }
+      timers.clear();
+      experimentalGroupAutoConfirmLockRef.current.clear();
+    };
+  }, []);
+
+  useEffect(() => {
+    for (const pair of experimentalGroupFormPairs) {
+      const latestExperimentalClass = pair.latestExperimentalClass;
+      const latestExperimentalStatus = String(latestExperimentalClass?.status ?? "").trim().toLowerCase();
+      const latestExperimentalAttendanceStatus = String(
+        latestExperimentalClass?.attendance_status ?? "",
+      )
+        .trim()
+        .toLowerCase();
+      const latestExperimentalCompleted =
+        latestExperimentalStatus === "completed" ||
+        latestExperimentalAttendanceStatus === "attended" ||
+        Boolean(latestExperimentalClass?.attendance_checked_at);
+      const canAutoConfirm =
+        pair.experimentalSlot.slotType === "experimental" &&
+        pair.hasAssignedMembers &&
+        Boolean(latestExperimentalClass?.group_class_id) &&
+        !latestExperimentalCompleted &&
+        latestExperimentalStatus !== "confirmed";
+      const effectiveLessonLink =
+        String(experimentalGroupLessonLinkDraftByPairId[pair.pairId] ?? "").trim() ||
+        String(latestExperimentalClass?.lesson_link ?? "").trim();
+      if (
+        !canAutoConfirm ||
+        !effectiveLessonLink ||
+        experimentalGroupLessonLinkSavingPairId === pair.pairId ||
+        experimentalGroupConfirmingPairId === pair.pairId
+      ) {
+        experimentalGroupAutoConfirmLockRef.current.delete(pair.pairId);
+        continue;
+      }
+      const autoLockKey = `${String(latestExperimentalClass?.group_class_id ?? "").trim()}::${effectiveLessonLink}`;
+      if (experimentalGroupAutoConfirmLockRef.current.get(pair.pairId) === autoLockKey) {
+        continue;
+      }
+      experimentalGroupAutoConfirmLockRef.current.set(pair.pairId, autoLockKey);
+      void handleConfirmExperimentalGroupPair(
+        pair.pairId,
+        String(latestExperimentalClass?.group_class_id ?? "").trim(),
+        { silent: true, autoLockKey },
+      );
+    }
+  }, [
+    experimentalGroupConfirmingPairId,
+    experimentalGroupFormPairs,
+    experimentalGroupLessonLinkDraftByPairId,
+    experimentalGroupLessonLinkSavingPairId,
+  ]);
 
   async function handleSaveExperimentalGroupSettings() {
     if (experimentalGroupSettingsSaving) return;
@@ -10699,14 +10823,6 @@ export function AtendimentoClient() {
                   !latestExperimentalCompleted &&
                   latestExperimentalStatus === "confirmed";
                 const completingThisPair = experimentalGroupCompletingPairId === pair.pairId;
-                const confirmingThisPair = experimentalGroupConfirmingPairId === pair.pairId;
-                const canConfirmExperimentalGroupFromSettings =
-                  card.slotType === "experimental" &&
-                  pair.hasAssignedMembers &&
-                  Boolean(latestExperimentalClass?.group_class_id) &&
-                  !latestExperimentalCompleted &&
-                  latestExperimentalStatus !== "confirmed";
-
                 return (
                   <div
                     key={`group-pair-${pair.pairId}`}
@@ -11075,73 +11191,32 @@ export function AtendimentoClient() {
                                 value={String(
                                   experimentalGroupLessonLinkDraftByPairId[pair.pairId] ?? "",
                                 )}
-                                onChange={(e) =>
+                                onChange={(e) => {
+                                  const nextValue = e.target.value;
                                   setExperimentalGroupLessonLinkDraftByPairId((prev) => ({
                                     ...prev,
-                                    [pair.pairId]: e.target.value,
-                                  }))
-                                }
+                                    [pair.pairId]: nextValue,
+                                  }));
+                                  if (latestExperimentalClass?.group_class_id) {
+                                    scheduleExperimentalGroupLessonLinkAutosave(
+                                      pair.pairId,
+                                      latestExperimentalClass.group_class_id,
+                                    );
+                                  }
+                                }}
+                                onBlur={() => {
+                                  if (latestExperimentalClass?.group_class_id) {
+                                    flushExperimentalGroupLessonLinkAutosave(
+                                      pair.pairId,
+                                      latestExperimentalClass.group_class_id,
+                                    );
+                                  }
+                                }}
                                 className="w-full min-w-0 rounded-xl border border-[var(--app-border)] bg-[var(--app-solid-surface-2)] px-4 py-3 text-[13px] font-semibold text-[var(--app-text-85)] placeholder:text-[var(--app-text-45)] transition focus:border-[var(--app-border-strong)] focus:outline-none disabled:cursor-not-allowed disabled:opacity-60"
                                 disabled={experimentalGroupLessonLinkSavingPairId === pair.pairId}
                               />
                             </div>
-                            <button
-                              type="button"
-                              onClick={() =>
-                                void handleSaveExperimentalGroupLessonLink(
-                                  pair.pairId,
-                                  latestExperimentalClass.group_class_id,
-                                )
-                              }
-                              disabled={
-                                experimentalGroupLessonLinkSavingPairId === pair.pairId ||
-                                String(
-                                  experimentalGroupLessonLinkDraftByPairId[pair.pairId] ?? "",
-                                ).trim() ===
-                                  String(latestExperimentalClass.lesson_link ?? "").trim()
-                              }
-                              className="inline-flex h-[46px] w-full items-center justify-center gap-2 rounded-xl border border-[var(--app-border)] bg-[var(--app-solid-surface-2)] px-4 text-[13px] font-semibold text-[var(--app-text-85)] transition hover:bg-[var(--app-hover)] min-[600px]:w-auto disabled:cursor-not-allowed disabled:opacity-55"
-                            >
-                              {experimentalGroupLessonLinkSavingPairId === pair.pairId ? (
-                                <Loader2 className="h-4 w-4 shrink-0 animate-spin" />
-                              ) : (
-                                <Save className="h-4 w-4 shrink-0" />
-                              )}
-                              Salvar
-                            </button>
                           </div>
-                          {canConfirmExperimentalGroupFromSettings ? (
-                            <div className="flex justify-end">
-                              <button
-                                type="button"
-                                onClick={() =>
-                                  latestExperimentalClass?.group_class_id
-                                    ? void handleConfirmExperimentalGroupPair(
-                                        pair.pairId,
-                                        latestExperimentalClass.group_class_id,
-                                      )
-                                    : undefined
-                                }
-                                disabled={
-                                  confirmingThisPair ||
-                                  experimentalGroupLessonLinkSavingPairId === pair.pairId ||
-                                  !String(
-                                    experimentalGroupLessonLinkDraftByPairId[pair.pairId] ??
-                                      latestExperimentalClass?.lesson_link ??
-                                      "",
-                                  ).trim()
-                                }
-                                className="inline-flex min-h-[42px] items-center justify-center gap-2 rounded-xl bg-[#ea580c] px-4 text-[13px] font-semibold !text-white disabled:cursor-not-allowed disabled:opacity-60"
-                              >
-                                {confirmingThisPair ? (
-                                  <Loader2 className="h-4 w-4 shrink-0 animate-spin" />
-                                ) : (
-                                  <Check className="h-4 w-4 shrink-0" />
-                                )}
-                                Confirmar turma
-                              </button>
-                            </div>
-                          ) : null}
                         </div>
                       ) : null}
                     </div>
