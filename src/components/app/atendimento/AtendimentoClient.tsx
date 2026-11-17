@@ -4871,7 +4871,7 @@ export function AtendimentoClient() {
     setExperimentalGroupFormDateIds((prev) => [...prev, "", ""]);
   }
 
-  function handleRemoveExperimentalGroupPair(pairId: string) {
+  async function handleRemoveExperimentalGroupPair(pairId: string) {
     const normalizedPairId = String(pairId ?? "").trim();
     if (!normalizedPairId) return;
     if (experimentalGroupFormPairs.length <= 1) {
@@ -4882,21 +4882,26 @@ export function AtendimentoClient() {
       modalToast.warning("Nao e possivel excluir uma turma que possui registros atribuidos.");
       return;
     }
+    const pair = experimentalGroupFormPairs.find((item) => item.pairId === normalizedPairId) ?? null;
+    const confirmed = await modalToast.confirm(
+      `Deseja realmente excluir a turma ${pair?.pairNumber ?? "selecionada"}? Essa alteração será salva agora.`,
+      {
+        title: "Excluir turma",
+        confirmText: "Excluir",
+        cancelText: "Cancelar",
+      },
+    );
+    if (!confirmed) return;
 
-    const pairIdsByIndex = experimentalGroupFormSlots.map((slot) =>
-      String(slot.pairId ?? "").trim(),
+    const nextSlots = experimentalGroupFormSlots.filter(
+      (slot) => String(slot.pairId ?? "").trim() !== normalizedPairId,
     );
-    setExperimentalGroupFormSlots((prev) =>
-      prev.filter((slot) => String(slot.pairId ?? "").trim() !== normalizedPairId),
-    );
-    setExperimentalGroupFormDateIds((prev) =>
-      prev.filter((_, index) => pairIdsByIndex[index] !== normalizedPairId),
-    );
-    setExperimentalGroupPairUsage((prev) => {
-      const next = { ...prev };
-      delete next[normalizedPairId];
-      return next;
+    const saved = await handleSaveExperimentalGroupSettings({
+      silent: false,
+      slots: nextSlots,
     });
+    if (!saved) return;
+    modalToast.success(`Turma ${pair?.pairNumber ?? ""} excluida.`.trim());
   }
 
   async function loadExperimentalGroupLeadData(lead: AtendimentoLeadListItem) {
