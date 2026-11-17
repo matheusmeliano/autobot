@@ -86,6 +86,8 @@ export type ExperimentalGroupPairActivitySummary = Record<
     latest_experimental_class: {
       group_class_id: string;
       status: string | null;
+      professor_date: string;
+      professor_time: string;
       professor_start_at: string;
       confirmed_at: string | null;
       attendance_status: string | null;
@@ -532,22 +534,54 @@ export function buildExperimentalGroupPairActivitySummary(params: {
       latest_experimental_class: null,
     };
   }
-  const sortedClasses = [...(params.groupClasses ?? [])].sort(
-    (left, right) =>
-      new Date(right.professor_start_at).getTime() - new Date(left.professor_start_at).getTime(),
-  );
-  for (const groupClass of sortedClasses) {
+  const nowMs = Date.now();
+  const classesByPairId = new Map<string, ExperimentalGroupClassRecord[]>();
+  for (const groupClass of params.groupClasses ?? []) {
     const pairId = resolveExperimentalGroupPairIdForClass({ settings, groupClass });
-    if (!pairId || summary[pairId]?.latest_experimental_class) continue;
+    if (!pairId) continue;
+    const current = classesByPairId.get(pairId) ?? [];
+    current.push(groupClass);
+    classesByPairId.set(pairId, current);
+  }
+
+  const comparePairClasses = (left: ExperimentalGroupClassRecord, right: ExperimentalGroupClassRecord) => {
+    const leftAssignedCount = (left.members ?? []).filter(
+      (member) => String(member.status ?? "").trim().toLowerCase() === "assigned",
+    ).length;
+    const rightAssignedCount = (right.members ?? []).filter(
+      (member) => String(member.status ?? "").trim().toLowerCase() === "assigned",
+    ).length;
+    const leftStartMs = new Date(left.professor_start_at).getTime();
+    const rightStartMs = new Date(right.professor_start_at).getTime();
+    const leftIsFuture = Number.isFinite(leftStartMs) && leftStartMs >= nowMs;
+    const rightIsFuture = Number.isFinite(rightStartMs) && rightStartMs >= nowMs;
+
+    const leftBucket =
+      leftAssignedCount > 0 ? (leftIsFuture ? 0 : 1) : leftIsFuture ? 2 : 3;
+    const rightBucket =
+      rightAssignedCount > 0 ? (rightIsFuture ? 0 : 1) : rightIsFuture ? 2 : 3;
+    if (leftBucket !== rightBucket) return leftBucket - rightBucket;
+
+    if (leftBucket === 1 || leftBucket === 3) {
+      return rightStartMs - leftStartMs;
+    }
+    return leftStartMs - rightStartMs;
+  };
+
+  for (const [pairId, pairClasses] of classesByPairId.entries()) {
+    const relevantClass = [...pairClasses].sort(comparePairClasses)[0] ?? null;
+    if (!relevantClass) continue;
     summary[pairId] = {
       latest_experimental_class: {
-        group_class_id: groupClass.id,
-        status: groupClass.status,
-        professor_start_at: groupClass.professor_start_at,
-        confirmed_at: groupClass.confirmed_at,
-        attendance_status: groupClass.attendance_status,
-        attendance_checked_at: groupClass.attendance_checked_at,
-        lesson_link: groupClass.lesson_link,
+        group_class_id: relevantClass.id,
+        status: relevantClass.status,
+        professor_date: relevantClass.professor_date,
+        professor_time: relevantClass.professor_time,
+        professor_start_at: relevantClass.professor_start_at,
+        confirmed_at: relevantClass.confirmed_at,
+        attendance_status: relevantClass.attendance_status,
+        attendance_checked_at: relevantClass.attendance_checked_at,
+        lesson_link: relevantClass.lesson_link,
       },
     };
   }

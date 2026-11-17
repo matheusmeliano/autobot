@@ -73,6 +73,8 @@ type ExperimentalGroupPairActivityPayload = Record<
     latest_experimental_class?: {
       group_class_id: string;
       status?: string | null;
+      professor_date?: string | null;
+      professor_time?: string | null;
       professor_start_at: string;
       confirmed_at?: string | null;
       attendance_status?: string | null;
@@ -2396,6 +2398,8 @@ export function AtendimentoClient() {
       latestExperimentalClass: {
         group_class_id: string;
         status: string | null;
+        professor_date: string | null;
+        professor_time: string | null;
         professor_start_at: string;
         confirmed_at: string | null;
         attendance_status: string | null;
@@ -2479,6 +2483,14 @@ export function AtendimentoClient() {
                 status:
                   String(
                     experimentalGroupPairActivity[pair.pairId]?.latest_experimental_class?.status ?? "",
+                  ).trim() || null,
+                professor_date:
+                  String(
+                    experimentalGroupPairActivity[pair.pairId]?.latest_experimental_class?.professor_date ?? "",
+                  ).trim() || null,
+                professor_time:
+                  String(
+                    experimentalGroupPairActivity[pair.pairId]?.latest_experimental_class?.professor_time ?? "",
                   ).trim() || null,
                 professor_start_at: String(
                   experimentalGroupPairActivity[pair.pairId]?.latest_experimental_class?.professor_start_at ?? "",
@@ -4332,13 +4344,25 @@ export function AtendimentoClient() {
       experimentalGroupSettingsAutosaveTimeoutRef.current = null;
     }
     setExperimentalGroupFormSlots(normalizedSlots);
+    const pairUsageSafe =
+      pairUsageRaw && typeof pairUsageRaw === "object" ? pairUsageRaw : {};
     setExperimentalGroupFormDateIds(
-      normalizedSlots.map((slot) =>
-        resolveExperimentalAvailabilityDateIdForGroupSlot(
+      normalizedSlots.map((slot) => {
+        const pairId = String(slot.pairId ?? "").trim();
+        const pairHasExperimentalMembers = Boolean(pairUsageSafe?.[pairId]?.has_experimental_members);
+        const assignedProfessorDate = pairHasExperimentalMembers
+          ? String(
+              (pairActivityRaw as any)?.[pairId]?.latest_experimental_class?.professor_date ?? "",
+            ).trim()
+          : "";
+        if (slot.slotType === "experimental" && assignedProfessorDate) {
+          return assignedProfessorDate;
+        }
+        return resolveExperimentalAvailabilityDateIdForGroupSlot(
           availabilityByProfessor[String(slot.professorPhone ?? "").trim()] ?? availability,
           slot,
-        ),
-      ),
+        );
+      }),
     );
   }
 
@@ -10927,17 +10951,56 @@ export function AtendimentoClient() {
                   experimentalGroupAvailabilityByProfessor[String(card.professorPhone ?? "").trim()] ??
                   experimentalGroupAvailability;
                 const dateOptions = pairAvailability?.dates ?? [];
+                const latestExperimentalClass = pair.latestExperimentalClass;
                 const selectedDateId =
                   String(experimentalGroupFormDateIds[index] ?? "").trim() ||
+                  (pair.hasExperimentalMembers
+                    ? String(latestExperimentalClass?.professor_date ?? "").trim()
+                    : "") ||
                   resolveExperimentalAvailabilityDateIdForGroupSlot(
                     pairAvailability,
                     card,
                   );
-                const selectedDateSlots = getExperimentalAvailabilitySlotsForDate(
+                const selectedDateSlotsBase = getExperimentalAvailabilitySlotsForDate(
                   pairAvailability,
                   selectedDateId,
                 );
-                const latestExperimentalClass = pair.latestExperimentalClass;
+                const selectedDateSlots = (() => {
+                  const assignedProfessorDate = String(
+                    latestExperimentalClass?.professor_date ?? "",
+                  ).trim();
+                  const assignedProfessorTime = String(
+                    latestExperimentalClass?.professor_time ?? "",
+                  ).trim();
+                  const assignedProfessorStartAt = String(
+                    latestExperimentalClass?.professor_start_at ?? "",
+                  ).trim();
+                  if (
+                    !pair.hasExperimentalMembers ||
+                    !assignedProfessorDate ||
+                    !assignedProfessorTime ||
+                    selectedDateId !== assignedProfessorDate ||
+                    selectedDateSlotsBase.some(
+                      (timeOption) => timeOption.professorTime === assignedProfessorTime,
+                    )
+                  ) {
+                    return selectedDateSlotsBase;
+                  }
+                  return [
+                    ...selectedDateSlotsBase,
+                    {
+                      id: `assigned-${pair.pairId}-${String(latestExperimentalClass?.group_class_id ?? "").trim()}`,
+                      professorDate: assignedProfessorDate,
+                      professorTime: assignedProfessorTime,
+                      professorStartAt: assignedProfessorStartAt,
+                      leadDate: assignedProfessorDate,
+                      leadTime: assignedProfessorTime,
+                      displayLabel: assignedProfessorTime,
+                    },
+                  ].sort((left, right) =>
+                    String(left.professorTime ?? "").localeCompare(String(right.professorTime ?? "")),
+                  );
+                })();
                 const latestExperimentalStatus = String(
                   latestExperimentalClass?.status ?? "",
                 ).trim().toLowerCase();
