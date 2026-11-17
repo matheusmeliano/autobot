@@ -4630,6 +4630,10 @@ export function AtendimentoClient() {
     );
   }
 
+  const experimentalGroupSettingsHasPendingChanges = useMemo<boolean>(() => {
+    return hasPendingExperimentalGroupSettingsChanges(experimentalGroupFormSlots);
+  }, [experimentalGroupFormSlots]);
+
   async function handleRequestCloseExperimentalGroupSettings() {
     if (typeof experimentalGroupSettingsAutosaveTimeoutRef.current === "number") {
       window.clearTimeout(experimentalGroupSettingsAutosaveTimeoutRef.current);
@@ -4664,27 +4668,11 @@ export function AtendimentoClient() {
   }, []);
 
   useEffect(() => {
-    if (!experimentalGroupSettingsOpen || experimentalGroupSettingsLoading) return;
-    const currentSnapshot = serializeExperimentalGroupFormSlots(experimentalGroupFormSlots);
-    if (currentSnapshot === experimentalGroupSettingsLastSavedSnapshotRef.current) {
-      return;
-    }
     if (typeof experimentalGroupSettingsAutosaveTimeoutRef.current === "number") {
       window.clearTimeout(experimentalGroupSettingsAutosaveTimeoutRef.current);
-    }
-    experimentalGroupSettingsAutosaveTimeoutRef.current = window.setTimeout(() => {
       experimentalGroupSettingsAutosaveTimeoutRef.current = null;
-      void handleSaveExperimentalGroupSettings({
-        silent: true,
-        slots: experimentalGroupFormSlots,
-      });
-    }, 700);
-    return () => {
-      if (typeof experimentalGroupSettingsAutosaveTimeoutRef.current === "number") {
-        window.clearTimeout(experimentalGroupSettingsAutosaveTimeoutRef.current);
-        experimentalGroupSettingsAutosaveTimeoutRef.current = null;
-      }
-    };
+    }
+    return;
   }, [
     experimentalGroupFormSlots,
     experimentalGroupSettingsLoading,
@@ -10911,6 +10899,31 @@ export function AtendimentoClient() {
                 className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-[var(--app-border)] bg-[var(--app-solid-surface)] text-[var(--app-text-70)] hover:bg-[var(--app-hover)] disabled:cursor-not-allowed disabled:opacity-60"
               >
                 <Plus className="h-4 w-4" />
+              </button>
+              <button
+                type="button"
+                aria-label="Salvar"
+                title={
+                  experimentalGroupSettingsHasPendingChanges
+                    ? "Salvar alterações das turmas"
+                    : "Nenhuma alteração pendente"
+                }
+                onClick={() => {
+                  void handleSaveExperimentalGroupSettings({ silent: false });
+                }}
+                disabled={
+                  experimentalGroupSettingsSaving ||
+                  experimentalGroupSettingsLoading ||
+                  !experimentalGroupSettingsHasPendingChanges
+                }
+                className="inline-flex h-10 items-center justify-center gap-2 rounded-full border border-[var(--app-border)] bg-[var(--app-solid-surface)] px-3 text-[12px] font-semibold text-[var(--app-text-70)] transition hover:bg-[var(--app-hover)] disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {experimentalGroupSettingsSaving ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Save className="h-4 w-4" />
+                )}
+                <span>Salvar</span>
               </button>
               <button
                 type="button"

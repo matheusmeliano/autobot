@@ -26,6 +26,7 @@ import {
   EXPERIMENTAL_CLASS_PROFESSOR_ASSIGNMENT_ALLOWLIST,
   listExperimentalClassAvailability,
 } from "@/lib/atendimento/experimentalClass";
+import { resolveLeadTimeZoneFromRecord, zonedDateTimeToUtcIso } from "@/lib/timezone";
 
 const weekdaySchema = z.enum(["mon", "tue", "wed", "thu", "fri", "sat", "sun"]);
 const slotTypeSchema = z.enum(["experimental", "recorrente"]);
@@ -168,6 +169,253 @@ function isCurrentPairScheduleAlreadyReserved(params: {
       String(groupClass.professor_phone ?? "").replace(/\D/g, "") === professorPhoneDigits
     );
   });
+}
+
+function normalizePhoneDigits(value: unknown) {
+  return String(value ?? "").replace(/\D/g, "");
+}
+
+function localDateInTimeZone(value: Date | string | number, timeZone: string): string {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(new Date(value));
+  const map = Object.fromEntries(
+    parts.filter((part) => part.type !== "literal").map((part) => [part.type, part.value]),
+  );
+  return `${map.year}-${map.month}-${map.day}`;
+}
+
+function weekdayInTimeZone(value: Date | string | number, timeZone: string): string {
+  return new Intl.DateTimeFormat("en-US", {
+    timeZone,
+    weekday: "short",
+  })
+    .format(new Date(value))
+    .toLowerCase()
+    .slice(0, 3);
+}
+
+function formatTimeInTimeZone(iso: string, timeZone: string): string {
+  return new Intl.DateTimeFormat("pt-BR", {
+    timeZone,
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  }).format(new Date(iso));
+}
+
+function buildExperimentalPairSlotMap(settings: ExperimentalGroupClassSettings) {
+  const map = new Map<string, ExperimentalGroupClassSettings["slots"][number]>();
+  for (const slot of settings.slots) {
+    if (slot.slot_type !== "experimental") continue;
+    const pairId = String(slot.pair_id ?? "").trim();
+    if (!pairId) continue;
+    map.set(pairId, slot);
+  }
+  return map;
+}
+
+function buildFutureProfessorOccurrences(params: {
+  count: number;
+  weekday: string;
+  professorTime: string;
+  timeZone: string;
+  fromDate?: Date;
+}) {
+  const occurrences: Array<{ professor_date: string; professor_start_at: string }> = [];
+  const fromDate = params.fromDate ?? new Date();
+  for (let offset = 0; offset < 420 && occurrences.length < params.count; offset += 1) {
+    const candidate = new Date(fromDate.getTime() + offset * 24 * 60 * 60 * 1000);
+    const professorDate = localDateInTimeZone(candidate, params.timeZone);
+    if (!professorDate) continue;
+    if (weekdayInTimeZone(candidate, params.timeZone) !== params.weekday) continue;
+    const professorStartAt = zonedDateTimeToUtcIso({
+      date: professorDate,
+      time: params.professorTime,
+      timeZone: params.timeZone,
+    });
+    if (!professorStartAt) continue;
+    if (new Date(professorStartAt).getTime() <= fromDate.getTime()) continue;
+    occurrences.push({
+      professor_date: professorDate,
+      professor_start_at: professorStartAt,
+    });
+  }
+  return occurrences;
+}
+
+async function syncExperimentalGroupSchedulesForSettingsChange(params: {
+  admin: ReturnType<typeof createSupabaseAdminClient>;
+  previousSettings: ExperimentalGroupClassSettings;
+  nextSettings: ExperimentalGroupClassSettings;
+  futureGroupClasses: ExperimentalGroupClassRecord[];
+}) {
+  const previousSettings = normalizeExperimentalGroupClassSettings(params.previousSettings);
+  const nextSettings = normalizeExperimentalGroupClassSettings(params.nextSettings);
+  const previousSlotMap = buildExperimentalPairSlotMap(previousSettings);
+  const nextSlotMap = buildExperimentalPairSlotMap(nextSettings);
+  const futureClassesByPairId = new Map<string, ExperimentalGroupClassRecord[]>();
+  for (const groupClass of params.futureGroupClasses) {
+    const pairId = resolveExperimentalGroupPairIdForClass({
+      settings: previousSettings,
+      groupClass,
+    });
+    if (!pairId) continue;
+    const current = futureClassesByPairId.get(pairId) ?? [];
+    current.push(groupClass);
+    futureClassesByPairId.set(pairId, current);
+  }
+
+  const professorTimeZone =
+    String(nextSettings.professor_timezone ?? "").trim() || ATENDIMENTO_PROFESSOR_TIME_ZONE;
+  const updatedClassesById = new Map<
+    string,
+    {
+      group_class_id: string;
+      professor_name: string | null;
+      professor_phone: string | null;
+      professor_date: string;
+      professor_time: string;
+      professor_start_at: string;
+      professor_timezone: string;
+      member_lead_ids: string[];
+    }
+  >();
+
+  for (const [pairId, rawPairClasses] of futureClassesByPairId.entries()) {
+    const previousSlot = previousSlotMap.get(pairId) ?? null;
+    const nextSlot = nextSlotMap.get(pairId) ?? null;
+    if (!nextSlot?.enabled || !nextSlot.weekday || !nextSlot.professor_time) continue;
+
+    const scheduleChanged =
+      !previousSlot ||
+      String(previousSlot.weekday ?? "").trim().toLowerCase() !==
+        String(nextSlot.weekday ?? "").trim().toLowerCase() ||
+      String(previousSlot.professor_time ?? "").trim() !==
+        String(nextSlot.professor_time ?? "").trim() ||
+      normalizePhoneDigits(previousSlot.professor_phone) !==
+        normalizePhoneDigits(nextSlot.professor_phone) ||
+      String(previousSlot.professor_name ?? "").trim() !==
+        String(nextSlot.professor_name ?? "").trim();
+    if (!scheduleChanged) continue;
+
+    const pairClasses = [...rawPairClasses]
+      .filter((groupClass) => {
+        const status = String(groupClass.status ?? "").trim().toLowerCase();
+        return status !== "cancelled" && status !== "completed";
+      })
+      .sort(
+        (left, right) =>
+          new Date(left.professor_start_at).getTime() - new Date(right.professor_start_at).getTime(),
+      );
+    if (!pairClasses.length) continue;
+
+    const occurrences = buildFutureProfessorOccurrences({
+      count: pairClasses.length,
+      weekday: String(nextSlot.weekday ?? "").trim().toLowerCase(),
+      professorTime: String(nextSlot.professor_time ?? "").trim(),
+      timeZone: professorTimeZone,
+      fromDate: new Date(),
+    });
+    if (!occurrences.length) continue;
+
+    for (const [index, groupClass] of pairClasses.entries()) {
+      const occurrence = occurrences[index];
+      if (!occurrence) break;
+      const updatePayload = {
+        professor_name: String(nextSlot.professor_name ?? "").trim() || null,
+        professor_phone: String(nextSlot.professor_phone ?? "").trim() || null,
+        professor_timezone: professorTimeZone,
+        professor_weekday: String(nextSlot.weekday ?? "").trim().toLowerCase(),
+        professor_date: occurrence.professor_date,
+        professor_time: String(nextSlot.professor_time ?? "").trim(),
+        professor_start_at: occurrence.professor_start_at,
+      };
+      const { error: groupClassUpdateError } = await params.admin
+        .from("atendimento_experimental_group_classes")
+        .update(updatePayload)
+        .eq("id", groupClass.id);
+      if (groupClassUpdateError) throw groupClassUpdateError;
+
+      updatedClassesById.set(groupClass.id, {
+        group_class_id: groupClass.id,
+        professor_name: updatePayload.professor_name,
+        professor_phone: updatePayload.professor_phone,
+        professor_date: updatePayload.professor_date,
+        professor_time: updatePayload.professor_time,
+        professor_start_at: updatePayload.professor_start_at,
+        professor_timezone: professorTimeZone,
+        member_lead_ids: (groupClass.members ?? [])
+          .filter((member) => String(member.status ?? "").trim().toLowerCase() === "assigned")
+          .map((member) => String(member.lead_id ?? "").trim())
+          .filter(Boolean),
+      });
+    }
+  }
+
+  const leadClassUpdates = new Map<
+    string,
+    {
+      group_class_id: string;
+      professor_name: string | null;
+      professor_phone: string | null;
+      professor_date: string;
+      professor_time: string;
+      professor_start_at: string;
+      professor_timezone: string;
+    }
+  >();
+  for (const classUpdate of updatedClassesById.values()) {
+    for (const leadId of classUpdate.member_lead_ids) {
+      leadClassUpdates.set(leadId, classUpdate);
+    }
+  }
+  if (!leadClassUpdates.size) return;
+
+  const leadIds = Array.from(leadClassUpdates.keys());
+  const { data: leads, error: leadsError } = await params.admin
+    .from("atendimento_leads")
+    .select("*")
+    .in("id", leadIds);
+  if (leadsError) throw leadsError;
+
+  const nowIso = new Date().toISOString();
+  for (const lead of Array.isArray(leads) ? leads : []) {
+    const leadId = String((lead as any)?.id ?? "").trim();
+    const classUpdate = leadClassUpdates.get(leadId);
+    if (!leadId || !classUpdate) continue;
+    const leadTimeZone = resolveLeadTimeZoneFromRecord({
+      lead: lead as Record<string, unknown>,
+      fallbackTimeZone: classUpdate.professor_timezone,
+    });
+    const { error: leadUpdateError } = await params.admin
+      .from("atendimento_leads")
+      .update({
+        experimental_class_group_class_id: classUpdate.group_class_id,
+        experimental_class_group_status: "assigned",
+        experimental_class_status: "scheduled",
+        experimental_class_professor_name: classUpdate.professor_name,
+        experimental_class_professor_phone: classUpdate.professor_phone,
+        experimental_class_professor_date: classUpdate.professor_date,
+        experimental_class_professor_time: classUpdate.professor_time,
+        experimental_class_professor_start_at: classUpdate.professor_start_at,
+        experimental_class_lead_date: localDateInTimeZone(
+          classUpdate.professor_start_at,
+          leadTimeZone,
+        ),
+        experimental_class_lead_time: formatTimeInTimeZone(
+          classUpdate.professor_start_at,
+          leadTimeZone,
+        ),
+        experimental_class_lead_start_at: classUpdate.professor_start_at,
+        updated_at: nowIso,
+      })
+      .eq("id", leadId);
+    if (leadUpdateError) throw leadUpdateError;
+  }
 }
 
 function isMissingRelationError(error: unknown): boolean {
@@ -454,10 +702,24 @@ export async function PATCH(req: Request) {
     }
 
     const updatedAt = await saveExperimentalGroupClassSettings({ admin, settings });
-    const availability = await buildExperimentalGroupAvailability(admin, futureGroupClasses);
+    await syncExperimentalGroupSchedulesForSettingsChange({
+      admin,
+      previousSettings: currentSettingsResult.settings,
+      nextSettings: settings,
+      futureGroupClasses,
+    });
+    const refreshedFutureGroupClasses = await listFutureExperimentalGroupClasses({
+      admin,
+      fromIso: new Date().toISOString(),
+    });
+    const availability = await buildExperimentalGroupAvailability(admin, refreshedFutureGroupClasses);
+    const refreshedAvailabilityByProfessor = await buildExperimentalGroupAvailabilityByProfessor(
+      admin,
+      refreshedFutureGroupClasses,
+    );
     const pairUsage = buildExperimentalGroupPairUsage({
       settings,
-      futureGroupClasses,
+      futureGroupClasses: refreshedFutureGroupClasses,
       recurringMembers: await listAssignedRecurringGroupMembers({ admin }),
     });
     const pairActivity = buildExperimentalGroupPairActivitySummary({
@@ -479,7 +741,7 @@ export async function PATCH(req: Request) {
       pair_usage: pairUsage,
       pair_activity: pairActivity,
       availability,
-      availability_by_professor: availabilityByProfessor,
+      availability_by_professor: refreshedAvailabilityByProfessor,
     });
   } catch (error: any) {
     return Response.json(
