@@ -8363,6 +8363,8 @@ export function AtendimentoClient() {
                             (selectedLead as any)?.experimental_class_booking ??
                             (selectedLead as any)?.future_experimental_class_booking;
                           const expBk = expBestBooking as any;
+                          const expSelectedLeadIsGroupAssigned =
+                            isLeadAssignedToExperimentalGroup(selectedLead);
                           const expEffectiveStatus =
                             String(
                               expBk?.status ??
@@ -8396,17 +8398,19 @@ export function AtendimentoClient() {
                                     </div>
                                   </div>
                                 </div>
-                                <div className="mt-4 flex justify-end">
-                                  <button
-                                    type="button"
-                                    onClick={() => handleOpenExperimentalBooking(selectedLead)}
-                                    className="inline-flex h-10 items-center justify-center gap-2 rounded-full border border-[var(--app-border)] bg-[var(--app-solid-surface)] px-4 text-[13px] font-semibold text-[var(--app-text-85)] hover:bg-[var(--app-hover)]"
-                                    title="Reagendar esta aula experimental."
-                                  >
-                                    <Plus className="h-4 w-4" />
-                                    Reagendar
-                                  </button>
-                                </div>
+                                {!expSelectedLeadIsGroupAssigned ? (
+                                  <div className="mt-4 flex justify-end">
+                                    <button
+                                      type="button"
+                                      onClick={() => handleOpenExperimentalBooking(selectedLead)}
+                                      className="inline-flex h-10 items-center justify-center gap-2 rounded-full border border-[var(--app-border)] bg-[var(--app-solid-surface)] px-4 text-[13px] font-semibold text-[var(--app-text-85)] hover:bg-[var(--app-hover)]"
+                                      title="Reagendar esta aula experimental."
+                                    >
+                                      <Plus className="h-4 w-4" />
+                                      Reagendar
+                                    </button>
+                                  </div>
+                                ) : null}
                               </>
                             );
                           }
@@ -9971,6 +9975,8 @@ export function AtendimentoClient() {
                           (selectedLead as any)?.latest_experimental_class_booking ??
                           (selectedLead as any)?.experimental_class_booking ??
                           (selectedLead as any)?.future_experimental_class_booking;
+                        const expSelectedLeadIsGroupAssigned =
+                          isLeadAssignedToExperimentalGroup(selectedLead);
                         const expEffectiveStatus = String(
                           (expBestBooking as any)?.status ??
                             (selectedLead as any)?.experimental_class_booking_status ??
@@ -10003,17 +10009,19 @@ export function AtendimentoClient() {
                                   </div>
                                 </div>
                               </div>
-                              <div className="mt-4 flex justify-end">
-                                <button
-                                  type="button"
-                                  onClick={() => handleOpenExperimentalBooking(selectedLead)}
-                                  className="inline-flex h-10 items-center justify-center gap-2 rounded-full border border-[var(--app-border)] bg-[var(--app-solid-surface)] px-4 text-[13px] font-semibold text-[var(--app-text-85)] hover:bg-[var(--app-hover)]"
-                                  title="Reagendar esta aula experimental."
-                                >
-                                  <Plus className="h-4 w-4" />
-                                  Reagendar
-                                </button>
-                              </div>
+                              {!expSelectedLeadIsGroupAssigned ? (
+                                <div className="mt-4 flex justify-end">
+                                  <button
+                                    type="button"
+                                    onClick={() => handleOpenExperimentalBooking(selectedLead)}
+                                    className="inline-flex h-10 items-center justify-center gap-2 rounded-full border border-[var(--app-border)] bg-[var(--app-solid-surface)] px-4 text-[13px] font-semibold text-[var(--app-text-85)] hover:bg-[var(--app-hover)]"
+                                    title="Reagendar esta aula experimental."
+                                  >
+                                    <Plus className="h-4 w-4" />
+                                    Reagendar
+                                  </button>
+                                </div>
+                              ) : null}
                             </>
                           );
                         }
@@ -10043,15 +10051,17 @@ export function AtendimentoClient() {
                                   <Info className="h-4 w-4" />
                                   Mais informações
                                 </button>
-                                <button
-                                  type="button"
-                                  onClick={() => handleOpenExperimentalBooking(selectedLead)}
-                                  className="inline-flex h-10 items-center justify-center gap-2 rounded-full border border-[var(--app-border)] bg-[var(--app-solid-surface)] px-4 text-[13px] font-semibold text-[var(--app-text-85)] hover:bg-[var(--app-hover)]"
-                                  title="Reagendar esta aula experimental."
-                                >
-                                  <Plus className="h-4 w-4" />
-                                  Reagendar
-                                </button>
+                                {!expSelectedLeadIsGroupAssigned ? (
+                                  <button
+                                    type="button"
+                                    onClick={() => handleOpenExperimentalBooking(selectedLead)}
+                                    className="inline-flex h-10 items-center justify-center gap-2 rounded-full border border-[var(--app-border)] bg-[var(--app-solid-surface)] px-4 text-[13px] font-semibold text-[var(--app-text-85)] hover:bg-[var(--app-hover)]"
+                                    title="Reagendar esta aula experimental."
+                                  >
+                                    <Plus className="h-4 w-4" />
+                                    Reagendar
+                                  </button>
+                                ) : null}
                               </div>
                             </>
                           );
