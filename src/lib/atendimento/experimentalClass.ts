@@ -617,6 +617,42 @@ Link da aula: ${safeLessonLink}
 Acompanhe o atendimento e certifique-se de que tudo ocorra bem.`;
 }
 
+export function buildExperimentalGroupClassAttendantStartReminderWhatsAppMessage(
+  studentNames: string[],
+  lessonLink: string,
+) {
+  const safeLessonLink = String(lessonLink ?? "").trim();
+  const names = studentNames
+    .map((name) => String(name ?? "").trim().split(/\s+/)[0] || "Aluno(a)")
+    .filter(Boolean);
+  const label = names.length > 0 ? names.join(", ") : "os alunos da turma";
+  return `Aviso: aula experimental em grupo inicia em 5 minutos.
+
+Alunos da turma: ${label}
+
+Link da aula: ${safeLessonLink}
+
+Entre na sala e aguarde a entrada dos alunos.`;
+}
+
+export function buildExperimentalGroupClassRegisteredAttendantStartReminderWhatsAppMessage(
+  studentNames: string[],
+  lessonLink: string,
+) {
+  const safeLessonLink = String(lessonLink ?? "").trim();
+  const names = studentNames
+    .map((name) => String(name ?? "").trim().split(/\s+/)[0] || "Aluno(a)")
+    .filter(Boolean);
+  const label = names.length > 0 ? names.join(", ") : "os alunos da turma";
+  return `Aviso: aula experimental em grupo inicia em 5 minutos.
+
+Alunos da turma: ${label}
+
+Link da aula: ${safeLessonLink}
+
+Acompanhe o atendimento e certifique-se de que tudo ocorra bem.`;
+}
+
 export function buildRecurringClassStudentLessonReadyWhatsAppMessage(name: string | null | undefined) {
   const safeFull = String(name ?? "").trim();
   const safeFirst = safeFull.split(/\s+/)[0] || "Aluno";

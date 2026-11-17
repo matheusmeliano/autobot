@@ -2029,22 +2029,9 @@ function buildRecurringGroupExperimentalGate(params: {
 }): RecurringGroupExperimentalGate {
   const pairId = String(params.pairId ?? "").trim() || null;
   const latestClass = params.latestClass ?? null;
-  if (!pairId || !latestClass) {
-    return {
-      released: true,
-      blocked: false,
-      pairId,
-      latestClass,
-    };
-  }
-  const classStartMs = new Date(latestClass.professor_start_at).getTime();
-  const classAlreadyHappened =
-    Number.isFinite(classStartMs) && classStartMs > 0 && classStartMs <= params.now.getTime();
-  const released =
-    !classAlreadyHappened || isExperimentalGroupClassAttendanceReleased(latestClass);
   return {
-    released,
-    blocked: classAlreadyHappened && !released,
+    released: true,
+    blocked: false,
     pairId,
     latestClass,
   };

@@ -1935,8 +1935,11 @@ export function AtendimentoClient() {
   >(null);
   const [experimentalGroupSettingsAssignProfPairId, setExperimentalGroupSettingsAssignProfPairId] =
     useState("");
+  const [experimentalGroupActionMenuPairId, setExperimentalGroupActionMenuPairId] = useState("");
   const [experimentalGroupCompletingPairId, setExperimentalGroupCompletingPairId] = useState("");
   const [experimentalGroupConfirmingPairId, setExperimentalGroupConfirmingPairId] = useState("");
+  const [experimentalGroupSendingNotificationPairId, setExperimentalGroupSendingNotificationPairId] =
+    useState("");
   const [experimentalGroupLessonLinkDraftByPairId, setExperimentalGroupLessonLinkDraftByPairId] =
     useState<Record<string, string>>({});
   const [experimentalGroupLessonLinkSavingPairId, setExperimentalGroupLessonLinkSavingPairId] =
@@ -3035,21 +3038,35 @@ export function AtendimentoClient() {
     }
   }
 
-  async function handleSendStudentNotificationExperimental(lead: AtendimentoLeadListItem) {
-    if (expSendingNotification) return;
+  async function handleSendStudentNotificationExperimental(
+    lead: AtendimentoLeadListItem,
+    options?: { silent?: boolean },
+  ): Promise<{ ok: boolean; error?: string }> {
+    if (expSendingNotification) {
+      return { ok: false, error: "Outro disparo experimental ja esta em andamento." };
+    }
     const professorOk = experimentalAssignedProfessorForLead(lead);
     const linkOk = experimentalLessonLinkForLead(lead);
     if (!professorOk) {
-      modalToast.warning("Selecione o professor responsável antes de disparar agora.");
-      return;
+      const message = "Selecione o professor responsável antes de disparar agora.";
+      if (!options?.silent) {
+        modalToast.warning(message);
+      }
+      return { ok: false, error: message };
     }
     if (!linkOk) {
-      modalToast.warning("Adicione o link da aula experimental antes de disparar a notificação.");
-      return;
+      const message = "Adicione o link da aula experimental antes de disparar a notificação.";
+      if (!options?.silent) {
+        modalToast.warning(message);
+      }
+      return { ok: false, error: message };
     }
     if (!String(lead.phone ?? "").trim()) {
-      modalToast.warning("Registro não possui telefone cadastrado para receber a notificação.");
-      return;
+      const message = "Registro não possui telefone cadastrado para receber a notificação.";
+      if (!options?.silent) {
+        modalToast.warning(message);
+      }
+      return { ok: false, error: message };
     }
     const bookingId = experimentalBookingIdForLead(lead);
     const safeBookingId = bookingId || `draft-${lead.id}`;
@@ -3070,8 +3087,11 @@ export function AtendimentoClient() {
         attendant_notification_sent?: boolean;
       } | null;
       if (!res.ok || !payload?.ok) {
-        modalToast.error(payload?.error ?? "Falha ao disparar as notificações.");
-        return;
+        const message = payload?.error ?? "Falha ao disparar as notificações.";
+        if (!options?.silent) {
+          modalToast.error(message);
+        }
+        return { ok: false, error: message };
       }
       const fresh = await fetch(`/api/atendimento/leads/${encodeURIComponent(lead.id)}?skipEvents=1`, { cache: "no-store" })
         .then(async (r) => (r.ok ? r.json().catch(() => null) : null))
@@ -3079,7 +3099,16 @@ export function AtendimentoClient() {
       if (fresh?.ok && fresh.lead?.id) {
         setPanelLeads((cur) => cur.map((l) => (l.id === lead.id ? ({ ...l, ...fresh.lead } as AtendimentoLeadListItem) : l)));
       }
-      modalToast.success("Notificações disparadas.");
+      if (!options?.silent) {
+        modalToast.success("Notificações disparadas.");
+      }
+      return { ok: true };
+    } catch (error: any) {
+      const message = String(error?.message ?? error ?? "Falha ao disparar as notificações.");
+      if (!options?.silent) {
+        modalToast.error(message);
+      }
+      return { ok: false, error: message };
     } finally {
       setExpSendingNotification(false);
     }
@@ -3168,7 +3197,10 @@ export function AtendimentoClient() {
     }
   }
 
-  async function handleSendExperimentalPostAttendanceMessage(lead: AtendimentoLeadListItem) {
+  async function handleSendExperimentalPostAttendanceMessage(
+    lead: AtendimentoLeadListItem,
+    options?: { silent?: boolean },
+  ): Promise<{ ok: boolean; error?: string }> {
     const conversationIdRaw =
       String((lead as any).conversation?.id ?? (lead as any).conversation_id ?? "").trim() || null;
     const phoneRaw = String(lead.phone ?? "").trim();
@@ -3204,25 +3236,37 @@ export function AtendimentoClient() {
       }
     }
     if (!att) {
-      modalToast.warning("Marque o comparecimento da aula experimental antes de enviar a mensagem de matrícula.");
-      return;
+      const message =
+        "Marque o comparecimento da aula experimental antes de enviar a mensagem de matrícula.";
+      if (!options?.silent) {
+        modalToast.warning(message);
+      }
+      return { ok: false, error: message };
     }
     if (!conversationIdRaw) {
-      modalToast.warning("Nenhuma conversa vinculada a este registro para enviar a mensagem.");
-      return;
+      const message = "Nenhuma conversa vinculada a este registro para enviar a mensagem.";
+      if (!options?.silent) {
+        modalToast.warning(message);
+      }
+      return { ok: false, error: message };
     }
     if (!phoneRaw) {
-      modalToast.warning("Registro não possui telefone cadastrado para receber a mensagem.");
-      return;
+      const message = "Registro não possui telefone cadastrado para receber a mensagem.";
+      if (!options?.silent) {
+        modalToast.warning(message);
+      }
+      return { ok: false, error: message };
     }
     const lockKey = `post-att::${lead.id}::${phoneRaw}`;
     const lockNow = Date.now();
     const lockLast = postAttendanceSendLocksRef.current.get(lockKey) ?? 0;
     if (lockLast > 0 && lockNow - lockLast < 45_000) {
-      return;
+      return { ok: false, error: "Mensagem de matrícula ainda está em janela de bloqueio." };
     }
     postAttendanceSendLocksRef.current.set(lockKey, lockNow);
-    if (expSendingPostAttendanceId) return;
+    if (expSendingPostAttendanceId) {
+      return { ok: false, error: "Outro envio de matrícula já está em andamento." };
+    }
     const nowIso = new Date().toISOString();
     setExpSendingPostAttendanceId(lead.id);
     try {
@@ -3244,8 +3288,11 @@ export function AtendimentoClient() {
         | { ok?: boolean; error?: string; message?: Record<string, unknown> | null }
         | null;
       if (!res.ok || !payload?.ok) {
-        modalToast.error(payload?.error ?? "Falha ao enviar a mensagem de matrícula.");
-        return;
+        const message = payload?.error ?? "Falha ao enviar a mensagem de matrícula.";
+        if (!options?.silent) {
+          modalToast.error(message);
+        }
+        return { ok: false, error: message };
       }
       setPanelLeads((cur) =>
         cur.map((l) => {
@@ -3272,9 +3319,17 @@ export function AtendimentoClient() {
           return next as AtendimentoLeadListItem;
         }),
       );
-      modalToast.success("Mensagem de matrícula enviada.");
+      if (!options?.silent) {
+        modalToast.success("Mensagem de matrícula enviada.");
+      }
+      return { ok: true };
     } catch (err) {
-      modalToast.error(err instanceof Error ? err.message : "Falha ao enviar a mensagem de matrícula.");
+      const message =
+        err instanceof Error ? err.message : "Falha ao enviar a mensagem de matrícula.";
+      if (!options?.silent) {
+        modalToast.error(message);
+      }
+      return { ok: false, error: message };
     } finally {
       setExpSendingPostAttendanceId(null);
     }
@@ -4185,7 +4240,7 @@ export function AtendimentoClient() {
         continue;
       }
 
-      if (handleForbiddenResponse(res)) return;
+      if (handleForbiddenResponse(res)) return false;
 
       const json = await res.json().catch(() => null);
       if (json?.ok) {
@@ -4405,51 +4460,78 @@ export function AtendimentoClient() {
     await loadExperimentalGroupSettings(false);
   }
 
-  async function handleCompleteExperimentalGroupPair(pairId: string, groupClassId: string) {
+  async function loadLeadForExperimentalGroupAction(
+    leadId: string,
+  ): Promise<AtendimentoLeadListItem | null> {
+    const normalizedLeadId = String(leadId ?? "").trim();
+    if (!normalizedLeadId) return null;
+    const cachedLead = panelLeads.find((lead) => lead.id === normalizedLeadId) ?? null;
+    if (cachedLead) return cachedLead;
+    try {
+      const res = await fetch(`/api/atendimento/leads/${encodeURIComponent(normalizedLeadId)}?skipEvents=1`, {
+        cache: "no-store",
+      });
+      if (!res.ok) return null;
+      const payload = (await res.json().catch(() => null)) as
+        | { ok?: boolean; lead?: Record<string, unknown> | null }
+        | null;
+      if (!payload?.ok || !payload.lead?.id) return null;
+      return payload.lead as AtendimentoLeadListItem;
+    } catch {
+      return null;
+    }
+  }
+
+  async function handleCompleteExperimentalGroupPair(pairId: string) {
     if (experimentalGroupCompletingPairId) return;
     const normalizedPairId = String(pairId ?? "").trim();
-    const normalizedGroupClassId = String(groupClassId ?? "").trim();
-    if (!normalizedPairId || !normalizedGroupClassId) return;
-    if (
-      !window.confirm(
-        "Confirmar que a aula experimental em grupo foi realizada com sucesso e liberar as notificações recorrentes deste par?",
-      )
-    ) {
+    if (!normalizedPairId) return;
+    const pair = experimentalGroupFormPairs.find((item) => item.pairId === normalizedPairId) ?? null;
+    if (!pair || pair.members.length === 0) {
+      modalToast.warning("A turma precisa ter pelo menos um registro atribuído.");
       return;
     }
+    setExperimentalGroupActionMenuPairId("");
     setExperimentalGroupCompletingPairId(normalizedPairId);
     try {
-      const res = await fetch("/api/atendimento/experimental-group-classes/complete", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          group_class_id: normalizedGroupClassId,
-        }),
-      });
-      if (handleForbiddenResponse(res)) return;
-      const json = await res.json().catch(() => null);
-      if (!res.ok || !json?.ok) {
-        modalToast.error(
-          normalizeExperimentalGroupErrorMessage(
-            json?.error,
-            "Falha ao confirmar a realização da aula experimental em grupo.",
-          ),
-        );
-        return;
+      let successCount = 0;
+      let failedCount = 0;
+      for (const member of pair.members) {
+        const lead = await loadLeadForExperimentalGroupAction(member.lead_id);
+        if (!lead) {
+          failedCount += 1;
+          continue;
+        }
+        const result = await handleSendExperimentalPostAttendanceMessage(lead, { silent: true });
+        if (result.ok) {
+          successCount += 1;
+        } else {
+          failedCount += 1;
+        }
       }
       await Promise.all([
         loadExperimentalGroupSettings(true),
         loadPanelLeads(),
         loadSummary({ silent: true }),
       ]);
-      modalToast.success(
-        "Aula experimental em grupo confirmada. As notificações recorrentes podem continuar.",
-      );
+      if (successCount > 0 && failedCount === 0) {
+        modalToast.success(
+          `Mensagem de matrícula enviada para ${successCount} registro(s) da turma.`,
+        );
+        return;
+      }
+      if (successCount > 0) {
+        modalToast.warning(
+          `Envio parcial: ${successCount} mensagem(ns) enviada(s) e ${failedCount} falha(s).`,
+        );
+        return;
+      }
+      modalToast.error("Não foi possível enviar a mensagem de matrícula para a turma.");
     } catch (error: any) {
       modalToast.error(
         normalizeExperimentalGroupErrorMessage(
           error?.message,
-          "Falha ao confirmar a realização da aula experimental em grupo.",
+          "Falha ao enviar a mensagem de matrícula da turma.",
         ),
       );
     } finally {
@@ -4567,10 +4649,12 @@ export function AtendimentoClient() {
     pairId: string,
     groupClassId: string,
     options?: { silent?: boolean; autoLockKey?: string | null },
-  ) {
+  ): Promise<boolean> {
     const normalizedPairId = String(pairId ?? "").trim();
     const normalizedGroupClassId = String(groupClassId ?? "").trim();
-    if (!normalizedPairId || !normalizedGroupClassId || experimentalGroupConfirmingPairId) return;
+    if (!normalizedPairId || !normalizedGroupClassId || experimentalGroupConfirmingPairId) {
+      return false;
+    }
 
     const lessonLink =
       String(experimentalGroupLessonLinkDraftByPairId[normalizedPairId] ?? "").trim() ||
@@ -4585,7 +4669,7 @@ export function AtendimentoClient() {
       if (!options?.silent) {
         modalToast.warning("Adicione o link da aula na turma antes de confirmar.");
       }
-      return;
+      return false;
     }
 
     setExperimentalGroupConfirmingPairId(normalizedPairId);
@@ -4598,14 +4682,108 @@ export function AtendimentoClient() {
           lesson_link: lessonLink,
         }),
       });
-      if (handleForbiddenResponse(res)) return;
+      if (handleForbiddenResponse(res)) return false;
       const json = await res.json().catch(() => null);
       if (!res.ok || !json?.ok) {
         if (options?.autoLockKey) {
           experimentalGroupAutoConfirmLockRef.current.delete(normalizedPairId);
         }
+        if (!options?.silent) {
+          modalToast.error(
+            normalizeExperimentalGroupErrorMessage(json?.error, "Falha ao confirmar a turma."),
+          );
+        }
+        return false;
+      }
+      await Promise.all([
+        loadExperimentalGroupSettings(true),
+        loadPanelLeads(),
+        loadSummary({ silent: true }),
+      ]);
+      if (!options?.silent) {
+        modalToast.success("Turma confirmada.");
+      }
+      return true;
+    } catch (error: any) {
+      if (options?.autoLockKey) {
+        experimentalGroupAutoConfirmLockRef.current.delete(normalizedPairId);
+      }
+      if (!options?.silent) {
         modalToast.error(
-          normalizeExperimentalGroupErrorMessage(json?.error, "Falha ao confirmar a turma."),
+          normalizeExperimentalGroupErrorMessage(error?.message, "Falha ao confirmar a turma."),
+        );
+      }
+      return false;
+    } finally {
+      setExperimentalGroupConfirmingPairId("");
+    }
+  }
+
+  async function handleSendStudentNotificationExperimentalGroup(
+    pairId: string,
+    groupClassId: string,
+  ) {
+    const normalizedPairId = String(pairId ?? "").trim();
+    const normalizedGroupClassId = String(groupClassId ?? "").trim();
+    if (
+      !normalizedPairId ||
+      !normalizedGroupClassId ||
+      experimentalGroupSendingNotificationPairId ||
+      experimentalGroupConfirmingPairId
+    ) {
+      return;
+    }
+
+    const lessonLink =
+      String(experimentalGroupLessonLinkDraftByPairId[normalizedPairId] ?? "").trim() ||
+      String(
+        experimentalGroupPairActivity[normalizedPairId]?.latest_experimental_class?.lesson_link ?? "",
+      ).trim() ||
+      "";
+    if (!lessonLink) {
+      modalToast.warning("Adicione o link da aula experimental antes de disparar agora.");
+      return;
+    }
+
+    const pair = experimentalGroupFormPairs.find((item) => item.pairId === normalizedPairId) ?? null;
+    if (!pair || pair.members.length === 0) {
+      modalToast.warning("A turma precisa ter pelo menos um registro atribuído.");
+      return;
+    }
+
+    setExperimentalGroupActionMenuPairId("");
+    const confirmed = await handleConfirmExperimentalGroupPair(normalizedPairId, normalizedGroupClassId, {
+      silent: true,
+    });
+    if (!confirmed) return;
+
+    setExperimentalGroupSendingNotificationPairId(normalizedPairId);
+    try {
+      const res = await fetch("/api/atendimento/experimental-group-classes/send-student-notification", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          group_class_id: normalizedGroupClassId,
+          lesson_link: lessonLink,
+        }),
+      });
+      if (handleForbiddenResponse(res)) return;
+      const json = (await res.json().catch(() => null)) as
+        | {
+            ok?: boolean;
+            error?: string;
+            student_sent_count?: number;
+            student_failed_count?: number;
+            attendant_notification_sent?: boolean;
+            registered_attendant_notification_sent?: boolean;
+          }
+        | null;
+      if (!res.ok || !json?.ok) {
+        modalToast.error(
+          normalizeExperimentalGroupErrorMessage(
+            json?.error,
+            "Falha ao disparar as notificações da turma.",
+          ),
         );
         return;
       }
@@ -4614,20 +4792,33 @@ export function AtendimentoClient() {
         loadPanelLeads(),
         loadSummary({ silent: true }),
       ]);
-      if (!options?.silent) {
+      const studentSentCount = Math.max(0, Number(json?.student_sent_count ?? 0));
+      const studentFailedCount = Math.max(0, Number(json?.student_failed_count ?? 0));
+      const professorSent = Boolean(json?.attendant_notification_sent);
+      const registeredAttendantSent = Boolean(json?.registered_attendant_notification_sent);
+      if (studentFailedCount === 0 && professorSent) {
         modalToast.success(
-          "Turma confirmada. As notificações recorrentes seguem bloqueadas até você marcar a aula experimental como realizada.",
+          `Disparo concluído para ${studentSentCount} registro(s) da turma.`,
         );
+        return;
       }
+      modalToast.warning(
+        [
+          `Envio parcial da turma: ${studentSentCount} aluno(s) notificado(s)`,
+          `${studentFailedCount} falha(s)`,
+          professorSent ? "professor avisado" : "professor com falha",
+          registeredAttendantSent ? "atendente cadastrado avisado" : "atendente cadastrado com falha",
+        ].join(" | "),
+      );
     } catch (error: any) {
-      if (options?.autoLockKey) {
-        experimentalGroupAutoConfirmLockRef.current.delete(normalizedPairId);
-      }
       modalToast.error(
-        normalizeExperimentalGroupErrorMessage(error?.message, "Falha ao confirmar a turma."),
+        normalizeExperimentalGroupErrorMessage(
+          error?.message,
+          "Falha ao disparar as notificações da turma.",
+        ),
       );
     } finally {
-      setExperimentalGroupConfirmingPairId("");
+      setExperimentalGroupSendingNotificationPairId("");
     }
   }
 
@@ -4898,6 +5089,7 @@ export function AtendimentoClient() {
   async function handleRemoveExperimentalGroupPair(pairId: string) {
     const normalizedPairId = String(pairId ?? "").trim();
     if (!normalizedPairId) return;
+    setExperimentalGroupActionMenuPairId("");
     if (experimentalGroupFormPairs.length <= 1) {
       modalToast.warning("Mantenha pelo menos 1 turma criada no modal.");
       return;
@@ -5172,9 +5364,7 @@ export function AtendimentoClient() {
         loadSummary({ silent: true }),
         loadExperimentalGroupLeadData(experimentalGroupLead),
       ]);
-      modalToast.success(
-        "Turma confirmada. As notificações recorrentes seguem bloqueadas até você marcar a aula experimental como realizada.",
-      );
+      modalToast.success("Turma confirmada.");
     } catch (error: any) {
       modalToast.error(
         normalizeExperimentalGroupErrorMessage(error?.message, "Falha ao confirmar a turma."),
@@ -11013,39 +11203,20 @@ export function AtendimentoClient() {
                     String(left.professorTime ?? "").localeCompare(String(right.professorTime ?? "")),
                   );
                 })();
-                const latestExperimentalStatus = String(
-                  latestExperimentalClass?.status ?? "",
-                ).trim().toLowerCase();
-                const latestExperimentalAttendanceStatus = String(
-                  latestExperimentalClass?.attendance_status ?? "",
-                ).trim().toLowerCase();
-                const latestExperimentalCheckedAt = String(
-                  latestExperimentalClass?.attendance_checked_at ?? "",
-                ).trim();
-                const latestExperimentalStartMs = new Date(
-                  String(latestExperimentalClass?.professor_start_at ?? ""),
-                ).getTime();
-                const latestExperimentalAlreadyHappened =
-                  Number.isFinite(latestExperimentalStartMs) &&
-                  latestExperimentalStartMs > 0 &&
-                  latestExperimentalStartMs <= Date.now();
-                const latestExperimentalCompleted =
-                  latestExperimentalStatus === "completed" ||
-                  latestExperimentalAttendanceStatus === "attended" ||
-                  Boolean(latestExperimentalCheckedAt);
-                const latestExperimentalIsConfirmedOrCompleted =
-                  latestExperimentalStatus === "confirmed" ||
-                  latestExperimentalStatus === "completed";
-                const showExperimentalCompletionButton =
+                const actionsMenuOpen = experimentalGroupActionMenuPairId === pair.pairId;
+                const sendingMatriculaThisPair = experimentalGroupCompletingPairId === pair.pairId;
+                const sendingNotificationThisPair =
+                  experimentalGroupSendingNotificationPairId === pair.pairId;
+                const canSendExperimentalGroupMatricula =
+                  card.slotType === "experimental" && pair.members.length > 0;
+                const canSendExperimentalGroupNotification =
                   card.slotType === "experimental" &&
+                  pair.members.length > 0 &&
                   Boolean(latestExperimentalClass?.group_class_id) &&
-                  latestExperimentalIsConfirmedOrCompleted &&
-                  (latestExperimentalAlreadyHappened || latestExperimentalCompleted);
-                const canCompleteExperimentalGroup =
-                  showExperimentalCompletionButton &&
-                  !latestExperimentalCompleted &&
-                  latestExperimentalStatus === "confirmed";
-                const completingThisPair = experimentalGroupCompletingPairId === pair.pairId;
+                  Boolean(
+                    String(experimentalGroupLessonLinkDraftByPairId[pair.pairId] ?? "").trim() ||
+                      String(latestExperimentalClass?.lesson_link ?? "").trim(),
+                  );
                 return (
                   <div
                     key={`group-pair-${pair.pairId}`}
@@ -11063,92 +11234,99 @@ export function AtendimentoClient() {
                             {`Turma ${pair.pairNumber}`}
                           </div>
                         </div>
-                        <div className="flex items-center justify-end gap-2 self-start justify-self-end">
-                          {showExperimentalCompletionButton ? (
-                            <button
-                              type="button"
-                              aria-label={`Confirmar realização da aula experimental da turma ${pair.pairNumber}`}
-                              title={
-                                latestExperimentalCompleted
-                                  ? `Aula experimental confirmada em ${formatAtendimentoDateTime(latestExperimentalCheckedAt)}`
-                                  : "Confirmar que a aula experimental em grupo foi realizada com sucesso"
-                              }
-                              onClick={() =>
-                                canCompleteExperimentalGroup && latestExperimentalClass?.group_class_id
-                                  ? void handleCompleteExperimentalGroupPair(
-                                      pair.pairId,
-                                      latestExperimentalClass.group_class_id,
-                                    )
-                                  : undefined
-                              }
-                              disabled={!canCompleteExperimentalGroup || completingThisPair}
-                              className={[
-                                "inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border transition disabled:cursor-not-allowed",
-                                latestExperimentalCompleted
-                                  ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-700"
-                                  : "border-emerald-500/30 bg-emerald-500/10 text-emerald-800 hover:bg-emerald-500/15 disabled:opacity-55",
-                              ].join(" ")}
-                            >
-                              {completingThisPair ? (
-                                <Loader2 className="h-4 w-4 shrink-0 animate-spin" />
-                              ) : (
-                                <Check className="h-4 w-4 shrink-0 text-emerald-700" />
-                              )}
-                            </button>
-                          ) : null}
+                        <div className="relative self-start justify-self-end">
                           <button
                             type="button"
-                            role="switch"
-                            aria-checked={card.enabled}
+                            aria-label={`Abrir ações da turma ${pair.pairNumber}`}
+                            aria-expanded={actionsMenuOpen}
                             onClick={() =>
-                              updateExperimentalGroupFormSlot(
-                                index,
-                                {
-                                  enabled: !card.enabled,
-                                },
-                                { syncPair: true },
+                              setExperimentalGroupActionMenuPairId((value) =>
+                                value === pair.pairId ? "" : pair.pairId,
                               )
                             }
-                            className="inline-flex shrink-0 items-center justify-center bg-transparent p-0 transition"
+                            onBlur={() => {
+                              setTimeout(() => setExperimentalGroupActionMenuPairId(""), 180);
+                            }}
+                            className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-[var(--app-border)] bg-[var(--app-solid-surface)] text-[var(--app-text-70)] transition hover:bg-[var(--app-hover)]"
                           >
-                            <span
+                            <ChevronDown
                               className={[
-                                "relative flex h-7 w-12 shrink-0 items-center rounded-full border transition",
-                                card.enabled
-                                  ? "border-emerald-500/30 bg-emerald-500/20"
-                                  : "border-[var(--app-border)] bg-[var(--app-solid-surface)]",
+                                "h-4 w-4 shrink-0 transition-transform",
+                                actionsMenuOpen ? "rotate-180" : "",
                               ].join(" ")}
-                            >
-                              <span
+                            />
+                          </button>
+                          {actionsMenuOpen ? (
+                            <div className="absolute right-0 top-full z-[390] mt-2 flex min-w-[210px] flex-col gap-1 overflow-hidden rounded-2xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] p-1.5 shadow-lg">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setExperimentalGroupActionMenuPairId("");
+                                  updateExperimentalGroupFormSlot(
+                                    index,
+                                    {
+                                      enabled: !card.enabled,
+                                    },
+                                    { syncPair: true },
+                                  );
+                                }}
+                                className="inline-flex min-h-[38px] items-center justify-between gap-3 rounded-xl px-3 text-left text-[13px] font-semibold text-[var(--app-text-80)] transition hover:bg-[var(--app-hover)]"
+                              >
+                                <span>{card.enabled ? "Desativar turma" : "Ativar turma"}</span>
+                                <span className="text-[11px] font-medium text-[var(--app-text-50)]">
+                                  {card.enabled ? "Ativa" : "Inativa"}
+                                </span>
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => void handleCompleteExperimentalGroupPair(pair.pairId)}
+                                disabled={!canSendExperimentalGroupMatricula || sendingMatriculaThisPair}
+                                className="inline-flex min-h-[38px] items-center justify-between gap-3 rounded-xl px-3 text-left text-[13px] font-semibold text-[var(--app-text-80)] transition hover:bg-[var(--app-hover)] disabled:cursor-not-allowed disabled:opacity-55"
+                              >
+                                <span>Check (✓)</span>
+                                {sendingMatriculaThisPair ? (
+                                  <Loader2 className="h-4 w-4 shrink-0 animate-spin" />
+                                ) : null}
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  latestExperimentalClass?.group_class_id
+                                    ? void handleSendStudentNotificationExperimentalGroup(
+                                        pair.pairId,
+                                        latestExperimentalClass.group_class_id,
+                                      )
+                                    : undefined
+                                }
+                                disabled={!canSendExperimentalGroupNotification || sendingNotificationThisPair}
+                                className="inline-flex min-h-[38px] items-center justify-between gap-3 rounded-xl px-3 text-left text-[13px] font-semibold text-[var(--app-text-80)] transition hover:bg-[var(--app-hover)] disabled:cursor-not-allowed disabled:opacity-55"
+                              >
+                                <span>Disparar agora</span>
+                                {sendingNotificationThisPair ? (
+                                  <Loader2 className="h-4 w-4 shrink-0 animate-spin" />
+                                ) : null}
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => void handleRemoveExperimentalGroupPair(pair.pairId)}
+                                title={
+                                  pair.hasAssignedMembers
+                                    ? `Turma com ${pair.assignedCount} registro(s) atribuido(s)`
+                                    : experimentalGroupFormPairs.length <= 1
+                                      ? "Mantenha pelo menos 1 turma criada no modal"
+                                      : `Excluir turma ${pair.pairNumber}`
+                                }
                                 className={[
-                                  "absolute h-5 w-5 rounded-full shadow-sm transition-all",
-                                  card.enabled
-                                    ? "left-[22px] bg-emerald-600"
-                                    : "left-1 bg-[var(--app-text-45)]",
+                                  "inline-flex min-h-[38px] items-center justify-between gap-3 rounded-xl px-3 text-left text-[13px] font-semibold transition hover:bg-[rgba(239,68,68,0.08)]",
+                                  pair.hasAssignedMembers
+                                    ? "text-[#b91c1c]"
+                                    : "text-[var(--app-text-80)]",
                                 ].join(" ")}
-                              />
-                            </span>
-                          </button>
-                          <button
-                            type="button"
-                            aria-label={`Excluir turma ${pair.pairNumber}`}
-                            title={
-                              pair.hasAssignedMembers
-                                ? `Turma com ${pair.assignedCount} registro(s) atribuido(s)`
-                                : experimentalGroupFormPairs.length <= 1
-                                  ? "Mantenha pelo menos 1 turma criada no modal"
-                                  : `Excluir turma ${pair.pairNumber}`
-                            }
-                            onClick={() => handleRemoveExperimentalGroupPair(pair.pairId)}
-                            className={[
-                              "inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border transition",
-                              pair.hasAssignedMembers
-                                ? "border-[#ef4444]/25 bg-[rgba(239,68,68,0.08)] text-[#b91c1c]"
-                                : "border-[var(--app-border)] bg-[var(--app-solid-surface)] text-[var(--app-text-70)] hover:bg-[var(--app-hover)] hover:text-[#b91c1c]",
-                            ].join(" ")}
-                          >
-                            <X className="h-4 w-4" />
-                          </button>
+                              >
+                                <span>Excluir turma</span>
+                              </button>
+                            </div>
+                          ) : null}
                         </div>
                       </div>
 

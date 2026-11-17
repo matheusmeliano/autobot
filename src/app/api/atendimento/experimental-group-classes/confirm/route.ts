@@ -210,7 +210,6 @@ export async function POST(req: Request) {
           lead_timezone: leadTimeZone,
           lesson_link: effectiveLessonLink,
           student_notification_sent: false,
-          recurring_release_pending: true,
         },
         actorType: "attendant",
         actorEmail: auth.user.email,
@@ -220,7 +219,6 @@ export async function POST(req: Request) {
     return Response.json({
       ok: true,
       lesson_link_saved: Boolean(effectiveLessonLink),
-      recurring_release_pending: true,
     });
   } catch (error: any) {
     return Response.json(
