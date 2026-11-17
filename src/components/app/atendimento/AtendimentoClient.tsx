@@ -80,6 +80,7 @@ type ExperimentalGroupPairActivityPayload = Record<
       attendance_status?: string | null;
       attendance_checked_at?: string | null;
       lesson_link?: string | null;
+      student_notification_sent_at?: string | null;
     } | null;
   }
 >;
@@ -2408,6 +2409,7 @@ export function AtendimentoClient() {
         attendance_status: string | null;
         attendance_checked_at: string | null;
         lesson_link: string | null;
+        student_notification_sent_at: string | null;
       } | null;
       experimentalSlot: ExperimentalGroupFormSlot;
       recurringSlot: ExperimentalGroupFormSlot;
@@ -2513,6 +2515,10 @@ export function AtendimentoClient() {
                 lesson_link:
                   String(
                     experimentalGroupPairActivity[pair.pairId]?.latest_experimental_class?.lesson_link ?? "",
+                  ).trim() || null,
+                student_notification_sent_at:
+                  String(
+                    experimentalGroupPairActivity[pair.pairId]?.latest_experimental_class?.student_notification_sent_at ?? "",
                   ).trim() || null,
               }
             : null,
@@ -11207,8 +11213,13 @@ export function AtendimentoClient() {
                 const sendingMatriculaThisPair = experimentalGroupCompletingPairId === pair.pairId;
                 const sendingNotificationThisPair =
                   experimentalGroupSendingNotificationPairId === pair.pairId;
+                const experimentalGroupNotificationSentAt = String(
+                  latestExperimentalClass?.student_notification_sent_at ?? "",
+                ).trim();
                 const canSendExperimentalGroupMatricula =
-                  card.slotType === "experimental" && pair.members.length > 0;
+                  card.slotType === "experimental" &&
+                  pair.members.length > 0 &&
+                  Boolean(experimentalGroupNotificationSentAt);
                 const canSendExperimentalGroupNotification =
                   card.slotType === "experimental" &&
                   pair.members.length > 0 &&
@@ -11281,6 +11292,11 @@ export function AtendimentoClient() {
                                 type="button"
                                 onClick={() => void handleCompleteExperimentalGroupPair(pair.pairId)}
                                 disabled={!canSendExperimentalGroupMatricula || sendingMatriculaThisPair}
+                                title={
+                                  canSendExperimentalGroupMatricula
+                                    ? "Enviar mensagem de matrícula para a turma"
+                                    : "Disponível somente após a notificação agendada da aula experimental em grupo ou após Disparar agora"
+                                }
                                 className="inline-flex min-h-[38px] items-center justify-between gap-3 rounded-xl px-3 text-left text-[13px] font-semibold text-[var(--app-text-80)] transition hover:bg-[var(--app-hover)] disabled:cursor-not-allowed disabled:opacity-55"
                               >
                                 <span>Check (✓)</span>

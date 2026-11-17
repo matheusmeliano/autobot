@@ -93,6 +93,7 @@ export type ExperimentalGroupPairActivitySummary = Record<
       attendance_status: string | null;
       attendance_checked_at: string | null;
       lesson_link: string | null;
+      student_notification_sent_at: string | null;
     } | null;
   }
 >;
@@ -582,6 +583,10 @@ export function buildExperimentalGroupPairActivitySummary(params: {
         attendance_status: relevantClass.attendance_status,
         attendance_checked_at: relevantClass.attendance_checked_at,
         lesson_link: relevantClass.lesson_link,
+        student_notification_sent_at:
+          relevantClass.members.find((member) =>
+            Boolean(String(member.student_notification_sent_at ?? "").trim()),
+          )?.student_notification_sent_at ?? null,
       },
     };
   }

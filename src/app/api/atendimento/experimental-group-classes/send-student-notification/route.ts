@@ -224,6 +224,12 @@ export async function POST(req: Request) {
         });
         studentSentCount += 1;
         await admin
+          .from("atendimento_experimental_group_class_members")
+          .update({
+            student_notification_sent_at: nowIso,
+          })
+          .eq("id", String(member?.id ?? "").trim());
+        await admin
           .from("atendimento_leads")
           .update({
             experimental_class_student_notification_sent_at: nowIso,
