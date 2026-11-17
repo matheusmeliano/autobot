@@ -10902,31 +10902,6 @@ export function AtendimentoClient() {
               </button>
               <button
                 type="button"
-                aria-label="Salvar"
-                title={
-                  experimentalGroupSettingsHasPendingChanges
-                    ? "Salvar alterações das turmas"
-                    : "Nenhuma alteração pendente"
-                }
-                onClick={() => {
-                  void handleSaveExperimentalGroupSettings({ silent: false });
-                }}
-                disabled={
-                  experimentalGroupSettingsSaving ||
-                  experimentalGroupSettingsLoading ||
-                  !experimentalGroupSettingsHasPendingChanges
-                }
-                className="inline-flex h-10 items-center justify-center gap-2 rounded-full border border-[var(--app-border)] bg-[var(--app-solid-surface)] px-3 text-[12px] font-semibold text-[var(--app-text-70)] transition hover:bg-[var(--app-hover)] disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                {experimentalGroupSettingsSaving ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  <Save className="h-4 w-4" />
-                )}
-                <span>Salvar</span>
-              </button>
-              <button
-                type="button"
                 aria-label="Fechar"
                 onClick={() => {
                   void handleRequestCloseExperimentalGroupSettings();
@@ -11282,18 +11257,27 @@ export function AtendimentoClient() {
                                   type="button"
                                   disabled={!card.enabled || !card.professorPhone}
                                   onClick={() =>
-                                    updateExperimentalGroupFormSlot(
-                                      index,
-                                      {
-                                        weekday:
-                                          getExperimentalAvailabilityWeekdayForDate(
-                                            pairAvailability,
-                                            selectedDateId,
-                                          ) || card.weekday,
-                                        professor_time: timeOption.professorTime,
-                                      },
-                                      { syncPair: true },
-                                    )
+                                    {
+                                      setExperimentalGroupFormDateIds((prev) =>
+                                        prev.map((value, slotIndex) =>
+                                          experimentalGroupFormSlots[slotIndex]?.pairId === pair.pairId
+                                            ? selectedDateId
+                                            : value,
+                                        ),
+                                      );
+                                      updateExperimentalGroupFormSlot(
+                                        index,
+                                        {
+                                          weekday:
+                                            getExperimentalAvailabilityWeekdayForDate(
+                                              pairAvailability,
+                                              selectedDateId,
+                                            ) || card.weekday,
+                                          professor_time: timeOption.professorTime,
+                                        },
+                                        { syncPair: true },
+                                      );
+                                    }
                                   }
                                   className={[
                                     "flex h-11 items-center justify-center rounded-2xl border px-2 text-[14px] font-semibold transition duration-150 disabled:cursor-not-allowed disabled:opacity-60 sm:h-12 sm:text-[15px]",
@@ -11387,6 +11371,34 @@ export function AtendimentoClient() {
                           </div>
                         </div>
                       ) : null}
+
+                      <div className="flex justify-end pt-1">
+                        <button
+                          type="button"
+                          aria-label={`Salvar turma ${pair.pairNumber}`}
+                          title={
+                            experimentalGroupSettingsHasPendingChanges
+                              ? "Salvar alterações das turmas"
+                              : "Nenhuma alteração pendente"
+                          }
+                          onClick={() => {
+                            void handleSaveExperimentalGroupSettings({ silent: false });
+                          }}
+                          disabled={
+                            experimentalGroupSettingsSaving ||
+                            experimentalGroupSettingsLoading ||
+                            !experimentalGroupSettingsHasPendingChanges
+                          }
+                          className="inline-flex h-9 items-center justify-center gap-2 rounded-full border border-[var(--app-border)] bg-[var(--app-solid-surface)] px-3 text-[12px] font-semibold text-[var(--app-text-70)] transition hover:bg-[var(--app-hover)] disabled:cursor-not-allowed disabled:opacity-60"
+                        >
+                          {experimentalGroupSettingsSaving ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : (
+                            <Save className="h-4 w-4" />
+                          )}
+                          <span>Salvar</span>
+                        </button>
+                      </div>
                     </div>
                   </div>
                 );

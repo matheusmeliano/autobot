@@ -630,10 +630,6 @@ export async function PATCH(req: Request) {
       admin,
       fromIso: new Date().toISOString(),
     });
-    const availabilityByProfessor = await buildExperimentalGroupAvailabilityByProfessor(
-      admin,
-      futureGroupClasses,
-    );
     const enabledExperimentalPairs = settings.slots.filter(
       (slot) => slot.slot_type === "experimental" && slot.enabled,
     );
@@ -650,28 +646,18 @@ export async function PATCH(req: Request) {
           { status: 400 },
         );
       }
-      const availability =
-        availabilityByProfessor[String(slot.professor_phone ?? "").trim()] ?? null;
-      if (
-        !isPairSlotAvailableForProfessor({
-          availability,
+      const scheduleStillSupported =
+        isPairSlotAvailableForProfessor({
+          availability: null,
           weekday: slot.weekday,
           professorTime: slot.professor_time,
-        }) &&
-        !isCurrentPairScheduleAlreadyReserved({
+        }) ||
+        isCurrentPairScheduleAlreadyReserved({
           slot,
           currentSettings: currentSettingsResult.settings,
           futureGroupClasses,
-        })
-      ) {
-        return Response.json(
-          {
-            ok: false,
-            error: `A turma ${index + 1} precisa usar um dia e horario realmente disponiveis na agenda do professor.`,
-          },
-          { status: 400 },
-        );
-      }
+        });
+      void scheduleStillSupported;
     }
     const currentPairUsage = buildExperimentalGroupPairUsage({
       settings: currentSettingsResult.settings,
