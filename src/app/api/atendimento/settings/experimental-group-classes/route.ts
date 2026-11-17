@@ -16,6 +16,7 @@ import {
 import {
   experimentalGroupWeekdayLabel,
   normalizeExperimentalGroupClassSettings,
+  resolveExperimentalGroupPairIdForClass,
   type ExperimentalGroupClassRecord,
   type ExperimentalGroupClassSettings,
   type ExperimentalGroupWeekdayKey,
@@ -129,6 +130,42 @@ function isPairSlotAvailableForProfessor(params: {
     if (String(matchingWeekday).trim().toLowerCase() !== weekday) return false;
     return slots.some(
       (slot: any) => String(slot?.professorTime ?? "").trim() === professorTime,
+    );
+  });
+}
+
+function isCurrentPairScheduleAlreadyReserved(params: {
+  slot: ExperimentalGroupClassSettings["slots"][number];
+  currentSettings: ExperimentalGroupClassSettings;
+  futureGroupClasses: ExperimentalGroupClassRecord[];
+}) {
+  const pairId = String(params.slot.pair_id ?? "").trim();
+  const weekday = String(params.slot.weekday ?? "").trim().toLowerCase();
+  const professorTime = String(params.slot.professor_time ?? "").trim();
+  const professorPhoneDigits = String(params.slot.professor_phone ?? "").replace(/\D/g, "");
+  if (!pairId || !weekday || !professorTime) return false;
+
+  const currentSlot = params.currentSettings.slots.find((slot) => {
+    if (slot.slot_type !== "experimental") return false;
+    if (String(slot.pair_id ?? "").trim() !== pairId) return false;
+    return (
+      String(slot.weekday ?? "").trim().toLowerCase() === weekday &&
+      String(slot.professor_time ?? "").trim() === professorTime &&
+      String(slot.professor_phone ?? "").replace(/\D/g, "") === professorPhoneDigits
+    );
+  });
+  if (currentSlot) return true;
+
+  return params.futureGroupClasses.some((groupClass) => {
+    const classPairId = resolveExperimentalGroupPairIdForClass({
+      settings: params.currentSettings,
+      groupClass,
+    });
+    if (String(classPairId ?? "").trim() !== pairId) return false;
+    return (
+      String(groupClass.professor_weekday ?? "").trim().toLowerCase() === weekday &&
+      String(groupClass.professor_time ?? "").trim() === professorTime &&
+      String(groupClass.professor_phone ?? "").replace(/\D/g, "") === professorPhoneDigits
     );
   });
 }
@@ -372,6 +409,11 @@ export async function PATCH(req: Request) {
           availability,
           weekday: slot.weekday,
           professorTime: slot.professor_time,
+        }) &&
+        !isCurrentPairScheduleAlreadyReserved({
+          slot,
+          currentSettings: currentSettingsResult.settings,
+          futureGroupClasses,
         })
       ) {
         return Response.json(
