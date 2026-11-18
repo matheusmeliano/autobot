@@ -5094,6 +5094,33 @@ export function AtendimentoClient() {
     const pair = experimentalGroupFormPairs.find((item) => item.pairId === normalizedPairId) ?? null;
     if (!pair) return;
     const nextEnabled = !Boolean(pair.experimentalSlot.enabled);
+    const experimentalSlot = pair.experimentalSlot;
+    if (nextEnabled) {
+      if (!String(experimentalSlot.professorName ?? "").trim() || !String(experimentalSlot.professorPhone ?? "").trim()) {
+        modalToast.warning("Selecione o professor antes de ativar a turma.");
+        return;
+      }
+      if (!String(experimentalSlot.weekday ?? "").trim() || !String(experimentalSlot.professor_time ?? "").trim()) {
+        modalToast.warning("Configure dia e horario antes de ativar a turma.");
+        return;
+      }
+      const conflictingExperimentalSlot = experimentalGroupFormPairs.find((currentPair) => {
+        if (currentPair.pairId === normalizedPairId) return false;
+        if (!currentPair.experimentalSlot.enabled) return false;
+        return (
+          String(currentPair.experimentalSlot.professorPhone ?? "").trim() ===
+            String(experimentalSlot.professorPhone ?? "").trim() &&
+          String(currentPair.experimentalSlot.weekday ?? "").trim() ===
+            String(experimentalSlot.weekday ?? "").trim() &&
+          String(currentPair.experimentalSlot.professor_time ?? "").trim() ===
+            String(experimentalSlot.professor_time ?? "").trim()
+        );
+      });
+      if (conflictingExperimentalSlot) {
+        modalToast.warning("Ja existe outra turma ativa com o mesmo professor, dia e horario.");
+        return;
+      }
+    }
     const previousSlots = experimentalGroupFormSlots;
     const nextSlots = previousSlots.map((slot) =>
       String(slot.pairId ?? "").trim() === normalizedPairId
