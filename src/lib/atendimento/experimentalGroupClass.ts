@@ -24,6 +24,7 @@ export type ExperimentalGroupConfiguredSlot = {
   professor_time: string | null;
   professor_name: string | null;
   professor_phone: string | null;
+  pair_name: string | null;
   slot_type: ExperimentalGroupSlotType;
   pair_id: string;
 };
@@ -120,6 +121,7 @@ function buildDefaultExperimentalGroupPair(pairNumber: number): ExperimentalGrou
       professor_time: null,
       professor_name: null,
       professor_phone: null,
+      pair_name: null,
       slot_type: "experimental",
       pair_id: pairId,
     },
@@ -129,6 +131,7 @@ function buildDefaultExperimentalGroupPair(pairNumber: number): ExperimentalGrou
       professor_time: null,
       professor_name: null,
       professor_phone: null,
+      pair_name: null,
       slot_type: "recorrente",
       pair_id: pairId,
     },
@@ -206,6 +209,7 @@ export function normalizeExperimentalGroupClassSettings(
       professor_time: professorTime,
       professor_name: normalizedProfessor?.name ?? null,
       professor_phone: normalizedProfessor?.phone ?? null,
+      pair_name: String(slotValue.pair_name ?? "").trim() || null,
       slot_type: slotType,
       pair_id: pairId,
     });
@@ -247,6 +251,8 @@ export function normalizeExperimentalGroupClassSettings(
       experimentalSlot?.professor_name ?? recurringSlot?.professor_name ?? null;
     const fallbackProfessorPhone =
       experimentalSlot?.professor_phone ?? recurringSlot?.professor_phone ?? null;
+    const fallbackPairName =
+      experimentalSlot?.pair_name ?? recurringSlot?.pair_name ?? null;
     const fallbackEnabled = Boolean(
       experimentalSlot?.enabled ?? recurringSlot?.enabled ?? false,
     );
@@ -257,6 +263,7 @@ export function normalizeExperimentalGroupClassSettings(
       professor_time: experimentalSlot?.professor_time ?? fallbackProfessorTime,
       professor_name: experimentalSlot?.professor_name ?? fallbackProfessorName,
       professor_phone: experimentalSlot?.professor_phone ?? fallbackProfessorPhone,
+      pair_name: experimentalSlot?.pair_name ?? fallbackPairName,
       slot_type: "experimental",
       pair_id: canonicalPairId,
     });
@@ -266,6 +273,7 @@ export function normalizeExperimentalGroupClassSettings(
       professor_time: recurringSlot?.professor_time ?? fallbackProfessorTime,
       professor_name: recurringSlot?.professor_name ?? fallbackProfessorName,
       professor_phone: recurringSlot?.professor_phone ?? fallbackProfessorPhone,
+      pair_name: recurringSlot?.pair_name ?? fallbackPairName,
       slot_type: "recorrente",
       pair_id: canonicalPairId,
     });

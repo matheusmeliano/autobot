@@ -45,6 +45,7 @@ const schema = z.object({
           .optional(),
         professor_name: z.string().trim().nullable().optional(),
         professor_phone: z.string().trim().nullable().optional(),
+        pair_name: z.string().trim().max(80).nullable().optional(),
         slot_type: slotTypeSchema.optional(),
         pair_id: z.string().trim().min(1).optional(),
       }),
@@ -94,6 +95,7 @@ function canonicalizeExperimentalGroupPairSettings(
         professor_time: source.professor_time ?? null,
         professor_name: source.professor_name ?? null,
         professor_phone: source.professor_phone ?? null,
+        pair_name: source.pair_name ?? null,
         pair_id: pairId,
       };
       return [

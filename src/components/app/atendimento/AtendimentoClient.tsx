@@ -46,6 +46,7 @@ type ExperimentalGroupSettingsPayload = {
     professor_time?: string | null;
     professor_name?: string | null;
     professor_phone?: string | null;
+    pair_name?: string | null;
     slot_type?: "experimental" | "recorrente";
     pair_id?: string | null;
   }>;
@@ -92,6 +93,7 @@ type ExperimentalGroupFormSlot = {
   professor_time: string;
   professorName: string;
   professorPhone: string;
+  pairName: string;
   slotType: ExperimentalGroupSlotType;
   pairId: string;
 };
@@ -181,6 +183,7 @@ function buildExperimentalGroupFormPair(pairNumber: number): ExperimentalGroupFo
       professor_time: "",
       professorName: "",
       professorPhone: "",
+      pairName: "",
       slotType: "experimental",
       pairId,
     },
@@ -190,6 +193,7 @@ function buildExperimentalGroupFormPair(pairNumber: number): ExperimentalGroupFo
       professor_time: "",
       professorName: "",
       professorPhone: "",
+      pairName: "",
       slotType: "recorrente",
       pairId,
     },
@@ -4384,6 +4388,7 @@ export function AtendimentoClient() {
             professor_time: String(slot?.professor_time ?? "").trim(),
             professorName: String(slot?.professor_name ?? "").trim(),
             professorPhone: String(slot?.professor_phone ?? "").trim(),
+            pairName: String(slot?.pair_name ?? "").trim(),
             slotType:
               String(slot?.slot_type ?? "").trim().toLowerCase() === "recorrente"
                 ? "recorrente"
@@ -4399,6 +4404,7 @@ export function AtendimentoClient() {
         professor_time: String(slot.professor_time ?? "").trim(),
         professor_name: String(slot.professorName ?? "").trim(),
         professor_phone: String(slot.professorPhone ?? "").trim(),
+        pair_name: String(slot.pairName ?? "").trim(),
         slot_type: slot.slotType,
         pair_id: String(slot.pairId ?? "").trim(),
       })),
@@ -4873,6 +4879,7 @@ export function AtendimentoClient() {
         professor_time: String(slot.professor_time ?? "").trim(),
         professor_name: String(slot.professorName ?? "").trim(),
         professor_phone: String(slot.professorPhone ?? "").trim(),
+        pair_name: String(slot.pairName ?? "").trim(),
         slot_type: slot.slotType,
         pair_id: String(slot.pairId ?? "").trim(),
       })),
@@ -4903,6 +4910,46 @@ export function AtendimentoClient() {
       String(experimentalGroupLessonLinkDraftByPairId[normalizedPairId] ?? "").trim() || "";
     if (!draft && !saved) return false;
     return draft !== saved;
+  }
+
+  function getSavedExperimentalGroupPairName(pairId: string): string {
+    const normalizedPairId = String(pairId ?? "").trim();
+    if (!normalizedPairId) return "";
+    try {
+      const savedSlots = JSON.parse(
+        experimentalGroupSettingsLastSavedSnapshotRef.current || "[]",
+      ) as Array<Record<string, unknown>>;
+      const matchingSlot =
+        savedSlots.find(
+          (slot) =>
+            String(slot?.pair_id ?? "").trim() === normalizedPairId &&
+            String(slot?.slot_type ?? "").trim().toLowerCase() === "experimental",
+        ) ??
+        savedSlots.find(
+          (slot) => String(slot?.pair_id ?? "").trim() === normalizedPairId,
+        ) ??
+        null;
+      return String(matchingSlot?.pair_name ?? "").trim();
+    } catch {
+      return "";
+    }
+  }
+
+  function hasPendingExperimentalGroupPairNameChange(pairId: string): boolean {
+    const normalizedPairId = String(pairId ?? "").trim();
+    if (!normalizedPairId) return false;
+    const currentSlot =
+      experimentalGroupFormSlots.find(
+        (slot) =>
+          String(slot.pairId ?? "").trim() === normalizedPairId &&
+          slot.slotType === "experimental",
+      ) ??
+      experimentalGroupFormSlots.find(
+        (slot) => String(slot.pairId ?? "").trim() === normalizedPairId,
+      ) ??
+      null;
+    if (!currentSlot) return false;
+    return String(currentSlot.pairName ?? "").trim() !== getSavedExperimentalGroupPairName(normalizedPairId);
   }
 
   async function handleRequestCloseExperimentalGroupSettings() {
@@ -4975,6 +5022,7 @@ export function AtendimentoClient() {
   async function handleSaveExperimentalGroupSettings(options?: {
     silent?: boolean;
     slots?: ExperimentalGroupFormSlot[];
+    successMessage?: string;
   }): Promise<boolean> {
     if (experimentalGroupSettingsSaving) return false;
     const slots = Array.isArray(options?.slots) ? options!.slots : experimentalGroupFormSlots;
@@ -5005,6 +5053,7 @@ export function AtendimentoClient() {
             professor_time: slot.professor_time || null,
             professor_name: slot.professorName || null,
             professor_phone: slot.professorPhone || null,
+            pair_name: String(slot.pairName ?? "").trim() || null,
             slot_type: slot.slotType,
             pair_id: slot.pairId,
           })),
@@ -5023,7 +5072,10 @@ export function AtendimentoClient() {
       }
       syncExperimentalGroupSettingsFromPayload(json);
       if (!options?.silent) {
-        modalToast.success("Configuração das aulas experimentais em grupo salva.");
+        modalToast.success(
+          String(options?.successMessage ?? "").trim() ||
+            "Configuração das aulas experimentais em grupo salva.",
+        );
       }
       void loadPanelLeads();
       return true;
@@ -11294,6 +11346,11 @@ export function AtendimentoClient() {
                 );
                 const hasPendingSaveForThisCard =
                   hasPendingLessonLinkChange || experimentalGroupSettingsHasPendingChanges;
+                const hasPendingPairNameChange = hasPendingExperimentalGroupPairNameChange(
+                  pair.pairId,
+                );
+                const displayPairName =
+                  String(card.pairName ?? "").trim() || `Turma ${pair.pairNumber}`;
                 const canSendExperimentalGroupMatricula =
                   card.slotType === "experimental" &&
                   pair.members.length > 0 &&
@@ -11321,7 +11378,7 @@ export function AtendimentoClient() {
                     <div className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-2">
                         <div className={["min-w-0", inactiveCardContentClass].join(" ")}>
                           <div className="text-[14px] font-bold text-[var(--app-text-85)]">
-                            {`Turma ${pair.pairNumber}`}
+                            {displayPairName}
                           </div>
                         </div>
                         <div className="relative self-start justify-self-end">
@@ -11430,6 +11487,29 @@ export function AtendimentoClient() {
                         </div>
                       </div>
                     <div className={["mt-4 space-y-4", inactiveCardContentClass].join(" ")}>
+                      <div className="space-y-2">
+                        <div className="flex items-center gap-3">
+                          <label className="text-xs font-semibold text-[var(--app-text-70)]">
+                            Nome da turma
+                          </label>
+                        </div>
+                        <input
+                          type="text"
+                          value={String(card.pairName ?? "")}
+                          onChange={(e) =>
+                            updateExperimentalGroupFormSlot(
+                              index,
+                              { pairName: e.target.value },
+                              { syncPair: true },
+                            )
+                          }
+                          placeholder={`Turma ${pair.pairNumber}`}
+                          maxLength={80}
+                          className="w-full min-w-0 rounded-xl border border-[var(--app-border)] bg-[var(--app-solid-surface-2)] px-4 py-3 text-[13px] font-semibold text-[var(--app-text-85)] placeholder:text-[var(--app-text-45)] transition focus:border-[var(--app-border-strong)] focus:outline-none disabled:cursor-not-allowed disabled:opacity-60"
+                          disabled={experimentalGroupSettingsSaving || experimentalGroupSettingsLoading}
+                        />
+                      </div>
+
                       <div className="space-y-2">
                         <div className="flex items-center gap-3">
                           <label className="text-xs font-semibold text-[var(--app-text-70)]">
@@ -11742,7 +11822,12 @@ export function AtendimentoClient() {
                               }
                               if (experimentalGroupSettingsHasPendingChanges) {
                                 handled =
-                                  (await handleSaveExperimentalGroupSettings({ silent: false })) ||
+                                  (await handleSaveExperimentalGroupSettings({
+                                    silent: false,
+                                    successMessage: hasPendingPairNameChange
+                                      ? "Turma renomeada."
+                                      : undefined,
+                                  })) ||
                                   handled;
                               }
                               if (!handled) {
