@@ -563,8 +563,6 @@ export function listExperimentalGroupClassSlots(params: {
   }
 
   const professorTimeZone = settings.professor_timezone || ATENDIMENTO_PROFESSOR_TIME_ZONE;
-  const assignedProfessor =
-    params.assignedProfessor ?? resolveExperimentalGroupProfessorFromLead(params.lead ?? null);
   const leadTimeZone = resolveLeadTimeZoneFromRecord({
     lead: params.lead ?? null,
     fallbackTimeZone: professorTimeZone,
@@ -702,15 +700,13 @@ export function listExperimentalGroupClassSlots(params: {
         });
       const blockedByIndividual =
         individualStarts.has(professorStartAt) && !existingClass;
-      const slotProfessorName =
-        String(configuredSlot.professor_name ?? "").trim() || assignedProfessor?.name || "";
-      const slotProfessorPhone =
-        String(configuredSlot.professor_phone ?? "").trim() || assignedProfessor?.phone || "";
+      const slotProfessorName = String(configuredSlot.professor_name ?? "").trim();
+      const slotProfessorPhone = String(configuredSlot.professor_phone ?? "").trim();
 
       if (!existingClass && (blockedByRecurring || blockedByIndividual)) {
         continue;
       }
-      if (!existingClass && !slotProfessorName && !slotProfessorPhone) {
+      if (!existingClass && (!slotProfessorName || !slotProfessorPhone)) {
         continue;
       }
 
