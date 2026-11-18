@@ -11942,7 +11942,7 @@ export function AtendimentoClient() {
                               className={[
                                 "rounded-2xl border px-4 py-4 text-left transition",
                                 isSelected
-                                  ? "!border-transparent !bg-[#ea580c] !text-white shadow-md"
+                                  ? "border-[#ea580c]/35 bg-[rgba(234,88,12,0.08)] text-[var(--app-text-85)] shadow-sm"
                                   : "border-[var(--app-border)] bg-[var(--app-solid-surface)] text-[var(--app-text-85)] hover:border-[#ea580c]/35 hover:bg-[var(--app-hover)]",
                               ].join(" ")}
                             >
@@ -11951,7 +11951,7 @@ export function AtendimentoClient() {
                                   <div
                                     className={
                                       "text-[14px] font-bold " +
-                                      (isSelected ? "!text-white" : "text-[var(--app-text-85)]")
+                                      (isSelected ? "text-[var(--app-text-90)]" : "text-[var(--app-text-85)]")
                                     }
                                   >
                                     Turma {turma.turmaNumber} disponível
@@ -11959,7 +11959,7 @@ export function AtendimentoClient() {
                                   <div
                                     className={
                                       "mt-1 text-[12px] " +
-                                      (isSelected ? "!text-white/90" : "text-[var(--app-text-55)]")
+                                      (isSelected ? "text-[var(--app-text-65)]" : "text-[var(--app-text-55)]")
                                     }
                                   >
                                     {turma.professorName || "Professor definido na turma"}
@@ -11967,14 +11967,21 @@ export function AtendimentoClient() {
                                   <div
                                     className={
                                       "mt-2 text-[12px] font-medium " +
-                                      (isSelected ? "!text-white/90" : "text-[var(--app-text-60)]")
+                                      (isSelected ? "text-[var(--app-text-70)]" : "text-[var(--app-text-60)]")
                                     }
                                   >
                                     {scheduleSummary}
                                   </div>
                                 </div>
                                 {turma.hasCurrentLeadAssigned ? (
-                                  <div className="inline-flex shrink-0 items-center gap-1 rounded-full border border-white/20 bg-white/15 px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.12em] !text-white">
+                                  <div
+                                    className={[
+                                      "inline-flex shrink-0 items-center gap-1 rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.12em]",
+                                      isSelected
+                                        ? "border border-[#ea580c]/25 bg-white text-[#c2410c]"
+                                        : "border border-white/20 bg-white/15 !text-white",
+                                    ].join(" ")}
+                                  >
                                     Atual
                                   </div>
                                 ) : null}
@@ -11982,7 +11989,7 @@ export function AtendimentoClient() {
                               <div
                                 className={
                                   "mt-3 text-[12px] " +
-                                  (isSelected ? "!text-white/90" : "text-[var(--app-text-55)]")
+                                  (isSelected ? "text-[var(--app-text-65)]" : "text-[var(--app-text-55)]")
                                 }
                               >
                                 Alunos: {turma.occupiedSeats}/{turma.capacity} | Vagas:{" "}
