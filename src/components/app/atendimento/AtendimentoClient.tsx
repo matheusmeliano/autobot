@@ -11220,7 +11220,7 @@ export function AtendimentoClient() {
                       "rounded-2xl border p-4 transition",
                       card.enabled
                         ? "border-[var(--app-border)] bg-[var(--app-solid-surface)]"
-                        : "border-[var(--app-border)] bg-[var(--app-solid-surface)] opacity-60",
+                        : "border-[var(--app-border)] bg-[var(--app-solid-surface)]",
                     ].join(" ")}
                   >
                     <div className="space-y-4">
