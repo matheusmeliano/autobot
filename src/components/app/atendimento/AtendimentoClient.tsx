@@ -1877,7 +1877,6 @@ export function AtendimentoClient() {
   const [experimentalGroupSettingsOpen, setExperimentalGroupSettingsOpen] = useState(false);
   const [experimentalGroupSettingsLoading, setExperimentalGroupSettingsLoading] = useState(false);
   const [experimentalGroupSettingsSaving, setExperimentalGroupSettingsSaving] = useState(false);
-  const experimentalGroupSettingsAutosaveTimeoutRef = useRef<number | null>(null);
   const experimentalGroupSettingsLastSavedSnapshotRef = useRef<string>("");
   const [experimentalGroupAvailability, setExperimentalGroupAvailability] =
     useState<ExperimentalAvailabilityPayload | null>(null);
@@ -4399,10 +4398,6 @@ export function AtendimentoClient() {
         pair_id: String(slot.pairId ?? "").trim(),
       })),
     );
-    if (typeof experimentalGroupSettingsAutosaveTimeoutRef.current === "number") {
-      window.clearTimeout(experimentalGroupSettingsAutosaveTimeoutRef.current);
-      experimentalGroupSettingsAutosaveTimeoutRef.current = null;
-    }
     setExperimentalGroupFormSlots(normalizedSlots);
     const pairUsageSafe =
       pairUsageRaw && typeof pairUsageRaw === "object" ? pairUsageRaw : {};
@@ -4835,38 +4830,16 @@ export function AtendimentoClient() {
   }
 
   async function handleRequestCloseExperimentalGroupSettings() {
-    if (typeof experimentalGroupSettingsAutosaveTimeoutRef.current === "number") {
-      window.clearTimeout(experimentalGroupSettingsAutosaveTimeoutRef.current);
-      experimentalGroupSettingsAutosaveTimeoutRef.current = null;
-    }
-    if (
-      !experimentalGroupSettingsSaving &&
-      hasPendingExperimentalGroupSettingsChanges(experimentalGroupFormSlots)
-    ) {
-      const saved = await handleSaveExperimentalGroupSettings({
-        silent: false,
-        slots: experimentalGroupFormSlots,
-      });
-      if (!saved) return;
-    }
     setExperimentalGroupSettingsOpen(false);
   }
 
   useEffect(() => {
     return () => {
       experimentalGroupAutoConfirmLockRef.current.clear();
-      if (typeof experimentalGroupSettingsAutosaveTimeoutRef.current === "number") {
-        window.clearTimeout(experimentalGroupSettingsAutosaveTimeoutRef.current);
-        experimentalGroupSettingsAutosaveTimeoutRef.current = null;
-      }
     };
   }, []);
 
   useEffect(() => {
-    if (typeof experimentalGroupSettingsAutosaveTimeoutRef.current === "number") {
-      window.clearTimeout(experimentalGroupSettingsAutosaveTimeoutRef.current);
-      experimentalGroupSettingsAutosaveTimeoutRef.current = null;
-    }
     return;
   }, [
     experimentalGroupFormSlots,
