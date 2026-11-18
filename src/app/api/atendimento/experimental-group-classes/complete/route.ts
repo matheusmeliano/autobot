@@ -14,16 +14,23 @@ function isMissingExperimentalGroupRelation(error: unknown): boolean {
   return (
     code === "42P01" ||
     code === "PGRST205" ||
-    code === "42703" ||
-    code === "PGRST204" ||
     /relation .*atendimento_experimental_group_(classes|class_members).*does not exist/i.test(
       message,
     ) ||
+    /could not find the table .*atendimento_experimental_group_(classes|class_members).* in the schema cache/i.test(
+      message,
+    )
+  );
+}
+
+function isExperimentalGroupAttendanceColumnsUnavailable(error: unknown): boolean {
+  const code = String((error as any)?.code ?? "").trim();
+  const message = String((error as any)?.message ?? "");
+  return (
+    code === "42703" ||
+    code === "PGRST204" ||
     /column .*(attendance_status|attendance_checked_at).* does not exist/i.test(message) ||
     /could not find the '(attendance_status|attendance_checked_at)' column .*schema cache/i.test(
-      message,
-    ) ||
-    /could not find the table .*atendimento_experimental_group_(classes|class_members).* in the schema cache/i.test(
       message,
     )
   );
@@ -84,7 +91,7 @@ export async function POST(req: Request) {
     const checkedAtIso =
       String((groupClass as any)?.attendance_checked_at ?? "").trim() || nowIso;
     if (classStatus !== "completed" || !String((groupClass as any)?.attendance_checked_at ?? "").trim()) {
-      const { error: updateClassError } = await admin
+      let { error: updateClassError } = await admin
         .from("atendimento_experimental_group_classes")
         .update({
           status: "completed",
@@ -93,6 +100,16 @@ export async function POST(req: Request) {
           updated_at: nowIso,
         })
         .eq("id", groupClassId);
+      if (updateClassError && isExperimentalGroupAttendanceColumnsUnavailable(updateClassError)) {
+        const fallbackUpdate = await admin
+          .from("atendimento_experimental_group_classes")
+          .update({
+            status: "completed",
+            updated_at: nowIso,
+          })
+          .eq("id", groupClassId);
+        updateClassError = fallbackUpdate.error;
+      }
       if (updateClassError) {
         if (isMissingExperimentalGroupRelation(updateClassError)) {
           return groupSchemaUnavailableResponse();
