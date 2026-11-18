@@ -11978,7 +11978,7 @@ export function AtendimentoClient() {
                                     className={[
                                       "inline-flex shrink-0 items-center gap-1 rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.12em]",
                                       isSelected
-                                        ? "border border-[#ea580c]/35 bg-[#ea580c] text-white"
+                                        ? "border border-[#ea580c]/35 bg-[#ea580c] !text-white"
                                         : "border border-white/20 bg-white/15 !text-white",
                                     ].join(" ")}
                                   >
