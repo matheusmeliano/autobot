@@ -5078,6 +5078,31 @@ export function AtendimentoClient() {
     modalToast.success(`Turma ${pair?.pairNumber ?? ""} excluida.`.trim());
   }
 
+  async function handleToggleExperimentalGroupPairEnabled(pairId: string) {
+    const normalizedPairId = String(pairId ?? "").trim();
+    if (!normalizedPairId || experimentalGroupSettingsSaving || experimentalGroupSettingsLoading) {
+      return;
+    }
+    setExperimentalGroupActionMenuPairId("");
+    const pair = experimentalGroupFormPairs.find((item) => item.pairId === normalizedPairId) ?? null;
+    if (!pair) return;
+    const nextEnabled = !Boolean(pair.experimentalSlot.enabled);
+    const nextSlots = experimentalGroupFormSlots.map((slot) =>
+      String(slot.pairId ?? "").trim() === normalizedPairId
+        ? {
+            ...slot,
+            enabled: nextEnabled,
+          }
+        : slot,
+    );
+    const saved = await handleSaveExperimentalGroupSettings({
+      silent: true,
+      slots: nextSlots,
+    });
+    if (!saved) return;
+    modalToast.success(nextEnabled ? "Turma ativada." : "Turma desativada.");
+  }
+
   async function loadExperimentalGroupLeadData(lead: AtendimentoLeadListItem) {
     setExperimentalGroupLoading(true);
     setExperimentalGroupLeadSlotType(null);
@@ -11231,17 +11256,9 @@ export function AtendimentoClient() {
                             <div className="absolute right-0 top-full z-[390] mt-2 flex min-w-[210px] flex-col gap-1 overflow-hidden rounded-2xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] p-1.5 shadow-lg">
                               <button
                                 type="button"
-                                onClick={() => {
-                                  setExperimentalGroupActionMenuPairId("");
-                                  updateExperimentalGroupFormSlot(
-                                    index,
-                                    {
-                                      enabled: !card.enabled,
-                                    },
-                                    { syncPair: true },
-                                  );
-                                }}
-                                className="inline-flex min-h-[38px] items-center justify-between gap-3 rounded-xl px-3 text-left text-[13px] font-semibold text-[var(--app-text-80)] transition hover:bg-[var(--app-hover)]"
+                                onClick={() => void handleToggleExperimentalGroupPairEnabled(pair.pairId)}
+                                disabled={experimentalGroupSettingsSaving || experimentalGroupSettingsLoading}
+                                className="inline-flex min-h-[38px] items-center justify-between gap-3 rounded-xl px-3 text-left text-[13px] font-semibold text-[var(--app-text-80)] transition hover:bg-[var(--app-hover)] disabled:cursor-not-allowed disabled:opacity-55"
                               >
                                 <span>{card.enabled ? "Desativar turma" : "Ativar turma"}</span>
                                 <span className="text-[11px] font-medium text-[var(--app-text-50)]">
