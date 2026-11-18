@@ -5041,7 +5041,7 @@ export function AtendimentoClient() {
       slots: nextSlots,
     });
     if (!saved) return;
-    modalToast.success(`Turma ${nextPairNumber} criada.`);
+    modalToast.success("Turma criada.");
   }
 
   async function handleRemoveExperimentalGroupPair(pairId: string) {
