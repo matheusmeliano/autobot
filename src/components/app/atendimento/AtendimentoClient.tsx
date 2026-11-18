@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { flushSync } from "react-dom";
 import { AlertCircle, AlertTriangle, BarChart3, Bot, Calendar as CalendarIcon, Check, CheckCircle2, ChevronDown, ChevronLeft, ChevronRight, Copy, Eraser, ExternalLink, FileText, Info, Loader2, MapPin, Palette, Pencil, Plus, RefreshCw, Save, Search, Sparkles, Trash2, UserRound, Users, X, Zap } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { ATENDIMENTO_PROFESSOR_TIME_ZONE, STAGE_LABELS, STATUS_LABELS } from "@/lib/atendimento/constants";
@@ -5102,18 +5103,24 @@ export function AtendimentoClient() {
           }
         : slot,
     );
-    setExperimentalGroupTogglingPairId(normalizedPairId);
-    setExperimentalGroupFormSlots(nextSlots);
+    flushSync(() => {
+      setExperimentalGroupTogglingPairId(normalizedPairId);
+      setExperimentalGroupFormSlots(nextSlots);
+    });
     const saved = await handleSaveExperimentalGroupSettings({
       silent: true,
       slots: nextSlots,
     });
     if (!saved) {
-      setExperimentalGroupFormSlots(previousSlots);
-      setExperimentalGroupTogglingPairId("");
+      flushSync(() => {
+        setExperimentalGroupFormSlots(previousSlots);
+        setExperimentalGroupTogglingPairId("");
+      });
       return;
     }
-    setExperimentalGroupTogglingPairId("");
+    flushSync(() => {
+      setExperimentalGroupTogglingPairId("");
+    });
     modalToast.success(nextEnabled ? "Turma ativada." : "Turma desativada.");
   }
 
