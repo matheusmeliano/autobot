@@ -4584,11 +4584,11 @@ export function AtendimentoClient() {
     pairId: string,
     groupClassId: string,
     options?: { silent?: boolean },
-  ) {
+  ): Promise<boolean> {
     const normalizedPairId = String(pairId ?? "").trim();
     const normalizedGroupClassId = String(groupClassId ?? "").trim();
-    if (!normalizedPairId || !normalizedGroupClassId) return;
-    if (experimentalGroupLessonLinkSavingPairId) return;
+    if (!normalizedPairId || !normalizedGroupClassId) return false;
+    if (experimentalGroupLessonLinkSavingPairId) return false;
 
     const saved =
       String(
@@ -4601,13 +4601,13 @@ export function AtendimentoClient() {
       if (!options?.silent) {
         modalToast.warning("Informe o link da aula da turma antes de salvar.");
       }
-      return;
+      return false;
     }
     if (draft === saved) {
       if (!options?.silent) {
         modalToast.info("Nenhuma alteração no link da turma.");
       }
-      return;
+      return false;
     }
 
     setExperimentalGroupLessonLinkSavingPairId(normalizedPairId);
@@ -4620,7 +4620,7 @@ export function AtendimentoClient() {
           lesson_link: draft || null,
         }),
       });
-      if (handleForbiddenResponse(res)) return;
+      if (handleForbiddenResponse(res)) return false;
       const json = await res.json().catch(() => null);
       if (!res.ok || !json?.ok) {
         modalToast.error(
@@ -4629,7 +4629,7 @@ export function AtendimentoClient() {
             "Falha ao salvar o link da turma experimental.",
           ),
         );
-        return;
+        return false;
       }
       await Promise.all([
         loadExperimentalGroupSettings(true),
@@ -4639,6 +4639,7 @@ export function AtendimentoClient() {
       if (!options?.silent) {
         modalToast.success(draft ? "Link da turma salvo." : "Link da turma removido.");
       }
+      return true;
     } catch (error: any) {
       modalToast.error(
         normalizeExperimentalGroupErrorMessage(
@@ -4646,6 +4647,7 @@ export function AtendimentoClient() {
           "Falha ao salvar o link da turma experimental.",
         ),
       );
+      return false;
     } finally {
       setExperimentalGroupLessonLinkSavingPairId("");
     }
@@ -4854,6 +4856,19 @@ export function AtendimentoClient() {
   const experimentalGroupSettingsHasPendingChanges = useMemo<boolean>(() => {
     return hasPendingExperimentalGroupSettingsChanges(experimentalGroupFormSlots);
   }, [experimentalGroupFormSlots]);
+
+  function hasPendingExperimentalGroupLessonLinkChange(pairId: string): boolean {
+    const normalizedPairId = String(pairId ?? "").trim();
+    if (!normalizedPairId) return false;
+    const saved =
+      String(
+        experimentalGroupPairActivity[normalizedPairId]?.latest_experimental_class?.lesson_link ?? "",
+      ).trim() || "";
+    const draft =
+      String(experimentalGroupLessonLinkDraftByPairId[normalizedPairId] ?? "").trim() || "";
+    if (!draft && !saved) return false;
+    return draft !== saved;
+  }
 
   async function handleRequestCloseExperimentalGroupSettings() {
     if (typeof experimentalGroupSettingsAutosaveTimeoutRef.current === "number") {
@@ -11216,6 +11231,11 @@ export function AtendimentoClient() {
                 const experimentalGroupNotificationSentAt = String(
                   latestExperimentalClass?.student_notification_sent_at ?? "",
                 ).trim();
+                const hasPendingLessonLinkChange = hasPendingExperimentalGroupLessonLinkChange(
+                  pair.pairId,
+                );
+                const hasPendingSaveForThisCard =
+                  hasPendingLessonLinkChange || experimentalGroupSettingsHasPendingChanges;
                 const canSendExperimentalGroupMatricula =
                   card.slotType === "experimental" &&
                   pair.members.length > 0 &&
@@ -11651,17 +11671,40 @@ export function AtendimentoClient() {
                           type="button"
                           aria-label={`Salvar turma ${pair.pairNumber}`}
                           title={
-                            experimentalGroupSettingsHasPendingChanges
-                              ? "Salvar alterações das turmas"
-                              : "Nenhuma alteração pendente"
+                            hasPendingLessonLinkChange
+                              ? "Salvar link da aula desta turma"
+                              : hasPendingSaveForThisCard
+                                ? "Salvar alterações das turmas"
+                                : "Nenhuma alteração pendente"
                           }
                           onClick={() => {
-                            void handleSaveExperimentalGroupSettings({ silent: false });
+                            void (async () => {
+                              let handled = false;
+                              if (
+                                hasPendingLessonLinkChange &&
+                                latestExperimentalClass?.group_class_id
+                              ) {
+                                handled = await handleSaveExperimentalGroupLessonLink(
+                                  pair.pairId,
+                                  latestExperimentalClass.group_class_id,
+                                  { silent: false },
+                                );
+                              }
+                              if (experimentalGroupSettingsHasPendingChanges) {
+                                handled =
+                                  (await handleSaveExperimentalGroupSettings({ silent: false })) ||
+                                  handled;
+                              }
+                              if (!handled) {
+                                modalToast.info("Nenhuma alteração pendente.");
+                              }
+                            })();
                           }}
                           disabled={
                             experimentalGroupSettingsSaving ||
                             experimentalGroupSettingsLoading ||
-                            !experimentalGroupSettingsHasPendingChanges
+                            experimentalGroupLessonLinkSavingPairId === pair.pairId ||
+                            !hasPendingSaveForThisCard
                           }
                           className="inline-flex h-9 items-center justify-center gap-2 rounded-full border border-[var(--app-border)] bg-[var(--app-solid-surface)] px-3 text-[12px] font-semibold text-[var(--app-text-70)] transition hover:bg-[var(--app-hover)] disabled:cursor-not-allowed disabled:opacity-60"
                         >
