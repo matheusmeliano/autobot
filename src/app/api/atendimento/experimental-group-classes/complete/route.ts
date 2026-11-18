@@ -54,7 +54,6 @@ export async function POST(req: Request) {
 
     const admin = createSupabaseAdminClient();
     const nowIso = new Date().toISOString();
-    const nowMs = new Date(nowIso).getTime();
     const groupClassId = parsed.data.group_class_id;
 
     const { data: groupClass, error: groupClassError } = await admin
@@ -81,13 +80,6 @@ export async function POST(req: Request) {
     }
 
     const professorStartAt = String((groupClass as any)?.professor_start_at ?? "").trim();
-    const classStartMs = new Date(professorStartAt).getTime();
-    if (Number.isFinite(classStartMs) && classStartMs > nowMs) {
-      return Response.json(
-        { ok: false, error: "A aula dessa turma ainda não aconteceu." },
-        { status: 409 },
-      );
-    }
 
     const checkedAtIso =
       String((groupClass as any)?.attendance_checked_at ?? "").trim() || nowIso;
