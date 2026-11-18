@@ -1945,7 +1945,6 @@ export function AtendimentoClient() {
     useState<Record<string, string>>({});
   const [experimentalGroupLessonLinkSavingPairId, setExperimentalGroupLessonLinkSavingPairId] =
     useState("");
-  const experimentalGroupLessonLinkAutosaveTimeoutsRef = useRef<Map<string, number>>(new Map());
   const experimentalGroupAutoConfirmLockRef = useRef<Map<string, string>>(new Map());
   const [experimentalGroupSelectedDateId, setExperimentalGroupSelectedDateId] = useState<
     string | null
@@ -4545,41 +4544,6 @@ export function AtendimentoClient() {
     }
   }
 
-  function clearExperimentalGroupLessonLinkAutosave(pairId: string) {
-    const normalizedPairId = String(pairId ?? "").trim();
-    if (!normalizedPairId) return;
-    const timers = experimentalGroupLessonLinkAutosaveTimeoutsRef.current;
-    const timeoutId = timers.get(normalizedPairId);
-    if (typeof timeoutId === "number") {
-      window.clearTimeout(timeoutId);
-    }
-    timers.delete(normalizedPairId);
-  }
-
-  function scheduleExperimentalGroupLessonLinkAutosave(pairId: string, groupClassId: string) {
-    const normalizedPairId = String(pairId ?? "").trim();
-    const normalizedGroupClassId = String(groupClassId ?? "").trim();
-    if (!normalizedPairId || !normalizedGroupClassId) return;
-    clearExperimentalGroupLessonLinkAutosave(normalizedPairId);
-    const timeoutId = window.setTimeout(() => {
-      experimentalGroupLessonLinkAutosaveTimeoutsRef.current.delete(normalizedPairId);
-      void handleSaveExperimentalGroupLessonLink(normalizedPairId, normalizedGroupClassId, {
-        silent: true,
-      });
-    }, 700);
-    experimentalGroupLessonLinkAutosaveTimeoutsRef.current.set(normalizedPairId, timeoutId);
-  }
-
-  function flushExperimentalGroupLessonLinkAutosave(pairId: string, groupClassId: string) {
-    const normalizedPairId = String(pairId ?? "").trim();
-    const normalizedGroupClassId = String(groupClassId ?? "").trim();
-    if (!normalizedPairId || !normalizedGroupClassId) return;
-    clearExperimentalGroupLessonLinkAutosave(normalizedPairId);
-    void handleSaveExperimentalGroupLessonLink(normalizedPairId, normalizedGroupClassId, {
-      silent: true,
-    });
-  }
-
   async function handleSaveExperimentalGroupLessonLink(
     pairId: string,
     groupClassId: string,
@@ -4890,11 +4854,6 @@ export function AtendimentoClient() {
 
   useEffect(() => {
     return () => {
-      const timers = experimentalGroupLessonLinkAutosaveTimeoutsRef.current;
-      for (const timeoutId of timers.values()) {
-        window.clearTimeout(timeoutId);
-      }
-      timers.clear();
       experimentalGroupAutoConfirmLockRef.current.clear();
       if (typeof experimentalGroupSettingsAutosaveTimeoutRef.current === "number") {
         window.clearTimeout(experimentalGroupSettingsAutosaveTimeoutRef.current);
@@ -11643,20 +11602,6 @@ export function AtendimentoClient() {
                                     ...prev,
                                     [pair.pairId]: nextValue,
                                   }));
-                                  if (latestExperimentalClass?.group_class_id) {
-                                    scheduleExperimentalGroupLessonLinkAutosave(
-                                      pair.pairId,
-                                      latestExperimentalClass.group_class_id,
-                                    );
-                                  }
-                                }}
-                                onBlur={() => {
-                                  if (latestExperimentalClass?.group_class_id) {
-                                    flushExperimentalGroupLessonLinkAutosave(
-                                      pair.pairId,
-                                      latestExperimentalClass.group_class_id,
-                                    );
-                                  }
                                 }}
                                 className="w-full min-w-0 rounded-xl border border-[var(--app-border)] bg-[var(--app-solid-surface-2)] px-4 py-3 text-[13px] font-semibold text-[var(--app-text-85)] placeholder:text-[var(--app-text-45)] transition focus:border-[var(--app-border-strong)] focus:outline-none disabled:cursor-not-allowed disabled:opacity-60"
                                 disabled={experimentalGroupLessonLinkSavingPairId === pair.pairId}
