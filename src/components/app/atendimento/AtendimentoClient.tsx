@@ -1877,6 +1877,7 @@ export function AtendimentoClient() {
   const [experimentalGroupSettingsOpen, setExperimentalGroupSettingsOpen] = useState(false);
   const [experimentalGroupSettingsLoading, setExperimentalGroupSettingsLoading] = useState(false);
   const [experimentalGroupSettingsSaving, setExperimentalGroupSettingsSaving] = useState(false);
+  const [experimentalGroupTogglingPairId, setExperimentalGroupTogglingPairId] = useState("");
   const experimentalGroupSettingsLastSavedSnapshotRef = useRef<string>("");
   const [experimentalGroupAvailability, setExperimentalGroupAvailability] =
     useState<ExperimentalAvailabilityPayload | null>(null);
@@ -5080,14 +5081,20 @@ export function AtendimentoClient() {
 
   async function handleToggleExperimentalGroupPairEnabled(pairId: string) {
     const normalizedPairId = String(pairId ?? "").trim();
-    if (!normalizedPairId || experimentalGroupSettingsSaving || experimentalGroupSettingsLoading) {
+    if (
+      !normalizedPairId ||
+      experimentalGroupSettingsSaving ||
+      experimentalGroupSettingsLoading ||
+      experimentalGroupTogglingPairId
+    ) {
       return;
     }
     setExperimentalGroupActionMenuPairId("");
     const pair = experimentalGroupFormPairs.find((item) => item.pairId === normalizedPairId) ?? null;
     if (!pair) return;
     const nextEnabled = !Boolean(pair.experimentalSlot.enabled);
-    const nextSlots = experimentalGroupFormSlots.map((slot) =>
+    const previousSlots = experimentalGroupFormSlots;
+    const nextSlots = previousSlots.map((slot) =>
       String(slot.pairId ?? "").trim() === normalizedPairId
         ? {
             ...slot,
@@ -5095,11 +5102,18 @@ export function AtendimentoClient() {
           }
         : slot,
     );
+    setExperimentalGroupTogglingPairId(normalizedPairId);
+    setExperimentalGroupFormSlots(nextSlots);
     const saved = await handleSaveExperimentalGroupSettings({
       silent: true,
       slots: nextSlots,
     });
-    if (!saved) return;
+    if (!saved) {
+      setExperimentalGroupFormSlots(previousSlots);
+      setExperimentalGroupTogglingPairId("");
+      return;
+    }
+    setExperimentalGroupTogglingPairId("");
     modalToast.success(nextEnabled ? "Turma ativada." : "Turma desativada.");
   }
 
@@ -11196,6 +11210,7 @@ export function AtendimentoClient() {
                 const experimentalGroupNotificationSentAt = String(
                   latestExperimentalClass?.student_notification_sent_at ?? "",
                 ).trim();
+                const togglingThisPair = experimentalGroupTogglingPairId === pair.pairId;
                 const hasPendingLessonLinkChange = hasPendingExperimentalGroupLessonLinkChange(
                   pair.pairId,
                 );
@@ -11257,13 +11272,21 @@ export function AtendimentoClient() {
                               <button
                                 type="button"
                                 onClick={() => void handleToggleExperimentalGroupPairEnabled(pair.pairId)}
-                                disabled={experimentalGroupSettingsSaving || experimentalGroupSettingsLoading}
+                                disabled={
+                                  experimentalGroupSettingsSaving ||
+                                  experimentalGroupSettingsLoading ||
+                                  Boolean(experimentalGroupTogglingPairId)
+                                }
                                 className="inline-flex min-h-[38px] items-center justify-between gap-3 rounded-xl px-3 text-left text-[13px] font-semibold text-[var(--app-text-80)] transition hover:bg-[var(--app-hover)] disabled:cursor-not-allowed disabled:opacity-55"
                               >
                                 <span>{card.enabled ? "Desativar turma" : "Ativar turma"}</span>
-                                <span className="text-[11px] font-medium text-[var(--app-text-50)]">
-                                  {card.enabled ? "Ativa" : "Inativa"}
-                                </span>
+                                {togglingThisPair ? (
+                                  <Loader2 className="h-4 w-4 shrink-0 animate-spin" />
+                                ) : (
+                                  <span className="text-[11px] font-medium text-[var(--app-text-50)]">
+                                    {card.enabled ? "Ativa" : "Inativa"}
+                                  </span>
+                                )}
                               </button>
                               <button
                                 type="button"
