@@ -11213,6 +11213,7 @@ export function AtendimentoClient() {
                     String(experimentalGroupLessonLinkDraftByPairId[pair.pairId] ?? "").trim() ||
                       String(latestExperimentalClass?.lesson_link ?? "").trim(),
                   );
+                const inactiveCardContentClass = card.enabled ? "" : "opacity-60";
                 return (
                   <div
                     key={`group-pair-${pair.pairId}`}
@@ -11223,9 +11224,8 @@ export function AtendimentoClient() {
                         : "border-[var(--app-border)] bg-[var(--app-solid-surface)]",
                     ].join(" ")}
                   >
-                    <div className="space-y-4">
-                      <div className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-2">
-                        <div className="min-w-0">
+                    <div className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-2">
+                        <div className={["min-w-0", inactiveCardContentClass].join(" ")}>
                           <div className="text-[14px] font-bold text-[var(--app-text-85)]">
                             {`Turma ${pair.pairNumber}`}
                           </div>
@@ -11322,7 +11322,7 @@ export function AtendimentoClient() {
                           ) : null}
                         </div>
                       </div>
-
+                    <div className={["mt-4 space-y-4", inactiveCardContentClass].join(" ")}>
                       <div className="space-y-2">
                         <div className="flex items-center gap-3">
                           <label className="text-xs font-semibold text-[var(--app-text-70)]">
