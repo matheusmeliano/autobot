@@ -633,18 +633,9 @@ export async function PATCH(req: Request) {
     const enabledExperimentalPairs = settings.slots.filter(
       (slot) => slot.slot_type === "experimental" && slot.enabled,
     );
-    for (const [index, slot] of enabledExperimentalPairs.entries()) {
-      if (!slot.professor_phone || !slot.professor_name) {
-        return Response.json(
-          { ok: false, error: `Selecione o professor da turma ${index + 1}.` },
-          { status: 400 },
-        );
-      }
+    for (const slot of enabledExperimentalPairs) {
       if (!slot.weekday || !slot.professor_time) {
-        return Response.json(
-          { ok: false, error: `Configure dia e horario na turma ${index + 1}.` },
-          { status: 400 },
-        );
+        continue;
       }
       const scheduleStillSupported =
         isPairSlotAvailableForProfessor({
