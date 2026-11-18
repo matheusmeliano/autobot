@@ -4464,23 +4464,24 @@ export function AtendimentoClient() {
 
   async function loadLeadForExperimentalGroupAction(
     leadId: string,
+    options?: { forceRefresh?: boolean },
   ): Promise<AtendimentoLeadListItem | null> {
     const normalizedLeadId = String(leadId ?? "").trim();
     if (!normalizedLeadId) return null;
     const cachedLead = panelLeads.find((lead) => lead.id === normalizedLeadId) ?? null;
-    if (cachedLead) return cachedLead;
+    if (cachedLead && !options?.forceRefresh) return cachedLead;
     try {
       const res = await fetch(`/api/atendimento/leads/${encodeURIComponent(normalizedLeadId)}?skipEvents=1`, {
         cache: "no-store",
       });
-      if (!res.ok) return null;
+      if (!res.ok) return cachedLead;
       const payload = (await res.json().catch(() => null)) as
         | { ok?: boolean; lead?: Record<string, unknown> | null }
         | null;
-      if (!payload?.ok || !payload.lead?.id) return null;
+      if (!payload?.ok || !payload.lead?.id) return cachedLead;
       return payload.lead as AtendimentoLeadListItem;
     } catch {
-      return null;
+      return cachedLead;
     }
   }
 
@@ -4493,22 +4494,85 @@ export function AtendimentoClient() {
       modalToast.warning("A turma precisa ter pelo menos um registro atribuído.");
       return;
     }
+    const latestExperimentalClass = pair.latestExperimentalClass;
+    const groupClassId = String(latestExperimentalClass?.group_class_id ?? "").trim();
+    if (!groupClassId) {
+      modalToast.warning("A turma precisa ter uma aula experimental criada antes do Check.");
+      return;
+    }
     setExperimentalGroupActionMenuPairId("");
     setExperimentalGroupCompletingPairId(normalizedPairId);
     try {
+      const completeRes = await fetch("/api/atendimento/experimental-group-classes/complete", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          group_class_id: groupClassId,
+        }),
+      });
+      const completePayload = (await completeRes.json().catch(() => null)) as
+        | { ok?: boolean; error?: string; attendance_checked_at?: string | null }
+        | null;
+      if (!completeRes.ok || !completePayload?.ok) {
+        modalToast.error(
+          normalizeExperimentalGroupErrorMessage(
+            completePayload?.error,
+            "Nao foi possível concluir a aula experimental da turma.",
+          ),
+        );
+        return;
+      }
+      const checkedAtIso =
+        String(completePayload?.attendance_checked_at ?? "").trim() || new Date().toISOString();
+      setExperimentalGroupPairActivity((current) => {
+        const currentEntry = current[normalizedPairId];
+        const currentClass = currentEntry?.latest_experimental_class;
+        if (!currentClass) return current;
+        return {
+          ...current,
+          [normalizedPairId]: {
+            ...currentEntry,
+            latest_experimental_class: {
+              ...currentClass,
+              status: "completed",
+              attendance_status: "attended",
+              attendance_checked_at: checkedAtIso,
+            },
+          },
+        };
+      });
+
       let successCount = 0;
       let failedCount = 0;
+      let firstFailureMessage = "";
       for (const member of pair.members) {
-        const lead = await loadLeadForExperimentalGroupAction(member.lead_id);
+        const lead = await loadLeadForExperimentalGroupAction(member.lead_id, { forceRefresh: true });
         if (!lead) {
           failedCount += 1;
+          if (!firstFailureMessage) {
+            firstFailureMessage = "Nao foi possível carregar um dos registros da turma.";
+          }
           continue;
         }
-        const result = await handleSendExperimentalPostAttendanceMessage(lead, { silent: true });
+        const leadForSend = {
+          ...lead,
+          full_name:
+            String(lead.full_name ?? "").trim() ||
+            String(member.full_name ?? "").trim() ||
+            lead.full_name,
+          phone:
+            String(lead.phone ?? "").trim() ||
+            String(member.phone ?? "").trim() ||
+            lead.phone,
+        } as AtendimentoLeadListItem;
+        const result = await handleSendExperimentalPostAttendanceMessage(leadForSend, { silent: true });
         if (result.ok) {
           successCount += 1;
         } else {
           failedCount += 1;
+          if (!firstFailureMessage) {
+            firstFailureMessage = String(result.error ?? "").trim();
+          }
         }
       }
       await Promise.all([
@@ -4524,11 +4588,18 @@ export function AtendimentoClient() {
       }
       if (successCount > 0) {
         modalToast.warning(
-          `Envio parcial: ${successCount} mensagem(ns) enviada(s) e ${failedCount} falha(s).`,
+          [
+            `Envio parcial: ${successCount} mensagem(ns) enviada(s) e ${failedCount} falha(s).`,
+            firstFailureMessage ? `Motivo principal: ${firstFailureMessage}` : "",
+          ]
+            .filter(Boolean)
+            .join(" "),
         );
         return;
       }
-      modalToast.error("Não foi possível enviar a mensagem de matrícula para a turma.");
+      modalToast.error(
+        firstFailureMessage || "Não foi possível enviar a mensagem de matrícula para a turma.",
+      );
     } catch (error: any) {
       modalToast.error(
         normalizeExperimentalGroupErrorMessage(
@@ -11220,6 +11291,7 @@ export function AtendimentoClient() {
                 const canSendExperimentalGroupMatricula =
                   card.slotType === "experimental" &&
                   pair.members.length > 0 &&
+                  Boolean(latestExperimentalClass?.group_class_id) &&
                   Boolean(experimentalGroupNotificationSentAt);
                 const savedExperimentalGroupLessonLink = String(
                   latestExperimentalClass?.lesson_link ?? "",
