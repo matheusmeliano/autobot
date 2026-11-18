@@ -5026,17 +5026,22 @@ export function AtendimentoClient() {
     );
   }
 
-  function handleOpenExperimentalGroupPairs() {
-    setExperimentalGroupFormSlots((prev) => {
-      const highestPairNumber = prev.reduce((highest, slot, index) => {
-        const rawPairId =
-          String(slot.pairId ?? "").trim() || `pair-${Math.floor(index / 2) + 1}`;
-        const pairNumber = Number(rawPairId.match(/(\d+)/)?.[1] ?? Number.NaN);
-        return Number.isFinite(pairNumber) ? Math.max(highest, pairNumber) : highest;
-      }, 0);
-      return [...prev, ...buildExperimentalGroupFormPair(highestPairNumber + 1)];
+  async function handleOpenExperimentalGroupPairs() {
+    if (experimentalGroupSettingsSaving || experimentalGroupSettingsLoading) return;
+    const highestPairNumber = experimentalGroupFormSlots.reduce((highest, slot, index) => {
+      const rawPairId =
+        String(slot.pairId ?? "").trim() || `pair-${Math.floor(index / 2) + 1}`;
+      const pairNumber = Number(rawPairId.match(/(\d+)/)?.[1] ?? Number.NaN);
+      return Number.isFinite(pairNumber) ? Math.max(highest, pairNumber) : highest;
+    }, 0);
+    const nextPairNumber = highestPairNumber + 1;
+    const nextSlots = [...experimentalGroupFormSlots, ...buildExperimentalGroupFormPair(nextPairNumber)];
+    const saved = await handleSaveExperimentalGroupSettings({
+      silent: true,
+      slots: nextSlots,
     });
-    setExperimentalGroupFormDateIds((prev) => [...prev, "", ""]);
+    if (!saved) return;
+    modalToast.success(`Turma ${nextPairNumber} criada.`);
   }
 
   async function handleRemoveExperimentalGroupPair(pairId: string) {
@@ -11079,7 +11084,10 @@ export function AtendimentoClient() {
               <button
                 type="button"
                 aria-label="Abrir Turmas"
-                onClick={handleOpenExperimentalGroupPairs}
+                onClick={() => {
+                  void handleOpenExperimentalGroupPairs();
+                }}
+                disabled={experimentalGroupSettingsSaving || experimentalGroupSettingsLoading}
                 className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-[var(--app-border)] bg-[var(--app-solid-surface)] text-[var(--app-text-70)] hover:bg-[var(--app-hover)] disabled:cursor-not-allowed disabled:opacity-60"
               >
                 <Plus className="h-4 w-4" />
