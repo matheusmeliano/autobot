@@ -3205,7 +3205,7 @@ export function AtendimentoClient() {
 
   async function handleSendExperimentalPostAttendanceMessage(
     lead: AtendimentoLeadListItem,
-    options?: { silent?: boolean },
+    options?: { silent?: boolean; skipAttendanceRequirement?: boolean },
   ): Promise<{ ok: boolean; error?: string }> {
     const conversationIdRaw =
       String((lead as any).conversation?.id ?? (lead as any).conversation_id ?? "").trim() || null;
@@ -3217,7 +3217,7 @@ export function AtendimentoClient() {
     const bk = expBestBooking as any;
     let att =
       String(bk?.attendance_status ?? (lead as any).experimental_class_attendance_status ?? "").trim();
-    if (!att) {
+    if (!att && !options?.skipAttendanceRequirement) {
       const bookingIdCandidate =
         String(bk?.id ?? (lead as any).experimental_class_booking_id ?? "").trim() ||
         `draft-${String(lead.id ?? "").trim()}`;
@@ -3240,6 +3240,9 @@ export function AtendimentoClient() {
           att = "";
         }
       }
+    }
+    if (!att && options?.skipAttendanceRequirement) {
+      att = "attended";
     }
     if (!att) {
       const message =
@@ -4565,7 +4568,10 @@ export function AtendimentoClient() {
             String(member.phone ?? "").trim() ||
             lead.phone,
         } as AtendimentoLeadListItem;
-        const result = await handleSendExperimentalPostAttendanceMessage(leadForSend, { silent: true });
+        const result = await handleSendExperimentalPostAttendanceMessage(leadForSend, {
+          silent: true,
+          skipAttendanceRequirement: true,
+        });
         if (result.ok) {
           successCount += 1;
         } else {
