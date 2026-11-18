@@ -89,9 +89,7 @@ export async function POST(req: Request) {
       return Response.json({ ok: false, error: "group_class_not_found" }, { status: 404 });
     }
 
-    const lessonLink =
-      String(parsed.data.lesson_link ?? "").trim() ||
-      String((groupClass as any)?.lesson_link ?? "").trim();
+    const lessonLink = String((groupClass as any)?.lesson_link ?? "").trim();
     if (!lessonLink) {
       return Response.json({ ok: false, error: "missing_lesson_link" }, { status: 409 });
     }

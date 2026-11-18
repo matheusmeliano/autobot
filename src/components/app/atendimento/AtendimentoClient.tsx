@@ -4703,14 +4703,11 @@ export function AtendimentoClient() {
       return;
     }
 
-    const lessonLink =
-      String(experimentalGroupLessonLinkDraftByPairId[normalizedPairId] ?? "").trim() ||
-      String(
-        experimentalGroupPairActivity[normalizedPairId]?.latest_experimental_class?.lesson_link ?? "",
-      ).trim() ||
-      "";
+    const lessonLink = String(
+      experimentalGroupPairActivity[normalizedPairId]?.latest_experimental_class?.lesson_link ?? "",
+    ).trim();
     if (!lessonLink) {
-      modalToast.warning("Adicione o link da aula experimental antes de disparar agora.");
+      modalToast.warning("Salve o link da aula na turma antes de disparar agora.");
       return;
     }
 
@@ -11224,14 +11221,14 @@ export function AtendimentoClient() {
                   card.slotType === "experimental" &&
                   pair.members.length > 0 &&
                   Boolean(experimentalGroupNotificationSentAt);
+                const savedExperimentalGroupLessonLink = String(
+                  latestExperimentalClass?.lesson_link ?? "",
+                ).trim();
                 const canSendExperimentalGroupNotification =
                   card.slotType === "experimental" &&
                   pair.members.length > 0 &&
                   Boolean(latestExperimentalClass?.group_class_id) &&
-                  Boolean(
-                    String(experimentalGroupLessonLinkDraftByPairId[pair.pairId] ?? "").trim() ||
-                      String(latestExperimentalClass?.lesson_link ?? "").trim(),
-                  );
+                  Boolean(savedExperimentalGroupLessonLink);
                 const inactiveCardContentClass = card.enabled ? "" : "opacity-60";
                 return (
                   <div
@@ -11319,6 +11316,11 @@ export function AtendimentoClient() {
                                     : undefined
                                 }
                                 disabled={!canSendExperimentalGroupNotification || sendingNotificationThisPair}
+                                title={
+                                  canSendExperimentalGroupNotification
+                                    ? "Enviar agora a notificação da aula experimental em grupo"
+                                    : "Disponível somente após salvar o link da aula na turma"
+                                }
                                 className="inline-flex min-h-[38px] items-center justify-between gap-3 rounded-xl px-3 text-left text-[13px] font-semibold text-[var(--app-text-80)] transition hover:bg-[var(--app-hover)] disabled:cursor-not-allowed disabled:opacity-55"
                               >
                                 <span>Disparar agora</span>
