@@ -346,9 +346,7 @@ function resolveExperimentalAvailabilityDateIdForGroupSlot(
 
 function resolveExperimentalGroupSelectedDateIdForPair(params: {
   pairId: string;
-  experimentalIndex: number;
-  recurringIndex: number;
-  storedDateIds: string[];
+  storedDateIdsByPairId: Record<string, string>;
   availability: ExperimentalAvailabilityPayload | null | undefined;
   slot: ExperimentalGroupFormSlot;
   hasExperimentalMembers: boolean;
@@ -358,14 +356,8 @@ function resolveExperimentalGroupSelectedDateIdForPair(params: {
   const availableDateIds = new Set(
     availabilityDates.map((dateOption) => String(dateOption?.id ?? "").trim()).filter(Boolean),
   );
-  const candidateStoredDateIds = [
-    String(params.storedDateIds[params.experimentalIndex] ?? "").trim(),
-    String(params.storedDateIds[params.recurringIndex] ?? "").trim(),
-  ].filter(Boolean);
-  for (const dateId of candidateStoredDateIds) {
-    if (!availableDateIds.has(dateId)) continue;
-    return dateId;
-  }
+  const storedDateId = String(params.storedDateIdsByPairId[params.pairId] ?? "").trim();
+  if (storedDateId && availableDateIds.has(storedDateId)) return storedDateId;
   const assignedProfessorDate = String(params.assignedProfessorDate ?? "").trim();
   if (params.hasExperimentalMembers && assignedProfessorDate) {
     return assignedProfessorDate;
@@ -1937,9 +1929,9 @@ export function AtendimentoClient() {
   const [experimentalGroupFormSlots, setExperimentalGroupFormSlots] = useState<
     ExperimentalGroupFormSlot[]
   >(createDefaultExperimentalGroupFormSlots);
-  const [experimentalGroupFormDateIds, setExperimentalGroupFormDateIds] = useState<string[]>(
-    createDefaultExperimentalGroupFormSlots().map(() => ""),
-  );
+  const [experimentalGroupFormDateIdsByPairId, setExperimentalGroupFormDateIdsByPairId] = useState<
+    Record<string, string>
+  >({});
   const [editLeadOpen, setEditLeadOpen] = useState(false);
   const [editLeadName, setEditLeadName] = useState("");
   const [editLeadPhone, setEditLeadPhone] = useState("");
@@ -4456,54 +4448,54 @@ export function AtendimentoClient() {
       })),
     );
     setExperimentalGroupFormSlots(normalizedSlots);
-    const previousSelectedDateIdByPairId = new Map<string, string>();
-    experimentalGroupFormSlots.forEach((slot, index) => {
-      if (slot.slotType !== "experimental") return;
-      const pairId = String(slot.pairId ?? "").trim();
-      const selectedDateId = String(experimentalGroupFormDateIds[index] ?? "").trim();
-      if (!pairId || !selectedDateId) return;
-      previousSelectedDateIdByPairId.set(pairId, selectedDateId);
-    });
+    const previousSelectedDateIdByPairId = new Map<string, string>(
+      Object.entries(experimentalGroupFormDateIdsByPairId).map(([pairId, selectedDateId]) => [
+        String(pairId ?? "").trim(),
+        String(selectedDateId ?? "").trim(),
+      ]),
+    );
     const pairUsageSafe =
       pairUsageRaw && typeof pairUsageRaw === "object" ? pairUsageRaw : {};
-    setExperimentalGroupFormDateIds(
-      normalizedSlots.map((slot) => {
-        const pairId = String(slot.pairId ?? "").trim();
-        const pairHasExperimentalMembers = Boolean(pairUsageSafe?.[pairId]?.has_experimental_members);
-        const assignedProfessorDate = pairHasExperimentalMembers
-          ? String(
-              (pairActivityRaw as any)?.[pairId]?.latest_experimental_class?.professor_date ?? "",
-            ).trim()
-          : "";
-        if (slot.slotType === "experimental" && assignedProfessorDate) {
-          return assignedProfessorDate;
-        }
-        const pairAvailability =
-          availabilityByProfessor[String(slot.professorPhone ?? "").trim()] ?? availability;
-        const preservedDateId = previousSelectedDateIdByPairId.get(pairId) ?? "";
-        if (preservedDateId) {
-          const preservedSlots = getExperimentalAvailabilitySlotsForDate(
-            pairAvailability,
-            preservedDateId,
+    const nextSelectedDateIdsByPairId: Record<string, string> = {};
+    normalizedSlots.forEach((slot) => {
+      if (slot.slotType !== "experimental") return;
+      const pairId = String(slot.pairId ?? "").trim();
+      if (!pairId) return;
+      const pairHasExperimentalMembers = Boolean(pairUsageSafe?.[pairId]?.has_experimental_members);
+      const assignedProfessorDate = pairHasExperimentalMembers
+        ? String(
+            (pairActivityRaw as any)?.[pairId]?.latest_experimental_class?.professor_date ?? "",
+          ).trim()
+        : "";
+      const pairAvailability =
+        availabilityByProfessor[String(slot.professorPhone ?? "").trim()] ?? availability;
+      const preservedDateId = previousSelectedDateIdByPairId.get(pairId) ?? "";
+      if (preservedDateId) {
+        const preservedSlots = getExperimentalAvailabilitySlotsForDate(
+          pairAvailability,
+          preservedDateId,
+        );
+        const preservedWeekday = getExperimentalAvailabilityWeekdayForDate(
+          pairAvailability,
+          preservedDateId,
+        );
+        const matchesWeekday =
+          !String(slot.weekday ?? "").trim() || preservedWeekday === String(slot.weekday ?? "").trim();
+        const matchesTime =
+          !String(slot.professor_time ?? "").trim() ||
+          preservedSlots.some(
+            (timeOption) => timeOption.professorTime === String(slot.professor_time ?? "").trim(),
           );
-          const preservedWeekday = getExperimentalAvailabilityWeekdayForDate(
-            pairAvailability,
-            preservedDateId,
-          );
-          const matchesWeekday =
-            !String(slot.weekday ?? "").trim() || preservedWeekday === String(slot.weekday ?? "").trim();
-          const matchesTime =
-            !String(slot.professor_time ?? "").trim() ||
-            preservedSlots.some(
-              (timeOption) => timeOption.professorTime === String(slot.professor_time ?? "").trim(),
-            );
-          if (matchesWeekday && matchesTime && preservedSlots.length > 0) {
-            return preservedDateId;
-          }
+        if (matchesWeekday && matchesTime && preservedSlots.length > 0) {
+          nextSelectedDateIdsByPairId[pairId] = preservedDateId;
+          return;
         }
-        return resolveExperimentalAvailabilityDateIdForGroupSlot(pairAvailability, slot);
-      }),
-    );
+      }
+      nextSelectedDateIdsByPairId[pairId] =
+        (slot.slotType === "experimental" && assignedProfessorDate) ||
+        resolveExperimentalAvailabilityDateIdForGroupSlot(pairAvailability, slot);
+    });
+    setExperimentalGroupFormDateIdsByPairId(nextSelectedDateIdsByPairId);
   }
 
   async function loadExperimentalGroupSettings(silent = false) {
@@ -5224,14 +5216,12 @@ export function AtendimentoClient() {
       normalizedDateId,
     );
     const targetPairId = String(experimentalGroupFormSlots[index]?.pairId ?? "").trim();
-    setExperimentalGroupFormDateIds((prev) =>
-      prev.map((value, slotIndex) =>
-        slotIndex === index ||
-        (targetPairId && experimentalGroupFormSlots[slotIndex]?.pairId === targetPairId)
-          ? normalizedDateId
-          : value,
-      ),
-    );
+    if (targetPairId) {
+      setExperimentalGroupFormDateIdsByPairId((prev) => ({
+        ...prev,
+        [targetPairId]: normalizedDateId,
+      }));
+    }
     setExperimentalGroupFormSlots((prev) =>
       prev.map((slot, slotIndex) => {
         if (slotIndex !== index && slot.pairId !== targetPairId) return slot;
@@ -11482,9 +11472,7 @@ export function AtendimentoClient() {
                 const latestExperimentalClass = pair.latestExperimentalClass;
                 const selectedDateId = resolveExperimentalGroupSelectedDateIdForPair({
                   pairId: pair.pairId,
-                  experimentalIndex: pair.experimentalIndex,
-                  recurringIndex: pair.recurringIndex,
-                  storedDateIds: experimentalGroupFormDateIds,
+                  storedDateIdsByPairId: experimentalGroupFormDateIdsByPairId,
                   availability: pairAvailability,
                   slot: card,
                   hasExperimentalMembers: pair.hasExperimentalMembers,
@@ -11760,11 +11748,11 @@ export function AtendimentoClient() {
                                         },
                                         { syncPair: true },
                                       );
-                                      setExperimentalGroupFormDateIds((prev) =>
-                                        prev.map((value, slotIndex) =>
-                                          experimentalGroupFormSlots[slotIndex]?.pairId === pair.pairId ? "" : value,
-                                        ),
-                                      );
+                                      setExperimentalGroupFormDateIdsByPairId((prev) => {
+                                        const next = { ...prev };
+                                        delete next[pair.pairId];
+                                        return next;
+                                      });
                                     }}
                                     className={[
                                       "flex w-full items-center justify-between gap-3 rounded-xl px-3.5 py-3 text-left transition",
@@ -11898,13 +11886,10 @@ export function AtendimentoClient() {
                                   disabled={!card.enabled || !card.professorPhone}
                                   onClick={() =>
                                     {
-                                      setExperimentalGroupFormDateIds((prev) =>
-                                        prev.map((value, slotIndex) =>
-                                          experimentalGroupFormSlots[slotIndex]?.pairId === pair.pairId
-                                            ? selectedDateId
-                                            : value,
-                                        ),
-                                      );
+                                      setExperimentalGroupFormDateIdsByPairId((prev) => ({
+                                        ...prev,
+                                        [pair.pairId]: selectedDateId,
+                                      }));
                                       updateExperimentalGroupFormSlot(
                                         index,
                                         {
