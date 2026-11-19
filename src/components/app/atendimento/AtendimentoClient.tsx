@@ -4393,27 +4393,24 @@ export function AtendimentoClient() {
       Array.isArray(json?.weekday_options) ? (json.weekday_options as Array<{ value: string; label: string }>) : [],
     );
     const rawSlots = Array.isArray(settings?.slots) ? settings!.slots : [];
-    const normalizedSlots: ExperimentalGroupFormSlot[] =
-      rawSlots.length > 0
-        ? rawSlots.map((slot, index) => ({
-            enabled: Boolean(slot?.enabled),
-            weekday: String(slot?.weekday ?? "").trim(),
-            professor_time: String(slot?.professor_time ?? "").trim(),
-            professorName: String(slot?.professor_name ?? "").trim(),
-            professorPhone: String(slot?.professor_phone ?? "").trim(),
-            pairName: String(slot?.pair_name ?? "").trim(),
-            pairCategory:
-              String(slot?.pair_category ?? "").trim().toLowerCase() === "recorrente"
-                ? "recorrente"
-                : "experimental",
-            slotType:
-              String(slot?.slot_type ?? "").trim().toLowerCase() === "recorrente"
-                ? "recorrente"
-                : "experimental",
-            pairId:
-              String(slot?.pair_id ?? "").trim() || `pair-${Math.floor(index / 2) + 1}`,
-          }))
-        : createDefaultExperimentalGroupFormSlots();
+    const normalizedSlots: ExperimentalGroupFormSlot[] = rawSlots.map((slot, index) => ({
+      enabled: Boolean(slot?.enabled),
+      weekday: String(slot?.weekday ?? "").trim(),
+      professor_time: String(slot?.professor_time ?? "").trim(),
+      professorName: String(slot?.professor_name ?? "").trim(),
+      professorPhone: String(slot?.professor_phone ?? "").trim(),
+      pairName: String(slot?.pair_name ?? "").trim(),
+      pairCategory:
+        String(slot?.pair_category ?? "").trim().toLowerCase() === "recorrente"
+          ? "recorrente"
+          : "experimental",
+      slotType:
+        String(slot?.slot_type ?? "").trim().toLowerCase() === "recorrente"
+          ? "recorrente"
+          : "experimental",
+      pairId:
+        String(slot?.pair_id ?? "").trim() || `pair-${Math.floor(index / 2) + 1}`,
+    }));
     experimentalGroupSettingsLastSavedSnapshotRef.current = JSON.stringify(
       normalizedSlots.map((slot) => ({
         enabled: Boolean(slot.enabled),
