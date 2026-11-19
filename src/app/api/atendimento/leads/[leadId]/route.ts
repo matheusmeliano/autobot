@@ -350,6 +350,7 @@ export async function GET(request: Request, context: { params: Promise<{ leadId:
     futureExpBooking = futureEarliestCandidate ?? futureBestCandidate ?? null;
 
     let cancelledAt: string | null = null;
+    let cancelledAction = "";
     let cancelledProfSnap: {
       name: string; phone: string; leadDate: string; leadTime: string;
       professorDate: string; professorTime: string; leadStartAt: string;
@@ -396,6 +397,9 @@ export async function GET(request: Request, context: { params: Promise<{ leadId:
       if (eventType === "experimental_class_cancelled") {
         isCancelledFromHistory = true;
         if (!cancelledAt) cancelledAt = String(eca ?? "").trim();
+        if (!cancelledAction) {
+          cancelledAction = String(details?.cancelled_action ?? "").trim().toLowerCase();
+        }
         if (!cancelledProfSnap) {
           const n = String(details?.professor_name_before ?? "").trim();
           const p = String(details?.professor_phone_before ?? "").trim();
@@ -466,6 +470,8 @@ export async function GET(request: Request, context: { params: Promise<{ leadId:
       existingBookingRaw = historyBookingFromScheduled;
     }
     const isCancelledLead = isCancelledFromTable || isCancelledFromHistory;
+    const shouldHideCancelledExperimentalSchedule =
+      cancelledAction === "group_member_removed" || cancelledAction === "deleted_and_unlinked";
     const snapProfName = cancelledProfSnap?.name ?? "";
     const snapProfPhone = cancelledProfSnap?.phone ?? "";
     const snapLeadDate = cancelledProfSnap?.leadDate ?? "";
@@ -480,7 +486,7 @@ export async function GET(request: Request, context: { params: Promise<{ leadId:
 
     const existingBooking =
       existingBookingRaw ??
-      (isCancelledLead
+      (isCancelledLead && !shouldHideCancelledExperimentalSchedule
         ? ({
             id: "",
             status: "cancelled",
@@ -522,35 +528,43 @@ export async function GET(request: Request, context: { params: Promise<{ leadId:
     const rowExperimentalProfPhone = String((lead as any)?.experimental_class_professor_phone ?? "").trim();
     const bookingExpProfName = String((existingBooking as any)?.assigned_professor_name ?? "").trim();
     const bookingExpProfPhone = String((existingBooking as any)?.assigned_professor_phone ?? "").trim();
-    const mergedExperimentalProfName = rowExperimentalProfName || bookingExpProfName || snapProfName || "";
-    const mergedExperimentalProfPhone = rowExperimentalProfPhone || bookingExpProfPhone || snapProfPhone || "";
+    const mergedExperimentalProfName =
+      rowExperimentalProfName ||
+      bookingExpProfName ||
+      (shouldHideCancelledExperimentalSchedule ? "" : snapProfName) ||
+      "";
+    const mergedExperimentalProfPhone =
+      rowExperimentalProfPhone ||
+      bookingExpProfPhone ||
+      (shouldHideCancelledExperimentalSchedule ? "" : snapProfPhone) ||
+      "";
     const mergedRowExperimentalClassStatus = isCancelledLead
       ? ""
       : String((lead as any)?.experimental_class_status ?? "").trim();
     const mergedProfessorDate =
       String((lead as any)?.experimental_class_professor_date ?? "").trim() ||
       String((existingBooking as any)?.professor_date ?? "").trim() ||
-      (isCancelledLead ? snapProfessorDate : "");
+      (isCancelledLead && !shouldHideCancelledExperimentalSchedule ? snapProfessorDate : "");
     const mergedLeadDate =
       String((lead as any)?.experimental_class_lead_date ?? "").trim() ||
       String((existingBooking as any)?.lead_date ?? "").trim() ||
-      (isCancelledLead ? snapLeadDate : "");
+      (isCancelledLead && !shouldHideCancelledExperimentalSchedule ? snapLeadDate : "");
     const mergedProfessorTime =
       String((lead as any)?.experimental_class_professor_time ?? "").trim() ||
       String((existingBooking as any)?.professor_time ?? "").trim() ||
-      (isCancelledLead ? snapProfessorTime : "");
+      (isCancelledLead && !shouldHideCancelledExperimentalSchedule ? snapProfessorTime : "");
     const mergedLeadTime =
       String((lead as any)?.experimental_class_lead_time ?? "").trim() ||
       String((existingBooking as any)?.lead_time ?? "").trim() ||
-      (isCancelledLead ? snapLeadTime : "");
+      (isCancelledLead && !shouldHideCancelledExperimentalSchedule ? snapLeadTime : "");
     const mergedProfessorStartAt =
       String((lead as any)?.experimental_class_professor_start_at ?? "").trim() ||
       String((existingBooking as any)?.professor_start_at ?? "").trim() ||
-      (isCancelledLead ? snapProfessorStartAt : "");
+      (isCancelledLead && !shouldHideCancelledExperimentalSchedule ? snapProfessorStartAt : "");
     const mergedLeadStartAt =
       String((lead as any)?.experimental_class_lead_start_at ?? "").trim() ||
       String((existingBooking as any)?.lead_start_at ?? "").trim() ||
-      (isCancelledLead ? snapLeadStartAt : "");
+      (isCancelledLead && !shouldHideCancelledExperimentalSchedule ? snapLeadStartAt : "");
     const mergedStatus = isCancelledLead
       ? ""
       : mergedRowExperimentalClassStatus ||
@@ -837,7 +851,10 @@ export async function GET(request: Request, context: { params: Promise<{ leadId:
         is_new_for_attendant: (lead as any)?.is_new_for_attendant ?? false,
         conversation: conversation ?? null,
         experimental_class_booking: suppressExperimental ? null : finalBookingForField,
-        latest_experimental_class_booking: suppressExperimental ? null : existingBookingRaw ?? existingBooking ?? null,
+        latest_experimental_class_booking:
+          suppressExperimental || shouldHideCancelledExperimentalSchedule
+            ? null
+            : existingBookingRaw ?? existingBooking ?? null,
         future_experimental_class_booking: suppressExperimental ? null : futureExpBooking,
         latest_past_class_meta: suppressExperimental ? null : latestPastClassMeta,
         latest_experimental_class_cancelled_at: cancelledAt,

@@ -147,6 +147,7 @@ export async function GET(req: Request) {
   const cancelledLeadBookingIds = new Set<string>();
   const cancelledByHistoryLeadIds = new Set<string>();
   const cancelledAtByLeadId = new Map<string, string>();
+  const cancelledActionByLeadId = new Map<string, string>();
   const cancelledProfessorSnapshotByLeadId = new Map<
     string,
     {
@@ -396,6 +397,12 @@ export async function GET(req: Request) {
         cancelledByHistoryLeadIds.add(leadId);
         if (!cancelledAtByLeadId.has(leadId)) {
           cancelledAtByLeadId.set(leadId, String(eca ?? "").trim());
+        }
+        if (!cancelledActionByLeadId.has(leadId)) {
+          cancelledActionByLeadId.set(
+            leadId,
+            String(details?.cancelled_action ?? "").trim().toLowerCase(),
+          );
         }
         if (!cancelledProfessorSnapshotByLeadId.has(leadId)) {
           const n = String(details?.professor_name_before ?? "").trim();
@@ -890,6 +897,9 @@ function sectionTimestampMs(row: any, sectionName: "interessados" | "alunos" | "
         null;
       const isCancelledLead = cancelledLeadBookingIds.has(leadId) || cancelledByHistoryLeadIds.has(leadId);
       const cancelledAt = cancelledAtByLeadId.get(leadId) ?? null;
+      const cancelledAction = cancelledActionByLeadId.get(leadId) ?? "";
+      const shouldHideCancelledExperimentalSchedule =
+        cancelledAction === "group_member_removed" || cancelledAction === "deleted_and_unlinked";
       const cancelledProfSnap = cancelledProfessorSnapshotByLeadId.get(leadId) ?? null;
       const snapProfName = String(cancelledProfSnap?.name ?? "").trim();
       const snapProfPhone = String(cancelledProfSnap?.phone ?? "").trim();
@@ -905,7 +915,7 @@ function sectionTimestampMs(row: any, sectionName: "interessados" | "alunos" | "
 
       const existingBooking =
         existingBookingRaw ??
-        (isCancelledLead
+        (isCancelledLead && !shouldHideCancelledExperimentalSchedule
           ? ({
               id: "",
               status: "cancelled",
@@ -957,43 +967,50 @@ function sectionTimestampMs(row: any, sectionName: "interessados" | "alunos" | "
       const rowRecurringProfPhone = String((row as any)?.recurring_class_professor_phone ?? "").trim();
       const bookingExpProfName = String((existingBooking as any)?.assigned_professor_name ?? "").trim();
       const bookingExpProfPhone = String((existingBooking as any)?.assigned_professor_phone ?? "").trim();
-
-      const mergedExperimentalProfName = rowExperimentalProfName || bookingExpProfName || snapProfName || "";
-      const mergedExperimentalProfPhone = rowExperimentalProfPhone || bookingExpProfPhone || snapProfPhone || "";
+      const mergedExperimentalProfName =
+        rowExperimentalProfName ||
+        bookingExpProfName ||
+        (shouldHideCancelledExperimentalSchedule ? "" : snapProfName) ||
+        "";
+      const mergedExperimentalProfPhone =
+        rowExperimentalProfPhone ||
+        bookingExpProfPhone ||
+        (shouldHideCancelledExperimentalSchedule ? "" : snapProfPhone) ||
+        "";
       const mergedRecurringProfName = rowRecurringProfName || "";
       const mergedRecurringProfPhone = rowRecurringProfPhone || "";
 
       const mergedProfessorDate =
         String((row as any)?.experimental_class_professor_date ?? "").trim() ||
         String((existingBooking as any)?.professor_date ?? "").trim() ||
-        (isCancelledLead ? snapProfessorDate : "") ||
+        (isCancelledLead && !shouldHideCancelledExperimentalSchedule ? snapProfessorDate : "") ||
         (cleanDraftTime?.professor_date ?? "") ||
         (cleanDraftDate?.professor_date ?? "");
       const mergedLeadDate =
         String((row as any)?.experimental_class_lead_date ?? "").trim() ||
         String((existingBooking as any)?.lead_date ?? "").trim() ||
-        (isCancelledLead ? snapLeadDate : "") ||
+        (isCancelledLead && !shouldHideCancelledExperimentalSchedule ? snapLeadDate : "") ||
         (cleanDraftTime?.lead_date ?? "") ||
         (cleanDraftDate?.lead_date ?? "");
       const mergedProfessorTime =
         String((row as any)?.experimental_class_professor_time ?? "").trim() ||
         String((existingBooking as any)?.professor_time ?? "").trim() ||
-        (isCancelledLead ? snapProfessorTime : "") ||
+        (isCancelledLead && !shouldHideCancelledExperimentalSchedule ? snapProfessorTime : "") ||
         (cleanDraftTime?.professor_time ?? "");
       const mergedLeadTime =
         String((row as any)?.experimental_class_lead_time ?? "").trim() ||
         String((existingBooking as any)?.lead_time ?? "").trim() ||
-        (isCancelledLead ? snapLeadTime : "") ||
+        (isCancelledLead && !shouldHideCancelledExperimentalSchedule ? snapLeadTime : "") ||
         (cleanDraftTime?.lead_time ?? "");
       const mergedProfessorStartAt =
         String((row as any)?.experimental_class_professor_start_at ?? "").trim() ||
         String((existingBooking as any)?.professor_start_at ?? "").trim() ||
-        (isCancelledLead ? snapProfessorStartAt : "") ||
+        (isCancelledLead && !shouldHideCancelledExperimentalSchedule ? snapProfessorStartAt : "") ||
         (cleanDraftTime?.professor_start_at ?? "");
       const mergedLeadStartAt =
         String((row as any)?.experimental_class_lead_start_at ?? "").trim() ||
         String((existingBooking as any)?.lead_start_at ?? "").trim() ||
-        (isCancelledLead ? snapLeadStartAt : "") ||
+        (isCancelledLead && !shouldHideCancelledExperimentalSchedule ? snapLeadStartAt : "") ||
         (cleanDraftTime?.lead_start_at ?? "");
       const mergedStatus = isCancelledLead
         ? ""
@@ -1325,7 +1342,10 @@ function sectionTimestampMs(row: any, sectionName: "interessados" | "alunos" | "
               null,
           };
         })(),
-        latest_experimental_class_booking: suppressExperimental ? null : latestPastExpBooking,
+        latest_experimental_class_booking:
+          suppressExperimental || shouldHideCancelledExperimentalSchedule
+            ? null
+            : latestPastExpBooking,
         future_experimental_class_booking: suppressExperimental ? null : futureExpBooking,
         latest_past_class_meta: suppressExperimental ? null : latestPastClassMeta,
         latest_experimental_class_cancelled_at: cancelledAtByLeadId.get(leadId) ?? null,
