@@ -788,10 +788,12 @@ export async function buildRecurringGroupClassSlotsForLead(params: {
 
     let nextProfessorStartAt: string | null = null;
     let nextProfessorDate = "";
+    const configuredProfessorDate = String(configuredSlot.professor_date ?? "").trim();
     for (let offset = 0; offset < lookAheadDays; offset += 1) {
       const candidateDate = new Date(now.getTime() + offset * 24 * 60 * 60 * 1000);
       const professorDate = localDateInTimeZone(candidateDate, professorTimeZone);
       if (!professorDate) continue;
+      if (configuredProfessorDate && professorDate < configuredProfessorDate) continue;
       if (weekdayInTimeZone(candidateDate, professorTimeZone) !== configuredSlot.weekday) continue;
       const professorStartAt = zonedDateTimeToUtcIso({
         date: professorDate,

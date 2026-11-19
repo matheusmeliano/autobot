@@ -664,6 +664,8 @@ export function listExperimentalGroupClassSlots(params: {
       ) {
         continue;
       }
+      const configuredProfessorDate = String(configuredSlot.professor_date ?? "").trim();
+      if (configuredProfessorDate && professorDate !== configuredProfessorDate) continue;
       if (configuredSlot.weekday !== weekday) continue;
       const professorStartAt = zonedDateTimeToUtcIso({
         date: professorDate,
