@@ -717,9 +717,7 @@ function isLeadAssignedToExperimentalGroup(lead: AtendimentoLeadListItem | null 
 
 function isLeadMarkedForExperimentalGroup(lead: AtendimentoLeadListItem | null | undefined): boolean {
   if (!lead) return false;
-  if (isLeadAssignedToAnyGroup(lead)) return true;
-  if (Boolean((lead as any)?.experimental_class_group_interest)) return true;
-  return String((lead as any)?.experimental_class_mode_preference ?? "").trim().toLowerCase() === "group";
+  return isLeadAssignedToAnyGroup(lead);
 }
 
 function resolveAssignedExperimentalGroupSlot(params: {
