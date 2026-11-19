@@ -344,6 +344,35 @@ function resolveExperimentalAvailabilityDateIdForGroupSlot(
   return String(fallback?.id ?? "").trim();
 }
 
+function resolveExperimentalGroupSelectedDateIdForPair(params: {
+  pairId: string;
+  experimentalIndex: number;
+  recurringIndex: number;
+  storedDateIds: string[];
+  availability: ExperimentalAvailabilityPayload | null | undefined;
+  slot: ExperimentalGroupFormSlot;
+  hasExperimentalMembers: boolean;
+  assignedProfessorDate: string | null | undefined;
+}): string {
+  const availabilityDates = Array.isArray(params.availability?.dates) ? params.availability!.dates : [];
+  const availableDateIds = new Set(
+    availabilityDates.map((dateOption) => String(dateOption?.id ?? "").trim()).filter(Boolean),
+  );
+  const candidateStoredDateIds = [
+    String(params.storedDateIds[params.experimentalIndex] ?? "").trim(),
+    String(params.storedDateIds[params.recurringIndex] ?? "").trim(),
+  ].filter(Boolean);
+  for (const dateId of candidateStoredDateIds) {
+    if (!availableDateIds.has(dateId)) continue;
+    return dateId;
+  }
+  const assignedProfessorDate = String(params.assignedProfessorDate ?? "").trim();
+  if (params.hasExperimentalMembers && assignedProfessorDate) {
+    return assignedProfessorDate;
+  }
+  return resolveExperimentalAvailabilityDateIdForGroupSlot(params.availability, params.slot);
+}
+
 function experimentalAssignedProfessorForLead(lead: AtendimentoLeadListItem | null | undefined): { name: string; phone: string; short: string } | null {
   if (!lead) return null;
   const flatName = String((lead as any)?.experimental_class_professor_name ?? "").trim();
@@ -11451,15 +11480,16 @@ export function AtendimentoClient() {
                   experimentalGroupAvailability;
                 const dateOptions = pairAvailability?.dates ?? [];
                 const latestExperimentalClass = pair.latestExperimentalClass;
-                const selectedDateId =
-                  String(experimentalGroupFormDateIds[index] ?? "").trim() ||
-                  (pair.hasExperimentalMembers
-                    ? String(latestExperimentalClass?.professor_date ?? "").trim()
-                    : "") ||
-                  resolveExperimentalAvailabilityDateIdForGroupSlot(
-                    pairAvailability,
-                    card,
-                  );
+                const selectedDateId = resolveExperimentalGroupSelectedDateIdForPair({
+                  pairId: pair.pairId,
+                  experimentalIndex: pair.experimentalIndex,
+                  recurringIndex: pair.recurringIndex,
+                  storedDateIds: experimentalGroupFormDateIds,
+                  availability: pairAvailability,
+                  slot: card,
+                  hasExperimentalMembers: pair.hasExperimentalMembers,
+                  assignedProfessorDate: latestExperimentalClass?.professor_date ?? "",
+                });
                 const selectedDateSlotsBase = getExperimentalAvailabilitySlotsForDate(
                   pairAvailability,
                   selectedDateId,
