@@ -184,6 +184,15 @@ export function normalizeExperimentalGroupClassSettings(
   const value = raw as Record<string, unknown>;
 
   const rawSlots = Array.isArray(value.slots) ? value.slots : [];
+  if (rawSlots.length === 0) {
+    return {
+      enabled: false,
+      professor_timezone:
+        String(value.professor_timezone ?? "").trim() || ATENDIMENTO_PROFESSOR_TIME_ZONE,
+      capacity: 4,
+      slots: [],
+    };
+  }
   const parsedSlots: ExperimentalGroupConfiguredSlot[] = [];
   for (const [index, slot] of rawSlots.slice(0, 40).entries()) {
     if (!slot || typeof slot !== "object") continue;

@@ -50,8 +50,7 @@ const schema = z.object({
         slot_type: slotTypeSchema.optional(),
         pair_id: z.string().trim().min(1).optional(),
       }),
-    )
-    .min(2),
+    ),
 });
 
 function buildWeekdayOptions() {

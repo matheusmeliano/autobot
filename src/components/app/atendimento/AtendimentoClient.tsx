@@ -5223,10 +5223,6 @@ export function AtendimentoClient() {
     const normalizedPairId = String(pairId ?? "").trim();
     if (!normalizedPairId) return;
     setExperimentalGroupActionMenuPairId("");
-    if (experimentalGroupFormPairs.length <= 1) {
-      modalToast.warning("Mantenha pelo menos 1 turma criada no modal.");
-      return;
-    }
     if (experimentalGroupPairUsage[normalizedPairId]?.has_assigned_members) {
       modalToast.warning("Nao e possivel excluir uma turma que possui registros atribuidos.");
       return;
@@ -11416,6 +11412,11 @@ export function AtendimentoClient() {
           </div>
 
           <div className="mt-5 space-y-4">
+            {experimentalGroupFormPairs.length === 0 ? (
+              <div className="rounded-2xl border border-dashed border-[var(--app-border)] bg-[var(--app-solid-surface)] px-4 py-6 text-center text-[14px] font-medium text-[var(--app-text-55)]">
+                Nenhuma turma criada.
+              </div>
+            ) : null}
             {experimentalGroupFormPairs.map((pair) => (
               (() => {
                 const card = pair.experimentalSlot;
@@ -11617,9 +11618,7 @@ export function AtendimentoClient() {
                                 title={
                                   pair.hasAssignedMembers
                                     ? `Turma com ${pair.assignedCount} registro(s) atribuido(s)`
-                                    : experimentalGroupFormPairs.length <= 1
-                                      ? "Mantenha pelo menos 1 turma criada no modal"
-                                      : `Excluir turma ${pair.pairNumber}`
+                                    : `Excluir turma ${pair.pairNumber}`
                                 }
                                 className={[
                                   "inline-flex min-h-[38px] items-center justify-between gap-3 rounded-xl px-3 text-left text-[13px] font-semibold transition hover:bg-[rgba(239,68,68,0.08)]",
