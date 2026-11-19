@@ -5673,11 +5673,19 @@ export function AtendimentoClient() {
         setExperimentalGroupLead(null);
         setIsExperimentalGroupModalOpen(false);
       }
-      await Promise.all([
-        loadPanelLeads(),
-        loadSummary({ silent: true }),
-        loadExperimentalGroupLeadData(experimentalGroupLead),
-      ]);
+      if (resolvedSlot.slot_type === "experimental") {
+        await Promise.all([
+          loadSummary({ silent: true }),
+          loadExperimentalGroupSettings(true),
+        ]);
+      } else {
+        await Promise.all([
+          loadPanelLeads(),
+          loadSummary({ silent: true }),
+          loadExperimentalGroupLeadData(experimentalGroupLead),
+          loadExperimentalGroupSettings(true),
+        ]);
+      }
       modalToast.success(
         resolvedSlot.slot_type === "recorrente"
           ? "Aluno removido da turma recorrente. O dia e horário voltaram para o individual."
