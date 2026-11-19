@@ -5554,12 +5554,19 @@ export function AtendimentoClient() {
   async function handleRemoveLeadFromExperimentalGroup(slot: ExperimentalGroupSlotPayload, leadId: string) {
     if (experimentalGroupActionLoading || !experimentalGroupLead) return;
     setExperimentalGroupActionLoading(true);
-    const resolvedSlot =
-      resolveAssignedExperimentalGroupSlot({
-        slots: experimentalGroupSlots,
-        lead: experimentalGroupLead,
-        leadSlotType: experimentalGroupLeadSlotType,
-      }) ?? slot;
+    const requestedGroupClassId = String(slot.group_class_id ?? "").trim();
+    const requestedPairId = String(slot.pair_id ?? "").trim();
+    const requestedSlotLooksConcrete =
+      slot.slot_type === "recorrente"
+        ? Boolean(requestedPairId || requestedGroupClassId)
+        : Boolean(requestedGroupClassId);
+    const resolvedSlot = requestedSlotLooksConcrete
+      ? slot
+      : resolveAssignedExperimentalGroupSlot({
+          slots: experimentalGroupSlots,
+          lead: experimentalGroupLead,
+          leadSlotType: experimentalGroupLeadSlotType,
+        }) ?? slot;
     try {
       const res = await fetch("/api/atendimento/experimental-group-classes/remove-member", {
         method: "POST",
