@@ -11497,7 +11497,7 @@ export function AtendimentoClient() {
                   >
                     <div className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-2">
                         <div className={["min-w-0", inactiveCardContentClass].join(" ")}>
-                          <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--app-text-45)]">
+                          <div className="pb-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--app-text-45)]">
                             {pairCategoryLabel}
                           </div>
                           <div className="text-[14px] font-bold text-[var(--app-text-85)]">
