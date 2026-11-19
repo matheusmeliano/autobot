@@ -4427,6 +4427,14 @@ export function AtendimentoClient() {
       })),
     );
     setExperimentalGroupFormSlots(normalizedSlots);
+    const previousSelectedDateIdByPairId = new Map<string, string>();
+    experimentalGroupFormSlots.forEach((slot, index) => {
+      if (slot.slotType !== "experimental") return;
+      const pairId = String(slot.pairId ?? "").trim();
+      const selectedDateId = String(experimentalGroupFormDateIds[index] ?? "").trim();
+      if (!pairId || !selectedDateId) return;
+      previousSelectedDateIdByPairId.set(pairId, selectedDateId);
+    });
     const pairUsageSafe =
       pairUsageRaw && typeof pairUsageRaw === "object" ? pairUsageRaw : {};
     setExperimentalGroupFormDateIds(
@@ -4441,10 +4449,30 @@ export function AtendimentoClient() {
         if (slot.slotType === "experimental" && assignedProfessorDate) {
           return assignedProfessorDate;
         }
-        return resolveExperimentalAvailabilityDateIdForGroupSlot(
-          availabilityByProfessor[String(slot.professorPhone ?? "").trim()] ?? availability,
-          slot,
-        );
+        const pairAvailability =
+          availabilityByProfessor[String(slot.professorPhone ?? "").trim()] ?? availability;
+        const preservedDateId = previousSelectedDateIdByPairId.get(pairId) ?? "";
+        if (preservedDateId) {
+          const preservedSlots = getExperimentalAvailabilitySlotsForDate(
+            pairAvailability,
+            preservedDateId,
+          );
+          const preservedWeekday = getExperimentalAvailabilityWeekdayForDate(
+            pairAvailability,
+            preservedDateId,
+          );
+          const matchesWeekday =
+            !String(slot.weekday ?? "").trim() || preservedWeekday === String(slot.weekday ?? "").trim();
+          const matchesTime =
+            !String(slot.professor_time ?? "").trim() ||
+            preservedSlots.some(
+              (timeOption) => timeOption.professorTime === String(slot.professor_time ?? "").trim(),
+            );
+          if (matchesWeekday && matchesTime && preservedSlots.length > 0) {
+            return preservedDateId;
+          }
+        }
+        return resolveExperimentalAvailabilityDateIdForGroupSlot(pairAvailability, slot);
       }),
     );
   }
