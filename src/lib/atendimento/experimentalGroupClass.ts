@@ -21,6 +21,7 @@ export type ExperimentalGroupSlotType = "experimental" | "recorrente";
 export type ExperimentalGroupConfiguredSlot = {
   enabled: boolean;
   weekday: ExperimentalGroupWeekdayKey | null;
+  professor_date: string | null;
   professor_time: string | null;
   professor_name: string | null;
   professor_phone: string | null;
@@ -119,6 +120,7 @@ function buildDefaultExperimentalGroupPair(pairNumber: number): ExperimentalGrou
     {
       enabled: false,
       weekday: null,
+      professor_date: null,
       professor_time: null,
       professor_name: null,
       professor_phone: null,
@@ -130,6 +132,7 @@ function buildDefaultExperimentalGroupPair(pairNumber: number): ExperimentalGrou
     {
       enabled: false,
       weekday: null,
+      professor_date: null,
       professor_time: null,
       professor_name: null,
       professor_phone: null,
@@ -201,6 +204,10 @@ export function normalizeExperimentalGroupClassSettings(
     const professorTime = normalizeTimeLabel(
       (slot as Record<string, unknown>).professor_time,
     );
+    const professorDateRaw = String(slotValue.professor_date ?? "").trim();
+    const professorDate = /^\d{4}-\d{2}-\d{2}$/.test(professorDateRaw)
+      ? professorDateRaw
+      : null;
     const inferredPairNumber = Math.floor(index / 2) + 1;
     const pairId =
       String(slotValue.pair_id ?? "").trim() || `pair-${inferredPairNumber}`;
@@ -218,6 +225,7 @@ export function normalizeExperimentalGroupClassSettings(
         slotValue.enabled === 1 ||
         slotValue.enabled === "1",
       weekday,
+      professor_date: professorDate,
       professor_time: professorTime,
       professor_name: normalizedProfessor?.name ?? null,
       professor_phone: normalizedProfessor?.phone ?? null,
@@ -258,6 +266,8 @@ export function normalizeExperimentalGroupClassSettings(
       pairSlots.find((slot) => slot.slot_type === "recorrente") ?? null;
     const fallbackWeekday =
       experimentalSlot?.weekday ?? recurringSlot?.weekday ?? null;
+    const fallbackProfessorDate =
+      experimentalSlot?.professor_date ?? recurringSlot?.professor_date ?? null;
     const fallbackProfessorTime =
       experimentalSlot?.professor_time ?? recurringSlot?.professor_time ?? null;
     const fallbackProfessorName =
@@ -275,6 +285,7 @@ export function normalizeExperimentalGroupClassSettings(
     normalizedSlots.push({
       enabled: Boolean(experimentalSlot?.enabled ?? fallbackEnabled),
       weekday: experimentalSlot?.weekday ?? fallbackWeekday,
+      professor_date: experimentalSlot?.professor_date ?? fallbackProfessorDate,
       professor_time: experimentalSlot?.professor_time ?? fallbackProfessorTime,
       professor_name: experimentalSlot?.professor_name ?? fallbackProfessorName,
       professor_phone: experimentalSlot?.professor_phone ?? fallbackProfessorPhone,
@@ -286,6 +297,7 @@ export function normalizeExperimentalGroupClassSettings(
     normalizedSlots.push({
       enabled: Boolean(recurringSlot?.enabled ?? fallbackEnabled),
       weekday: recurringSlot?.weekday ?? fallbackWeekday,
+      professor_date: recurringSlot?.professor_date ?? fallbackProfessorDate,
       professor_time: recurringSlot?.professor_time ?? fallbackProfessorTime,
       professor_name: recurringSlot?.professor_name ?? fallbackProfessorName,
       professor_phone: recurringSlot?.professor_phone ?? fallbackProfessorPhone,

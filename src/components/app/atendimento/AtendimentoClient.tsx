@@ -43,6 +43,7 @@ type ExperimentalGroupSettingsPayload = {
   slots: Array<{
     enabled?: boolean;
     weekday?: string | null;
+    professor_date?: string | null;
     professor_time?: string | null;
     professor_name?: string | null;
     professor_phone?: string | null;
@@ -92,6 +93,7 @@ type ExperimentalGroupPairActivityPayload = Record<
 type ExperimentalGroupFormSlot = {
   enabled: boolean;
   weekday: string;
+  professorDate: string;
   professor_time: string;
   professorName: string;
   professorPhone: string;
@@ -186,6 +188,7 @@ function buildExperimentalGroupFormPair(
     {
       enabled: false,
       weekday: "",
+      professorDate: "",
       professor_time: "",
       professorName: "",
       professorPhone: "",
@@ -197,6 +200,7 @@ function buildExperimentalGroupFormPair(
     {
       enabled: false,
       weekday: "",
+      professorDate: "",
       professor_time: "",
       professorName: "",
       professorPhone: "",
@@ -323,6 +327,19 @@ function getExperimentalAvailabilityWeekdayForDate(
   );
 }
 
+function resolveExperimentalAvailabilityDateIdByProfessorDate(
+  availability: ExperimentalAvailabilityPayload | null | undefined,
+  professorDate: string | null | undefined,
+): string {
+  const normalizedProfessorDate = String(professorDate ?? "").trim().slice(0, 10);
+  if (!normalizedProfessorDate) return "";
+  const dates = Array.isArray(availability?.dates) ? availability!.dates : [];
+  const matchedDate = dates.find(
+    (dateOption) => String(dateOption?.professorDate ?? "").trim().slice(0, 10) === normalizedProfessorDate,
+  );
+  return String(matchedDate?.id ?? "").trim();
+}
+
 function resolveExperimentalAvailabilityDateIdForGroupSlot(
   availability: ExperimentalAvailabilityPayload | null | undefined,
   slot: ExperimentalGroupFormSlot,
@@ -356,6 +373,13 @@ function resolveExperimentalGroupSelectedDateIdForPair(params: {
   const availableDateIds = new Set(
     availabilityDates.map((dateOption) => String(dateOption?.id ?? "").trim()).filter(Boolean),
   );
+  const savedProfessorDateId = resolveExperimentalAvailabilityDateIdByProfessorDate(
+    params.availability,
+    params.slot.professorDate,
+  );
+  if (savedProfessorDateId && availableDateIds.has(savedProfessorDateId)) {
+    return savedProfessorDateId;
+  }
   const storedDateId = String(params.storedDateIdsByPairId[params.pairId] ?? "").trim();
   if (storedDateId && availableDateIds.has(storedDateId)) return storedDateId;
   const assignedProfessorDate = String(params.assignedProfessorDate ?? "").trim();
@@ -4417,6 +4441,7 @@ export function AtendimentoClient() {
     const normalizedSlots: ExperimentalGroupFormSlot[] = rawSlots.map((slot, index) => ({
       enabled: Boolean(slot?.enabled),
       weekday: String(slot?.weekday ?? "").trim(),
+      professorDate: String(slot?.professor_date ?? "").trim().slice(0, 10),
       professor_time: String(slot?.professor_time ?? "").trim(),
       professorName: String(slot?.professor_name ?? "").trim(),
       professorPhone: String(slot?.professor_phone ?? "").trim(),
@@ -4436,6 +4461,7 @@ export function AtendimentoClient() {
       normalizedSlots.map((slot) => ({
         enabled: Boolean(slot.enabled),
         weekday: String(slot.weekday ?? "").trim(),
+        professor_date: String(slot.professorDate ?? "").trim().slice(0, 10),
         professor_time: String(slot.professor_time ?? "").trim(),
         professor_name: String(slot.professorName ?? "").trim(),
         professor_phone: String(slot.professorPhone ?? "").trim(),
@@ -4469,6 +4495,14 @@ export function AtendimentoClient() {
         : "";
       const pairAvailability =
         availabilityByProfessor[String(slot.professorPhone ?? "").trim()] ?? availability;
+      const savedProfessorDateId = resolveExperimentalAvailabilityDateIdByProfessorDate(
+        pairAvailability,
+        slot.professorDate,
+      );
+      if (savedProfessorDateId) {
+        nextSelectedDateIdsByPairId[pairId] = savedProfessorDateId;
+        return;
+      }
       const preservedDateId = previousSelectedDateIdByPairId.get(pairId) ?? "";
       if (preservedDateId) {
         const preservedSlots = getExperimentalAvailabilitySlotsForDate(
@@ -4942,6 +4976,7 @@ export function AtendimentoClient() {
       slots.map((slot) => ({
         enabled: Boolean(slot.enabled),
         weekday: String(slot.weekday ?? "").trim(),
+        professor_date: String(slot.professorDate ?? "").trim().slice(0, 10),
         professor_time: String(slot.professor_time ?? "").trim(),
         professor_name: String(slot.professorName ?? "").trim(),
         professor_phone: String(slot.professorPhone ?? "").trim(),
@@ -5134,6 +5169,7 @@ export function AtendimentoClient() {
           slots: slots.map((slot) => ({
             enabled: slot.enabled,
             weekday: slot.weekday || null,
+            professor_date: slot.professorDate || null,
             professor_time: slot.professor_time || null,
             professor_name: slot.professorName || null,
             professor_phone: slot.professorPhone || null,
@@ -5207,6 +5243,9 @@ export function AtendimentoClient() {
     const pairProfessorPhone = String(experimentalGroupFormSlots[index]?.professorPhone ?? "").trim();
     const pairAvailability =
       experimentalGroupAvailabilityByProfessor[pairProfessorPhone] ?? experimentalGroupAvailability;
+    const selectedDateOption = Array.isArray(pairAvailability?.dates)
+      ? pairAvailability!.dates.find((dateOption) => String(dateOption?.id ?? "").trim() === normalizedDateId)
+      : null;
     const selectedSlots = getExperimentalAvailabilitySlotsForDate(
       pairAvailability,
       normalizedDateId,
@@ -5216,6 +5255,9 @@ export function AtendimentoClient() {
       normalizedDateId,
     );
     const targetPairId = String(experimentalGroupFormSlots[index]?.pairId ?? "").trim();
+    const selectedProfessorDate =
+      String(selectedDateOption?.professorDate ?? "").trim().slice(0, 10) ||
+      String(selectedSlots[0]?.professorDate ?? "").trim().slice(0, 10);
     if (targetPairId) {
       setExperimentalGroupFormDateIdsByPairId((prev) => ({
         ...prev,
@@ -5231,6 +5273,7 @@ export function AtendimentoClient() {
         return {
           ...slot,
           weekday,
+          professorDate: selectedProfessorDate,
           professor_time: hasCurrentTime ? slot.professor_time : "",
         };
       }),
@@ -11744,6 +11787,7 @@ export function AtendimentoClient() {
                                           professorName: opt.name,
                                           professorPhone: opt.phone,
                                           weekday: "",
+                                          professorDate: "",
                                           professor_time: "",
                                         },
                                         { syncPair: true },
@@ -11898,6 +11942,8 @@ export function AtendimentoClient() {
                                               pairAvailability,
                                               selectedDateId,
                                             ) || card.weekday,
+                                          professorDate:
+                                            timeOption.professorDate || selectedDateId,
                                           professor_time: timeOption.professorTime,
                                         },
                                         { syncPair: true },

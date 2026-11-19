@@ -37,6 +37,12 @@ const schema = z.object({
       z.object({
         enabled: z.boolean(),
         weekday: weekdaySchema.nullable().optional(),
+        professor_date: z
+          .string()
+          .trim()
+          .regex(/^\d{4}-\d{2}-\d{2}$/)
+          .nullable()
+          .optional(),
         professor_time: z
           .string()
           .trim()
@@ -92,6 +98,7 @@ function canonicalizeExperimentalGroupPairSettings(
       const sharedValues = {
         enabled: Boolean(source.enabled),
         weekday: source.weekday ?? null,
+        professor_date: source.professor_date ?? null,
         professor_time: source.professor_time ?? null,
         professor_name: source.professor_name ?? null,
         professor_phone: source.professor_phone ?? null,
