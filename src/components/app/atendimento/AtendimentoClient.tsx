@@ -134,6 +134,7 @@ type ExperimentalGroupSlotPayload = {
   id: string;
   group_class_id: string | null;
   pair_id: string | null;
+  pair_name?: string | null;
   slot_type: "experimental" | "recorrente";
   professor_name: string | null;
   professor_phone: string | null;
@@ -2336,6 +2337,7 @@ export function AtendimentoClient() {
     Array<{
       pairId: string;
       turmaNumber: number;
+      pairName: string | null;
       professorName: string | null;
       professorPhone: string | null;
       previewDate: string | null;
@@ -2351,6 +2353,7 @@ export function AtendimentoClient() {
       string,
       {
         pairId: string;
+        pairName: string | null;
         professorName: string | null;
         professorPhone: string | null;
           previewDate: string | null;
@@ -2369,6 +2372,7 @@ export function AtendimentoClient() {
       if (!pairId) continue;
       const current = grouped.get(pairId) ?? {
         pairId,
+        pairName: String(slot.pair_name ?? "").trim() || null,
         professorName: slot.professor_name ?? null,
         professorPhone: slot.professor_phone ?? null,
           previewDate:
@@ -2386,6 +2390,7 @@ export function AtendimentoClient() {
         hasCurrentLeadAssigned: Boolean(slot.is_current_lead_assigned),
         slotCount: 0,
       };
+      current.pairName = current.pairName ?? (String(slot.pair_name ?? "").trim() || null);
       current.professorName = current.professorName ?? slot.professor_name ?? null;
       current.professorPhone = current.professorPhone ?? slot.professor_phone ?? null;
       current.occupiedSeats = Math.max(current.occupiedSeats, Number(slot.occupied_seats ?? 0));
@@ -2435,6 +2440,7 @@ export function AtendimentoClient() {
       .map((entry, index) => ({
         pairId: entry.pairId,
         turmaNumber: index + 1,
+        pairName: entry.pairName,
         professorName: entry.professorName,
         professorPhone: entry.professorPhone,
         previewDate: entry.previewDate,
@@ -12200,7 +12206,7 @@ export function AtendimentoClient() {
                                       (isSelected ? "text-[var(--app-text-90)]" : "text-[var(--app-text-85)]")
                                     }
                                   >
-                                    Turma {turma.turmaNumber} disponível
+                                    {String(turma.pairName ?? "").trim() || `Turma ${turma.turmaNumber}`} disponível
                                   </div>
                                   <div
                                     className={

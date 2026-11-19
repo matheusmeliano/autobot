@@ -839,6 +839,7 @@ export async function buildRecurringGroupClassSlotsForLead(params: {
       id: `recurring-${pairId}`,
       group_class_id: null,
       pair_id: pairId,
+      pair_name: String(configuredSlot.pair_name ?? "").trim() || null,
       slot_type: "recorrente",
       professor_name: slotProfessorName || null,
       professor_phone: slotProfessorPhone || null,

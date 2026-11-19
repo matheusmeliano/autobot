@@ -201,10 +201,19 @@ export async function GET(_req: Request, { params }: { params: Promise<{ leadId:
             settings,
             groupClass: assignedGroupClass as any,
           }) || `assigned-${leadAssignedExperimentalGroupId}`;
+        const pairName =
+          settings.slots.find(
+            (slot) =>
+              String(slot.pair_id ?? "").trim() === pairId &&
+              String(slot.slot_type ?? "").trim().toLowerCase() === "experimental",
+          )?.pair_name ??
+          settings.slots.find((slot) => String(slot.pair_id ?? "").trim() === pairId)?.pair_name ??
+          null;
         const assignedSlot = {
           id: String((assignedGroupClass as any)?.id ?? "").trim() || leadAssignedExperimentalGroupId,
           group_class_id: leadAssignedExperimentalGroupId,
           pair_id: pairId,
+          pair_name: String(pairName ?? "").trim() || null,
           slot_type: "experimental" as const,
           professor_name: String((assignedGroupClass as any)?.professor_name ?? "").trim() || null,
           professor_phone: String((assignedGroupClass as any)?.professor_phone ?? "").trim() || null,
