@@ -72,8 +72,78 @@ export async function POST(req: Request) {
 
     const admin = createSupabaseAdminClient();
     const nowIso = new Date().toISOString();
+    const requestedGroupClassId = String(parsed.data.group_class_id ?? "").trim() || null;
+    const requestedPairId = String(parsed.data.pair_id ?? "").trim() || null;
 
-    if (parsed.data.slot_type === "recorrente" || (!parsed.data.group_class_id && parsed.data.pair_id)) {
+    const { data: leadForRouting, error: leadForRoutingError } = await admin
+      .from("atendimento_leads")
+      .select(
+        "id, recurring_class_group_pair_id, recurring_class_group_status, experimental_class_group_class_id, experimental_class_group_status",
+      )
+      .eq("id", parsed.data.lead_id)
+      .maybeSingle();
+
+    if (leadForRoutingError) {
+      if (isMissingExperimentalGroupRelation(leadForRoutingError)) {
+        return groupSchemaUnavailableResponse();
+      }
+      return Response.json({ ok: false, error: leadForRoutingError.message }, { status: 500 });
+    }
+
+    const leadRecurringPairId =
+      String((leadForRouting as any)?.recurring_class_group_pair_id ?? "").trim() || null;
+    const leadRecurringGroupStatus = String(
+      (leadForRouting as any)?.recurring_class_group_status ?? "",
+    )
+      .trim()
+      .toLowerCase();
+    const leadExperimentalGroupClassId =
+      String((leadForRouting as any)?.experimental_class_group_class_id ?? "").trim() || null;
+    const leadExperimentalGroupStatus = String(
+      (leadForRouting as any)?.experimental_class_group_status ?? "",
+    )
+      .trim()
+      .toLowerCase();
+
+    const activeExperimentalMembersResult = await admin
+      .from("atendimento_experimental_group_class_members")
+      .select("id, group_class_id", { count: "exact" })
+      .eq("lead_id", parsed.data.lead_id)
+      .eq("status", "assigned");
+    if (activeExperimentalMembersResult.error) {
+      if (isMissingExperimentalGroupRelation(activeExperimentalMembersResult.error)) {
+        return groupSchemaUnavailableResponse();
+      }
+      return Response.json(
+        { ok: false, error: activeExperimentalMembersResult.error.message },
+        { status: 500 },
+      );
+    }
+
+    const activeExperimentalMembers = Array.isArray(activeExperimentalMembersResult.data)
+      ? activeExperimentalMembersResult.data
+      : [];
+    const hasActiveExperimentalMember = activeExperimentalMembers.length > 0;
+    const leadHasRecurringAssignment = Boolean(
+      leadRecurringPairId && leadRecurringGroupStatus && leadRecurringGroupStatus !== "removed",
+    );
+    const leadHasExperimentalAssignment = Boolean(
+      (leadExperimentalGroupClassId &&
+        leadExperimentalGroupStatus &&
+        leadExperimentalGroupStatus !== "removed") ||
+        hasActiveExperimentalMember,
+    );
+    const shouldForceExperimentalRemoval = Boolean(
+      !requestedGroupClassId &&
+        requestedPairId &&
+        !leadHasRecurringAssignment &&
+        leadHasExperimentalAssignment,
+    );
+
+    if (
+      !shouldForceExperimentalRemoval &&
+      (parsed.data.slot_type === "recorrente" || (!requestedGroupClassId && requestedPairId))
+    ) {
       const { data: clearedRecurringLead, error: clearRecurringGroupError } = await admin
         .from("atendimento_leads")
         .update({
@@ -118,7 +188,7 @@ export async function POST(req: Request) {
         eventType: "recurring_group_class_member_removed",
         title: "Aluno removido de uma turma recorrente em grupo",
         details: {
-          pair_id: String(parsed.data.pair_id ?? "").trim() || null,
+          pair_id: requestedPairId,
         },
         actorType: "attendant",
         actorEmail: auth.user.email,
@@ -127,7 +197,7 @@ export async function POST(req: Request) {
       return Response.json({ ok: true });
     }
 
-    if (!parsed.data.group_class_id) {
+    if (!requestedGroupClassId && !leadExperimentalGroupClassId && !hasActiveExperimentalMember) {
       return Response.json({ ok: false, error: "invalid_payload" }, { status: 400 });
     }
 
@@ -148,7 +218,6 @@ export async function POST(req: Request) {
 
     const leadAssignedGroupClassId =
       String((lead as any)?.experimental_class_group_class_id ?? "").trim() || null;
-    const requestedGroupClassId = String(parsed.data.group_class_id ?? "").trim() || null;
     const effectiveGroupClassId = leadAssignedGroupClassId || requestedGroupClassId;
 
     const activeMembersResult = await admin
