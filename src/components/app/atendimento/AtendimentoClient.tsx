@@ -47,12 +47,14 @@ type ExperimentalGroupSettingsPayload = {
     professor_name?: string | null;
     professor_phone?: string | null;
     pair_name?: string | null;
+    pair_category?: "experimental" | "recorrente";
     slot_type?: "experimental" | "recorrente";
     pair_id?: string | null;
   }>;
 };
 
 type ExperimentalGroupSlotType = "experimental" | "recorrente";
+type ExperimentalGroupPairCategory = "experimental" | "recorrente";
 
 type ExperimentalGroupPairUsagePayload = Record<
   string,
@@ -94,6 +96,7 @@ type ExperimentalGroupFormSlot = {
   professorName: string;
   professorPhone: string;
   pairName: string;
+  pairCategory: ExperimentalGroupPairCategory;
   slotType: ExperimentalGroupSlotType;
   pairId: string;
 };
@@ -174,7 +177,10 @@ const EXPERIMENTAL_GROUP_WEEKDAY_SHORT_LABELS: Record<string, string> = {
   sun: "Dom",
 };
 
-function buildExperimentalGroupFormPair(pairNumber: number): ExperimentalGroupFormSlot[] {
+function buildExperimentalGroupFormPair(
+  pairNumber: number,
+  pairCategory: ExperimentalGroupPairCategory = "experimental",
+): ExperimentalGroupFormSlot[] {
   const pairId = `pair-${pairNumber}`;
   return [
     {
@@ -184,6 +190,7 @@ function buildExperimentalGroupFormPair(pairNumber: number): ExperimentalGroupFo
       professorName: "",
       professorPhone: "",
       pairName: "",
+      pairCategory,
       slotType: "experimental",
       pairId,
     },
@@ -194,6 +201,7 @@ function buildExperimentalGroupFormPair(pairNumber: number): ExperimentalGroupFo
       professorName: "",
       professorPhone: "",
       pairName: "",
+      pairCategory,
       slotType: "recorrente",
       pairId,
     },
@@ -1883,6 +1891,11 @@ export function AtendimentoClient() {
   const [experimentalGroupSettingsLoading, setExperimentalGroupSettingsLoading] = useState(false);
   const [experimentalGroupSettingsSaving, setExperimentalGroupSettingsSaving] = useState(false);
   const [experimentalGroupTogglingPairId, setExperimentalGroupTogglingPairId] = useState("");
+  const [experimentalGroupCreateTypeModalOpen, setExperimentalGroupCreateTypeModalOpen] =
+    useState(false);
+  const [experimentalGroupCreatePairNumber, setExperimentalGroupCreatePairNumber] = useState<
+    number | null
+  >(null);
   const experimentalGroupSettingsLastSavedSnapshotRef = useRef<string>("");
   const [experimentalGroupAvailability, setExperimentalGroupAvailability] =
     useState<ExperimentalAvailabilityPayload | null>(null);
@@ -4389,6 +4402,10 @@ export function AtendimentoClient() {
             professorName: String(slot?.professor_name ?? "").trim(),
             professorPhone: String(slot?.professor_phone ?? "").trim(),
             pairName: String(slot?.pair_name ?? "").trim(),
+            pairCategory:
+              String(slot?.pair_category ?? "").trim().toLowerCase() === "recorrente"
+                ? "recorrente"
+                : "experimental",
             slotType:
               String(slot?.slot_type ?? "").trim().toLowerCase() === "recorrente"
                 ? "recorrente"
@@ -4405,6 +4422,9 @@ export function AtendimentoClient() {
         professor_name: String(slot.professorName ?? "").trim(),
         professor_phone: String(slot.professorPhone ?? "").trim(),
         pair_name: String(slot.pairName ?? "").trim(),
+        pair_category: String(slot.pairCategory ?? "").trim().toLowerCase() === "recorrente"
+          ? "recorrente"
+          : "experimental",
         slot_type: slot.slotType,
         pair_id: String(slot.pairId ?? "").trim(),
       })),
@@ -4880,6 +4900,10 @@ export function AtendimentoClient() {
         professor_name: String(slot.professorName ?? "").trim(),
         professor_phone: String(slot.professorPhone ?? "").trim(),
         pair_name: String(slot.pairName ?? "").trim(),
+        pair_category:
+          String(slot.pairCategory ?? "").trim().toLowerCase() === "recorrente"
+            ? "recorrente"
+            : "experimental",
         slot_type: slot.slotType,
         pair_id: String(slot.pairId ?? "").trim(),
       })),
@@ -4952,7 +4976,21 @@ export function AtendimentoClient() {
     return String(currentSlot.pairName ?? "").trim() !== getSavedExperimentalGroupPairName(normalizedPairId);
   }
 
+  function resolveExperimentalGroupNextPairNumber(
+    slots: ExperimentalGroupFormSlot[] = experimentalGroupFormSlots,
+  ): number {
+    const highestPairNumber = slots.reduce((highest, slot, index) => {
+      const rawPairId =
+        String(slot.pairId ?? "").trim() || `pair-${Math.floor(index / 2) + 1}`;
+      const pairNumber = Number(rawPairId.match(/(\d+)/)?.[1] ?? Number.NaN);
+      return Number.isFinite(pairNumber) ? Math.max(highest, pairNumber) : highest;
+    }, 0);
+    return highestPairNumber + 1;
+  }
+
   async function handleRequestCloseExperimentalGroupSettings() {
+    setExperimentalGroupCreateTypeModalOpen(false);
+    setExperimentalGroupCreatePairNumber(null);
     setExperimentalGroupSettingsOpen(false);
   }
 
@@ -5054,6 +5092,10 @@ export function AtendimentoClient() {
             professor_name: slot.professorName || null,
             professor_phone: slot.professorPhone || null,
             pair_name: String(slot.pairName ?? "").trim() || null,
+            pair_category:
+              String(slot.pairCategory ?? "").trim().toLowerCase() === "recorrente"
+                ? "recorrente"
+                : "experimental",
             slot_type: slot.slotType,
             pair_id: slot.pairId,
           })),
@@ -5151,21 +5193,29 @@ export function AtendimentoClient() {
     );
   }
 
-  async function handleOpenExperimentalGroupPairs() {
+  function handleOpenExperimentalGroupPairs() {
     if (experimentalGroupSettingsSaving || experimentalGroupSettingsLoading) return;
-    const highestPairNumber = experimentalGroupFormSlots.reduce((highest, slot, index) => {
-      const rawPairId =
-        String(slot.pairId ?? "").trim() || `pair-${Math.floor(index / 2) + 1}`;
-      const pairNumber = Number(rawPairId.match(/(\d+)/)?.[1] ?? Number.NaN);
-      return Number.isFinite(pairNumber) ? Math.max(highest, pairNumber) : highest;
-    }, 0);
-    const nextPairNumber = highestPairNumber + 1;
-    const nextSlots = [...experimentalGroupFormSlots, ...buildExperimentalGroupFormPair(nextPairNumber)];
+    setExperimentalGroupCreatePairNumber(resolveExperimentalGroupNextPairNumber());
+    setExperimentalGroupCreateTypeModalOpen(true);
+  }
+
+  async function handleCreateExperimentalGroupPair(
+    pairCategory: ExperimentalGroupPairCategory,
+  ) {
+    if (experimentalGroupSettingsSaving || experimentalGroupSettingsLoading) return;
+    const nextPairNumber =
+      experimentalGroupCreatePairNumber ?? resolveExperimentalGroupNextPairNumber();
+    const nextSlots = [
+      ...experimentalGroupFormSlots,
+      ...buildExperimentalGroupFormPair(nextPairNumber, pairCategory),
+    ];
     const saved = await handleSaveExperimentalGroupSettings({
       silent: true,
       slots: nextSlots,
     });
     if (!saved) return;
+    setExperimentalGroupCreateTypeModalOpen(false);
+    setExperimentalGroupCreatePairNumber(null);
     modalToast.success("Turma criada.");
   }
 
@@ -11226,6 +11276,72 @@ export function AtendimentoClient() {
       {renderFiltersModal()}
 
       <AppModal
+        open={experimentalGroupCreateTypeModalOpen}
+        onClose={() => {
+          if (experimentalGroupSettingsSaving || experimentalGroupSettingsLoading) return;
+          setExperimentalGroupCreateTypeModalOpen(false);
+          setExperimentalGroupCreatePairNumber(null);
+        }}
+        size="md"
+        position="center"
+        zIndexClass="z-[430]"
+      >
+        <div className="flex flex-col gap-4">
+          <div className="flex items-center justify-between gap-3">
+            <div className="min-w-0">
+              <h3 className="text-[18px] font-bold text-[var(--app-text-85)]">Nova turma</h3>
+              <div className="mt-1 text-[12px] text-[var(--app-text-55)]">
+                Escolha se essa turma sera experimental ou recorrente.
+              </div>
+            </div>
+            <button
+              type="button"
+              aria-label="Fechar"
+              onClick={() => {
+                if (experimentalGroupSettingsSaving || experimentalGroupSettingsLoading) return;
+                setExperimentalGroupCreateTypeModalOpen(false);
+                setExperimentalGroupCreatePairNumber(null);
+              }}
+              disabled={experimentalGroupSettingsSaving || experimentalGroupSettingsLoading}
+              className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-[var(--app-border)] bg-[var(--app-solid-surface)] text-[var(--app-text-70)] hover:bg-[var(--app-hover)] disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+
+          <div className="grid grid-cols-1 gap-3">
+            <button
+              type="button"
+              onClick={() => void handleCreateExperimentalGroupPair("experimental")}
+              disabled={experimentalGroupSettingsSaving || experimentalGroupSettingsLoading}
+              className="rounded-2xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] p-4 text-left transition hover:border-[#ea580c]/35 hover:bg-[var(--app-hover)] disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              <div className="text-[14px] font-bold text-[var(--app-text-85)]">
+                Turma Experimental
+              </div>
+              <div className="mt-1 text-[12px] leading-relaxed text-[var(--app-text-60)]">
+                A aula acontece uma unica vez, conforme o dia e horario agendados, sem repeticao.
+              </div>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => void handleCreateExperimentalGroupPair("recorrente")}
+              disabled={experimentalGroupSettingsSaving || experimentalGroupSettingsLoading}
+              className="rounded-2xl border border-[var(--app-border)] bg-[var(--app-solid-surface)] p-4 text-left transition hover:border-[#ea580c]/35 hover:bg-[var(--app-hover)] disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              <div className="text-[14px] font-bold text-[var(--app-text-85)]">
+                Turma Recorrente
+              </div>
+              <div className="mt-1 text-[12px] leading-relaxed text-[var(--app-text-60)]">
+                A aula acontece semanalmente, sempre no mesmo dia da semana e horario definidos.
+              </div>
+            </button>
+          </div>
+        </div>
+      </AppModal>
+
+      <AppModal
         open={experimentalGroupSettingsOpen}
         onClose={() => {
           void handleRequestCloseExperimentalGroupSettings();
@@ -11254,7 +11370,7 @@ export function AtendimentoClient() {
                 type="button"
                 aria-label="Abrir Turmas"
                 onClick={() => {
-                  void handleOpenExperimentalGroupPairs();
+                  handleOpenExperimentalGroupPairs();
                 }}
                 disabled={experimentalGroupSettingsSaving || experimentalGroupSettingsLoading}
                 className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-[var(--app-border)] bg-[var(--app-solid-surface)] text-[var(--app-text-70)] hover:bg-[var(--app-hover)] disabled:cursor-not-allowed disabled:opacity-60"
@@ -11351,6 +11467,10 @@ export function AtendimentoClient() {
                 );
                 const displayPairName =
                   String(card.pairName ?? "").trim() || `Turma ${pair.pairNumber}`;
+                const pairCategoryLabel =
+                  card.pairCategory === "recorrente"
+                    ? "Turma Recorrente"
+                    : "Turma Experimental";
                 const canSendExperimentalGroupMatricula =
                   card.slotType === "experimental" &&
                   pair.members.length > 0 &&
@@ -11377,6 +11497,9 @@ export function AtendimentoClient() {
                   >
                     <div className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-2">
                         <div className={["min-w-0", inactiveCardContentClass].join(" ")}>
+                          <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--app-text-45)]">
+                            {pairCategoryLabel}
+                          </div>
                           <div className="text-[14px] font-bold text-[var(--app-text-85)]">
                             {displayPairName}
                           </div>
