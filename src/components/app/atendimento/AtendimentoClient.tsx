@@ -373,6 +373,13 @@ function resolveExperimentalGroupSelectedDateIdForPair(params: {
   const availableDateIds = new Set(
     availabilityDates.map((dateOption) => String(dateOption?.id ?? "").trim()).filter(Boolean),
   );
+  const assignedProfessorDateId = resolveExperimentalAvailabilityDateIdByProfessorDate(
+    params.availability,
+    params.assignedProfessorDate,
+  );
+  if (params.hasExperimentalMembers && assignedProfessorDateId && availableDateIds.has(assignedProfessorDateId)) {
+    return assignedProfessorDateId;
+  }
   const savedProfessorDateId = resolveExperimentalAvailabilityDateIdByProfessorDate(
     params.availability,
     params.slot.professorDate,
@@ -4495,6 +4502,14 @@ export function AtendimentoClient() {
         : "";
       const pairAvailability =
         availabilityByProfessor[String(slot.professorPhone ?? "").trim()] ?? availability;
+      const assignedProfessorDateId = resolveExperimentalAvailabilityDateIdByProfessorDate(
+        pairAvailability,
+        assignedProfessorDate,
+      );
+      if (pairHasExperimentalMembers && assignedProfessorDateId) {
+        nextSelectedDateIdsByPairId[pairId] = assignedProfessorDateId;
+        return;
+      }
       const savedProfessorDateId = resolveExperimentalAvailabilityDateIdByProfessorDate(
         pairAvailability,
         slot.professorDate,
