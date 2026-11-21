@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import {
   findLeadByPhone,
+  formalizeAndPersistContract,
   triggerRecurringPaymentIntentIfNeeded,
   sendAtendimentoWhatsAppText,
   isLeadRecurringRegistrationConcluded,
@@ -260,6 +261,14 @@ export async function GET(req: NextRequest) {
     const existingRecurringRegistrationPassword = String((data as any).recurring_registration_password ?? "").trim();
     const existingSignupPasswordRawTemp = String((data as any).signup_password_raw_temp ?? "").trim();
     const hasAnySavedPassword = Boolean(existingRecurringRegistrationPassword || existingSignupPasswordRawTemp);
+    const recurringGroupPairId = String((data as any)?.recurring_class_group_pair_id ?? "").trim();
+    const recurringGroupStatus = String((data as any)?.recurring_class_group_status ?? "")
+      .trim()
+      .toLowerCase();
+    const autoConvertedByRecurringGroup =
+      Boolean(recurringGroupPairId) &&
+      recurringGroupStatus === "assigned" &&
+      (curLeadStatus === "aluno" || curFunnelStage === "aluno_recorrente_cadastrado");
 
     const stepRaw = (data as any)?.recurring_registration_step;
     const parsedStep =
@@ -313,6 +322,43 @@ export async function GET(req: NextRequest) {
           }
         }
       } catch {}
+    }
+
+    if (
+      isMatriculaConcluida &&
+      autoConvertedByRecurringGroup &&
+      !existingContractSignedAtRaw &&
+      !existingContractPdfUrl
+    ) {
+      try {
+        const formalizedContract = await formalizeAndPersistContract({
+          admin,
+          leadId: String((data as any)?.id ?? "").trim(),
+          conversationId: null,
+          enrollmentNumber: existingEnrollmentNumber || null,
+        });
+        if (formalizedContract?.ok) {
+          (data as any).contract_status = "assinado";
+          (data as any).contract_signed_at = String(
+            formalizedContract.contract_signed_at ?? (data as any).contract_signed_at ?? "",
+          ).trim();
+          (data as any).contract_pdf_url = String(
+            formalizedContract.contract_pdf_url ?? (data as any).contract_pdf_url ?? "",
+          ).trim();
+          if (!existingEnrollmentNumber) {
+            const nextEnrollment = String(formalizedContract.enrollment_number ?? "").trim();
+            if (nextEnrollment) {
+              (data as any).enrollment_number = nextEnrollment;
+              existingEnrollmentNumber = nextEnrollment;
+            }
+          }
+        }
+      } catch (error) {
+        console.error(
+          "[cadastro-recorrente-draft] falha ao formalizar contrato do aluno convertido por turma",
+          error instanceof Error ? error.message : String(error ?? ""),
+        );
+      }
     }
 
     let latestRecurringNotificationOccurrenceStartAt: string | null = null;

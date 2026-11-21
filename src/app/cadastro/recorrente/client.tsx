@@ -2211,6 +2211,7 @@ export default function CadastroRecorrenteBody() {
     const recurringScheduleLabel = buildAlunoRecurringScheduleLabel(lead);
     const professorName = String(lead?.recurring_class_professor_name ?? "").trim() || "Lucas Brum";
     const planName = String(lead?.plan_name ?? "").trim() || "Plano Individual";
+    const alunoContractStatusRaw = String(lead?.contract_status ?? "").trim().toLowerCase();
     const alunoContractPdfUrl = String(lead?.contract_pdf_url ?? "").trim();
     const alunoContractSignedAtRaw = String(lead?.contract_signed_at ?? "").trim();
     let alunoContractSignedDate: string | null = null;
@@ -2223,7 +2224,8 @@ export default function CadastroRecorrenteBody() {
         }
       } catch {}
     }
-    const alunoContractSigned = Boolean(alunoContractPdfUrl && alunoContractSignedDate);
+    const alunoContractSigned =
+      Boolean(alunoContractSignedDate) || alunoContractStatusRaw === "assinado";
     const planMonthlyRaw = String(lead?.plan_monthly_value ?? "").trim();
     const planMonthlyRawNormalized = planMonthlyRaw.replace(/\s+/g, "").replace(",", ".").toLowerCase();
     const planMonthlyIsLegacy116 =
@@ -2683,6 +2685,10 @@ export default function CadastroRecorrenteBody() {
                         </svg>
                         Baixar contrato
                       </a>
+                    ) : alunoContractSigned ? (
+                      <div className="text-xs text-slate-500 leading-relaxed max-w-xs text-right">
+                        Contrato assinado.
+                      </div>
                     ) : (
                       <div className="text-xs text-slate-500 leading-relaxed max-w-xs text-right">
                         O contrato será disponibilizado assim que a assinatura for confirmada.
