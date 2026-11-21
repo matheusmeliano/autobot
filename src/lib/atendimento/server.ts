@@ -4180,6 +4180,14 @@ export function isLeadRecurringRegistrationConcluded(lead: unknown): boolean {
   const payConfirmedAtRaw = String(obj?.payment_confirmed_at ?? "").trim();
   const leadStatusRaw = String(obj?.status ?? "").trim().toLowerCase();
   const funnelRaw = String(obj?.funnel_stage ?? "").trim().toLowerCase();
+  const recurringGroupPairId = String(obj?.recurring_class_group_pair_id ?? "").trim();
+  const recurringGroupStatus = String(obj?.recurring_class_group_status ?? "")
+    .trim()
+    .toLowerCase();
+  const autoConvertedByRecurringGroup =
+    Boolean(recurringGroupPairId) &&
+    recurringGroupStatus === "assigned" &&
+    (leadStatusRaw === "aluno" || funnelRaw === "aluno_recorrente_cadastrado");
   return (
     payStatusRaw === "confirmado" ||
     payStatusRaw === "matriculado" ||
@@ -4187,7 +4195,8 @@ export function isLeadRecurringRegistrationConcluded(lead: unknown): boolean {
     leadStatusRaw === "matriculado" ||
     leadStatusRaw === "matricula_confirmada" ||
     funnelRaw === "matriculado" ||
-    funnelRaw === "matricula_confirmada"
+    funnelRaw === "matricula_confirmada" ||
+    autoConvertedByRecurringGroup
   );
 }
 
