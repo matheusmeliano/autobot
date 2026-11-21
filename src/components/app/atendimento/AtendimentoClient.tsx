@@ -732,41 +732,50 @@ function resolveAssignedExperimentalGroupSlot(params: {
   const assignedSlots = params.slots.filter((slot) => slot.is_current_lead_assigned);
   if (!assignedSlots.length) return null;
 
+  const assignedExperimentalGroupId = String(
+    (lead as any)?.experimental_class_group_class_id ?? "",
+  ).trim();
+  const assignedProfessorStartAt = String(
+    (lead as any)?.experimental_class_professor_start_at ?? "",
+  ).trim();
+  const assignedProfessorDate = String((lead as any)?.experimental_class_professor_date ?? "").trim();
+  const assignedProfessorTime = String((lead as any)?.experimental_class_professor_time ?? "").trim();
+  const assignedProfessorPhone = String((lead as any)?.experimental_class_professor_phone ?? "").trim();
+  const matchedExperimentalSlot =
+    assignedSlots.find(
+      (slot) =>
+        slot.slot_type === "experimental" &&
+        ((assignedExperimentalGroupId &&
+          String(slot.group_class_id ?? "").trim() === assignedExperimentalGroupId) ||
+          (assignedProfessorStartAt &&
+            String(slot.professor_start_at ?? "").trim() === assignedProfessorStartAt) ||
+          ((assignedProfessorDate &&
+            String(slot.professor_date ?? "").trim() === assignedProfessorDate &&
+            assignedProfessorTime &&
+            String(slot.professor_time ?? "").trim() === assignedProfessorTime &&
+            (!assignedProfessorPhone ||
+              String(slot.professor_phone ?? "").trim() === assignedProfessorPhone)))),
+    ) ?? null;
+  if (matchedExperimentalSlot) return matchedExperimentalSlot;
+
+  const assignedRecurringPairId = String((lead as any)?.recurring_class_group_pair_id ?? "").trim();
+  const matchedRecurringSlot =
+    assignedSlots.find(
+      (slot) =>
+        slot.slot_type === "recorrente" &&
+        (!assignedRecurringPairId || String(slot.pair_id ?? "").trim() === assignedRecurringPairId),
+    ) ?? null;
+  if (matchedRecurringSlot) return matchedRecurringSlot;
+
   if (desiredSlotType === "experimental") {
-    const assignedGroupId = String((lead as any)?.experimental_class_group_class_id ?? "").trim();
-    const assignedProfessorStartAt = String(
-      (lead as any)?.experimental_class_professor_start_at ?? "",
-    ).trim();
-    const assignedProfessorDate = String((lead as any)?.experimental_class_professor_date ?? "").trim();
-    const assignedProfessorTime = String((lead as any)?.experimental_class_professor_time ?? "").trim();
-    const assignedProfessorPhone = String((lead as any)?.experimental_class_professor_phone ?? "").trim();
     return (
-      assignedSlots.find(
-        (slot) =>
-          slot.slot_type === "experimental" &&
-          ((assignedGroupId && String(slot.group_class_id ?? "").trim() === assignedGroupId) ||
-            (assignedProfessorStartAt &&
-              String(slot.professor_start_at ?? "").trim() === assignedProfessorStartAt) ||
-            ((assignedProfessorDate &&
-              String(slot.professor_date ?? "").trim() === assignedProfessorDate &&
-              assignedProfessorTime &&
-              String(slot.professor_time ?? "").trim() === assignedProfessorTime &&
-              (!assignedProfessorPhone ||
-                String(slot.professor_phone ?? "").trim() === assignedProfessorPhone)))),
-      ) ??
       assignedSlots.find((slot) => slot.slot_type === "experimental") ??
       null
     );
   }
 
   if (desiredSlotType === "recorrente") {
-    const assignedPairId = String((lead as any)?.recurring_class_group_pair_id ?? "").trim();
     return (
-      assignedSlots.find(
-        (slot) =>
-          slot.slot_type === "recorrente" &&
-          (!assignedPairId || String(slot.pair_id ?? "").trim() === assignedPairId),
-      ) ??
       assignedSlots.find((slot) => slot.slot_type === "recorrente") ??
       null
     );
@@ -5517,12 +5526,6 @@ export function AtendimentoClient() {
     }
     if (result.reasons.includes("missing_valid_phone")) {
       modalToast.warning("Esse registro precisa ter um telefone válido para entrar em uma turma.");
-      return;
-    }
-    if (result.reasons.includes("missing_state_city") && !result.canOpenModal) {
-      modalToast.warning(
-        "Para atribuir uma turma experimental a este registro, informe primeiro o estado e a cidade.",
-      );
       return;
     }
     if (!result.slots.length) {

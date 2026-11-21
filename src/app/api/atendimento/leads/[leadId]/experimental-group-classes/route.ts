@@ -96,15 +96,13 @@ export async function GET(_req: Request, { params }: { params: Promise<{ leadId:
     const leadAssignedProfessorPhoneDigits = normalizePhoneDigits(
       (lead as any)?.experimental_class_professor_phone ?? null,
     );
-    const leadHasExperimentalAssignment =
-      !isStudentLead &&
-      Boolean(
-        leadAssignedExperimentalStatus &&
-          leadAssignedExperimentalStatus !== "removed" &&
-          (leadAssignedExperimentalGroupId ||
-            leadAssignedProfessorStartAt ||
-            (leadAssignedProfessorDate && leadAssignedProfessorTime)),
-      );
+    const leadHasExperimentalAssignment = Boolean(
+      leadAssignedExperimentalStatus &&
+        leadAssignedExperimentalStatus !== "removed" &&
+        (leadAssignedExperimentalGroupId ||
+          leadAssignedProfessorStartAt ||
+          (leadAssignedProfessorDate && leadAssignedProfessorTime)),
+    );
     const matchesLeadExperimentalAssignment = (slot: {
       slot_type: string;
       group_class_id: string | null;
@@ -149,19 +147,15 @@ export async function GET(_req: Request, { params }: { params: Promise<{ leadId:
       now: new Date(),
       lookAheadDays: 56,
     });
-    const experimentalSlots = isStudentLead
-      ? []
-      : await buildExperimentalGroupClassSlotsForLead({
-          admin,
-          lead: lead as Record<string, unknown>,
-          settings,
-          now: new Date(),
-          lookAheadDays: 56,
-          excludeLeadIdFromIndividualBookings: true,
-        });
-    const rawSlots = isStudentLead
-      ? recurringSlots
-      : [...experimentalSlots, ...recurringSlots];
+    const experimentalSlots = await buildExperimentalGroupClassSlotsForLead({
+      admin,
+      lead: lead as Record<string, unknown>,
+      settings,
+      now: new Date(),
+      lookAheadDays: 56,
+      excludeLeadIdFromIndividualBookings: true,
+    });
+    const rawSlots = [...experimentalSlots, ...recurringSlots];
     let slots =
       leadHasExperimentalAssignment
         ? rawSlots.map((slot) => {
@@ -280,15 +274,9 @@ export async function GET(_req: Request, { params }: { params: Promise<{ leadId:
       }
     }
 
-    const hasRecurringOptions = rawSlots.some(
-      (slot) =>
-        String(slot.slot_type ?? "").trim().toLowerCase() === "recorrente" ||
-        String((slot as any)?.pair_category ?? "").trim().toLowerCase() === "recorrente",
-    );
     const reasons: string[] = [];
     if (!settings.enabled) reasons.push("feature_disabled");
     if (!hasPhone) reasons.push("missing_valid_phone");
-    if (!hasStateAndCity && !hasRecurringOptions) reasons.push("missing_state_city");
     return Response.json({
       ok: true,
       lead_slot_type: isStudentLead ? "recorrente" : "experimental",

@@ -382,10 +382,10 @@ export async function POST(req: Request) {
       settings.slots.find((slot) => String(slot.pair_id ?? "").trim() === requestedPairId)?.pair_category ??
       null;
     const isStudentLead = isLeadRecurringStudent(lead as any);
-    const shouldAutoConvertToRecurringStudent =
-      !isStudentLead && String(requestedPairCategory ?? "").trim().toLowerCase() === "recorrente";
     const assigningRecurringGroup =
-      isStudentLead || shouldAutoConvertToRecurringStudent || parsed.data.slot_type === "recorrente";
+      String(requestedPairCategory ?? "").trim().toLowerCase() === "recorrente" ||
+      parsed.data.slot_type === "recorrente";
+    const shouldAutoConvertToRecurringStudent = !isStudentLead && assigningRecurringGroup;
 
     if (!shouldAutoConvertToRecurringStudent && !leadHasName(lead as any)) {
       return Response.json(
@@ -396,16 +396,6 @@ export async function POST(req: Request) {
         { status: 409 },
       );
     }
-    if (!assigningRecurringGroup && !leadHasStateAndCity(lead as any)) {
-      return Response.json(
-        {
-          ok: false,
-          error: "Para atribuir uma turma a este registro, informe primeiro o estado e a cidade.",
-        },
-        { status: 409 },
-      );
-    }
-
     const slots = assigningRecurringGroup
       ? await buildRecurringGroupClassSlotsForLead({
           admin,
@@ -438,13 +428,6 @@ export async function POST(req: Request) {
     if (!targetSlot) {
       return Response.json(
         { ok: false, error: "A turma selecionada não está mais disponível." },
-        { status: 409 },
-      );
-    }
-    const expectedSlotType = assigningRecurringGroup ? "recorrente" : "experimental";
-    if (targetSlot.slot_type !== expectedSlotType) {
-      return Response.json(
-        { ok: false, error: "Este registro só pode ser atribuído ao tipo de turma correspondente." },
         { status: 409 },
       );
     }
