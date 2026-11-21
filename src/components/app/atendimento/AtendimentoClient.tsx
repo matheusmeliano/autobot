@@ -5500,15 +5500,6 @@ export function AtendimentoClient() {
       );
       return;
     }
-    if (
-      !isLeadAssignedToAnyGroup(lead) &&
-      !leadHasStateAndCityForExperimentalGroup(lead)
-    ) {
-      modalToast.warning(
-        "Para atribuir uma turma a este registro, informe primeiro o estado e a cidade.",
-      );
-      return;
-    }
     setExperimentalGroupLead(lead);
     const result = await loadExperimentalGroupLeadData(lead);
     if (!result) return;
@@ -5526,6 +5517,12 @@ export function AtendimentoClient() {
     }
     if (result.reasons.includes("missing_valid_phone")) {
       modalToast.warning("Esse registro precisa ter um telefone válido para entrar em uma turma.");
+      return;
+    }
+    if (result.reasons.includes("missing_state_city") && !result.canOpenModal) {
+      modalToast.warning(
+        "Para atribuir uma turma experimental a este registro, informe primeiro o estado e a cidade.",
+      );
       return;
     }
     if (!result.slots.length) {
