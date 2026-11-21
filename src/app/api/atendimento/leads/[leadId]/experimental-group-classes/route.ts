@@ -21,6 +21,14 @@ function isLeadRecurringStudent(lead: Record<string, unknown> | null): boolean {
   const payConfirmedAtRaw = String((lead as any)?.payment_confirmed_at ?? "").trim();
   const leadStatusRaw = String((lead as any)?.status ?? "").trim().toLowerCase();
   const funnelRaw = String((lead as any)?.funnel_stage ?? "").trim().toLowerCase();
+  const recurringGroupPairId = String((lead as any)?.recurring_class_group_pair_id ?? "").trim();
+  const recurringGroupStatus = String((lead as any)?.recurring_class_group_status ?? "")
+    .trim()
+    .toLowerCase();
+  const autoConvertedByRecurringGroup =
+    Boolean(recurringGroupPairId) &&
+    recurringGroupStatus === "assigned" &&
+    (leadStatusRaw === "aluno" || funnelRaw === "aluno_recorrente_cadastrado");
   return (
     payStatusRaw === "confirmado" ||
     payStatusRaw === "matriculado" ||
@@ -29,6 +37,7 @@ function isLeadRecurringStudent(lead: Record<string, unknown> | null): boolean {
     leadStatusRaw === "matricula_confirmada" ||
     funnelRaw === "matriculado" ||
     funnelRaw === "matricula_confirmada" ||
+    autoConvertedByRecurringGroup ||
     Boolean(String((lead as any)?.enrollment_number ?? "").trim())
   );
 }
@@ -209,11 +218,21 @@ export async function GET(_req: Request, { params }: { params: Promise<{ leadId:
           )?.pair_name ??
           settings.slots.find((slot) => String(slot.pair_id ?? "").trim() === pairId)?.pair_name ??
           null;
+        const pairCategory: "experimental" | "recorrente" =
+          String(
+            settings.slots.find((slot) => String(slot.pair_id ?? "").trim() === pairId)
+              ?.pair_category ?? "",
+          )
+            .trim()
+            .toLowerCase() === "recorrente"
+            ? "recorrente"
+            : "experimental";
         const assignedSlot = {
           id: String((assignedGroupClass as any)?.id ?? "").trim() || leadAssignedExperimentalGroupId,
           group_class_id: leadAssignedExperimentalGroupId,
           pair_id: pairId,
           pair_name: String(pairName ?? "").trim() || null,
+          pair_category: pairCategory,
           slot_type: "experimental" as const,
           professor_name: String((assignedGroupClass as any)?.professor_name ?? "").trim() || null,
           professor_phone: String((assignedGroupClass as any)?.professor_phone ?? "").trim() || null,

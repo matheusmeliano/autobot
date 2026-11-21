@@ -135,6 +135,7 @@ type ExperimentalGroupSlotPayload = {
   group_class_id: string | null;
   pair_id: string | null;
   pair_name?: string | null;
+  pair_category?: "experimental" | "recorrente" | null;
   slot_type: "experimental" | "recorrente";
   professor_name: string | null;
   professor_phone: string | null;
@@ -1664,6 +1665,23 @@ function buildExperimentalMetaForList(lead: AtendimentoLeadListItem): { label: s
 }
 
 function buildRecurringMetaForVisaoGeral(lead: AtendimentoLeadListItem): { title: string; body: string; tone: "warning" | "success" | "default" | "info" } | null {
+  const recurringGroupPairId = String((lead as any)?.recurring_class_group_pair_id ?? "").trim();
+  const recurringGroupStatus = String((lead as any)?.recurring_class_group_status ?? "")
+    .trim()
+    .toLowerCase();
+  const leadStatusRaw = String((lead as any)?.status ?? "").trim().toLowerCase();
+  const funnelRaw = String((lead as any)?.funnel_stage ?? "").trim().toLowerCase();
+  const autoConvertedByRecurringGroup =
+    Boolean(recurringGroupPairId) &&
+    recurringGroupStatus === "assigned" &&
+    (leadStatusRaw === "aluno" || funnelRaw === "aluno_recorrente_cadastrado");
+  if (autoConvertedByRecurringGroup) {
+    return {
+      title: "Matrícula concluída",
+      body: "Registro convertido automaticamente em aluno ao entrar na turma recorrente.",
+      tone: "success",
+    };
+  }
 
   // ============================================================
   // GUARD: RODAR NOVA SEQUENCIA ESTRITA RECORRENTE SÓ SE O
@@ -1863,10 +1881,18 @@ function buildStudentDashboardUrl(lead: AtendimentoLeadListItem): string {
 }
 
 function isLeadMatriculaConcluida(lead: AtendimentoLeadListItem): boolean {
+  const recurringGroupPairId = String((lead as any)?.recurring_class_group_pair_id ?? "").trim();
+  const recurringGroupStatus = String((lead as any)?.recurring_class_group_status ?? "")
+    .trim()
+    .toLowerCase();
   const payStatusRaw = String((lead as any)?.payment_status ?? "").trim().toLowerCase();
   const payConfirmedAtRaw = String((lead as any)?.payment_confirmed_at ?? "").trim();
   const leadStatusRaw = String((lead as any)?.status ?? "").trim().toLowerCase();
   const funnelRaw = String((lead as any)?.funnel_stage ?? "").trim().toLowerCase();
+  const autoConvertedByRecurringGroup =
+    Boolean(recurringGroupPairId) &&
+    recurringGroupStatus === "assigned" &&
+    (leadStatusRaw === "aluno" || funnelRaw === "aluno_recorrente_cadastrado");
   return (
     payStatusRaw === "confirmado" ||
     payStatusRaw === "matriculado" ||
@@ -1874,7 +1900,8 @@ function isLeadMatriculaConcluida(lead: AtendimentoLeadListItem): boolean {
     leadStatusRaw === "matriculado" ||
     leadStatusRaw === "matricula_confirmada" ||
     funnelRaw === "matriculado" ||
-    funnelRaw === "matricula_confirmada"
+    funnelRaw === "matricula_confirmada" ||
+    autoConvertedByRecurringGroup
   );
 }
 
@@ -5517,7 +5544,10 @@ export function AtendimentoClient() {
     if (!experimentalGroupLead || experimentalGroupActionLoading) return;
     setExperimentalGroupActionLoading(true);
     try {
-      if (slot.slot_type === "recorrente") {
+      const shouldHandleAsRecurring =
+        slot.slot_type === "recorrente" ||
+        String(slot.pair_category ?? "").trim().toLowerCase() === "recorrente";
+      if (shouldHandleAsRecurring) {
         if (!slot.is_current_lead_assigned) {
           const assignRes = await fetch("/api/atendimento/experimental-group-classes/assign", {
             method: "POST",
@@ -5527,7 +5557,7 @@ export function AtendimentoClient() {
               group_class_id: slot.group_class_id,
               professor_start_at: slot.professor_start_at,
               pair_id: slot.pair_id,
-              slot_type: slot.slot_type,
+              slot_type: "recorrente",
             }),
           });
           if (handleForbiddenResponse(assignRes)) return;
@@ -5561,7 +5591,7 @@ export function AtendimentoClient() {
           );
           return;
         }
-        modalToast.success("Turma recorrente confirmada.");
+        modalToast.success("Registro convertido em aluno e vinculado à turma recorrente.");
         return;
       }
 

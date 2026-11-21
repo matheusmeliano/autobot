@@ -24,6 +24,14 @@ function isLeadRecurringStudent(lead: Record<string, unknown> | null): boolean {
   const payConfirmedAtRaw = String((lead as any)?.payment_confirmed_at ?? "").trim();
   const leadStatusRaw = String((lead as any)?.status ?? "").trim().toLowerCase();
   const funnelRaw = String((lead as any)?.funnel_stage ?? "").trim().toLowerCase();
+  const recurringGroupPairId = String((lead as any)?.recurring_class_group_pair_id ?? "").trim();
+  const recurringGroupStatus = String((lead as any)?.recurring_class_group_status ?? "")
+    .trim()
+    .toLowerCase();
+  const autoConvertedByRecurringGroup =
+    Boolean(recurringGroupPairId) &&
+    recurringGroupStatus === "assigned" &&
+    (leadStatusRaw === "aluno" || funnelRaw === "aluno_recorrente_cadastrado");
   return (
     payStatusRaw === "confirmado" ||
     payStatusRaw === "matriculado" ||
@@ -32,6 +40,7 @@ function isLeadRecurringStudent(lead: Record<string, unknown> | null): boolean {
     leadStatusRaw === "matricula_confirmada" ||
     funnelRaw === "matriculado" ||
     funnelRaw === "matricula_confirmada" ||
+    autoConvertedByRecurringGroup ||
     Boolean(String((lead as any)?.enrollment_number ?? "").trim())
   );
 }
@@ -361,7 +370,24 @@ export async function POST(req: Request) {
     if (!lead?.id) {
       return Response.json({ ok: false, error: "lead_not_found" }, { status: 404 });
     }
-    if (!leadHasName(lead as any)) {
+    const { settings } = await loadExperimentalGroupClassSettings({ admin });
+    if (!settings.enabled) {
+      return Response.json(
+        { ok: false, error: "A funcionalidade de aulas experimentais em grupo está desativada." },
+        { status: 409 },
+      );
+    }
+    const requestedPairId = String(parsed.data.pair_id ?? "").trim();
+    const requestedPairCategory =
+      settings.slots.find((slot) => String(slot.pair_id ?? "").trim() === requestedPairId)?.pair_category ??
+      null;
+    const isStudentLead = isLeadRecurringStudent(lead as any);
+    const shouldAutoConvertToRecurringStudent =
+      !isStudentLead && String(requestedPairCategory ?? "").trim().toLowerCase() === "recorrente";
+    const assigningRecurringGroup =
+      isStudentLead || shouldAutoConvertToRecurringStudent || parsed.data.slot_type === "recorrente";
+
+    if (!shouldAutoConvertToRecurringStudent && !leadHasName(lead as any)) {
       return Response.json(
         {
           ok: false,
@@ -370,7 +396,7 @@ export async function POST(req: Request) {
         { status: 409 },
       );
     }
-    if (!leadHasStateAndCity(lead as any)) {
+    if (!assigningRecurringGroup && !leadHasStateAndCity(lead as any)) {
       return Response.json(
         {
           ok: false,
@@ -380,16 +406,7 @@ export async function POST(req: Request) {
       );
     }
 
-    const { settings } = await loadExperimentalGroupClassSettings({ admin });
-    if (!settings.enabled) {
-      return Response.json(
-        { ok: false, error: "A funcionalidade de aulas experimentais em grupo está desativada." },
-        { status: 409 },
-      );
-    }
-
-    const isStudentLead = isLeadRecurringStudent(lead as any);
-    const slots = isStudentLead
+    const slots = assigningRecurringGroup
       ? await buildRecurringGroupClassSlotsForLead({
           admin,
           lead: lead as Record<string, unknown>,
@@ -409,9 +426,9 @@ export async function POST(req: Request) {
     const targetSlot =
       slots.find(
         (slot) =>
-          (parsed.data.slot_type === "recorrente" &&
-            parsed.data.pair_id &&
-            String(slot.pair_id ?? "").trim() === parsed.data.pair_id) ||
+          (assigningRecurringGroup &&
+            requestedPairId &&
+            String(slot.pair_id ?? "").trim() === requestedPairId) ||
           (parsed.data.group_class_id &&
             String(slot.group_class_id ?? "").trim() === parsed.data.group_class_id) ||
           (parsed.data.professor_start_at &&
@@ -424,7 +441,7 @@ export async function POST(req: Request) {
         { status: 409 },
       );
     }
-    const expectedSlotType = isStudentLead ? "recorrente" : "experimental";
+    const expectedSlotType = assigningRecurringGroup ? "recorrente" : "experimental";
     if (targetSlot.slot_type !== expectedSlotType) {
       return Response.json(
         { ok: false, error: "Este registro só pode ser atribuído ao tipo de turma correspondente." },
@@ -448,7 +465,7 @@ export async function POST(req: Request) {
       .maybeSingle();
 
     const nowIso = new Date().toISOString();
-    if (isStudentLead || targetSlot.slot_type === "recorrente") {
+    if (assigningRecurringGroup) {
       const leadTimeZone = resolveLeadTimeZoneFromRecord({
         lead: lead as Record<string, unknown>,
         fallbackTimeZone:
@@ -457,28 +474,33 @@ export async function POST(req: Request) {
           targetSlot.professor_timezone,
       });
       const currentRecurringStatus = String((lead as any)?.recurring_class_status ?? "").trim();
+      const recurringLeadUpdatePayload: Record<string, unknown> = {
+        recurring_class_group_pair_id: String(targetSlot.pair_id ?? "").trim() || null,
+        recurring_class_group_status: "assigned",
+        recurring_class_status: currentRecurringStatus || "confirmado",
+        recurring_class_professor_name: targetSlot.professor_name,
+        recurring_class_professor_phone: targetSlot.professor_phone,
+        recurring_class_weekday: targetSlot.professor_weekday,
+        recurring_class_weekday_label: targetSlot.professor_weekday_label,
+        recurring_class_professor_time: targetSlot.professor_time,
+        recurring_class_lead_time: targetSlot.lead_time || targetSlot.professor_time,
+        recurring_class_professor_timezone: targetSlot.professor_timezone,
+        recurring_class_lead_timezone: leadTimeZone,
+        recurring_class_first_class_at: targetSlot.professor_start_at,
+        recurring_class_student_start_notification_sent_at: null,
+        recurring_class_attendant_start_notification_sent_at: null,
+        updated_at: nowIso,
+      };
+      if (shouldAutoConvertToRecurringStudent) {
+        recurringLeadUpdatePayload.status = "aluno";
+        recurringLeadUpdatePayload.funnel_stage = "aluno_recorrente_cadastrado";
+      }
       const { data: updatedRecurringLead, error: updateRecurringLeadError } = await admin
         .from("atendimento_leads")
-        .update({
-          recurring_class_group_pair_id: String(targetSlot.pair_id ?? "").trim() || null,
-          recurring_class_group_status: "assigned",
-          recurring_class_status: currentRecurringStatus || "confirmado",
-          recurring_class_professor_name: targetSlot.professor_name,
-          recurring_class_professor_phone: targetSlot.professor_phone,
-          recurring_class_weekday: targetSlot.professor_weekday,
-          recurring_class_weekday_label: targetSlot.professor_weekday_label,
-          recurring_class_professor_time: targetSlot.professor_time,
-          recurring_class_lead_time: targetSlot.lead_time || targetSlot.professor_time,
-          recurring_class_professor_timezone: targetSlot.professor_timezone,
-          recurring_class_lead_timezone: leadTimeZone,
-          recurring_class_first_class_at: targetSlot.professor_start_at,
-          recurring_class_student_start_notification_sent_at: null,
-          recurring_class_attendant_start_notification_sent_at: null,
-          updated_at: nowIso,
-        })
+        .update(recurringLeadUpdatePayload)
         .eq("id", leadId)
         .select(
-          "id, recurring_class_group_pair_id, recurring_class_group_status, recurring_class_status, recurring_class_weekday, recurring_class_professor_time",
+          "id, recurring_class_group_pair_id, recurring_class_group_status, recurring_class_status, recurring_class_weekday, recurring_class_professor_time, status, funnel_stage",
         )
         .maybeSingle();
       if (updateRecurringLeadError) {
@@ -522,6 +544,7 @@ export async function POST(req: Request) {
         title: "Aluno atribuído a uma turma recorrente em grupo",
         details: {
           pair_id: String(targetSlot.pair_id ?? "").trim() || null,
+          auto_converted_from_experimental: shouldAutoConvertToRecurringStudent,
           professor_name: targetSlot.professor_name,
           professor_phone: targetSlot.professor_phone,
           professor_weekday: targetSlot.professor_weekday,
@@ -535,6 +558,7 @@ export async function POST(req: Request) {
       return Response.json({
         ok: true,
         pair_id: String(targetSlot.pair_id ?? "").trim() || null,
+        converted_to_student: shouldAutoConvertToRecurringStudent,
       });
     }
 

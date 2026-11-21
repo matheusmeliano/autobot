@@ -70,6 +70,7 @@ export type ExperimentalGroupSlotSummary = {
   group_class_id: string | null;
   pair_id: string | null;
   pair_name: string | null;
+  pair_category: ExperimentalGroupSlotType;
   slot_type: ExperimentalGroupSlotType;
   professor_name: string | null;
   professor_phone: string | null;
@@ -763,6 +764,7 @@ export function listExperimentalGroupClassSlots(params: {
         group_class_id: existingClass?.id ?? null,
         pair_id: pairId || null,
         pair_name: String(configuredSlot.pair_name ?? "").trim() || null,
+        pair_category: configuredSlot.pair_category,
         slot_type: "experimental",
         professor_name:
           existingClass?.professor_name ??
